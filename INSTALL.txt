@@ -32,7 +32,7 @@ Ubuntu/Linux:
     The cycler install is to work around a bug in the current matplotlib release. It should be fixed in the next one.
     The renaming of the tensorflow install file is to overcome a bug in tensorflow. This should get fixed too.
 
-TEST YOUR INTALLATION:
+TEST YOUR INSTALLATION:
     git clone https://github.com/martin-gorner/tensorflow-mnist-tutorial.git
     cd tensorflow-mnist-tutorial
     python3 mnist_1.0_softmax.py
