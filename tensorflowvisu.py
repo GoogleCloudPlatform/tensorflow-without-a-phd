@@ -162,12 +162,10 @@ class MnistDataVis:
             if (i == ccount % 3):
                 return c
 
-    def __init__(self, title1=None, title2=None, title3=None, title4=None, title5=None, title6=None, histogram4colornum=None, histogram5colornum=None):
+    def __init__(self, title1=None, title2=None, title3=None, title4=None, title5=None, title6=None, histogram4colornum=None, histogram5colornum=None, dpi=70):
         self._color4 = self.__get_histogram_cyclecolor(histogram4colornum)
         self._color5 = self.__get_histogram_cyclecolor(histogram5colornum)
-        #fig = plt.figure(figsize=(13.00,8.00), dpi=100) # good on my screen - square plots,
-        #fig = plt.figure(figsize=(12.80,7.20), dpi=100) # half HD - best output of very small digits, plots not exactly square
-        fig = plt.figure(figsize=(19.20,10.80), dpi=70) # full HD
+        fig = plt.figure(figsize=(19.20,10.80), dpi=dpi)
         plt.gcf().canvas.set_window_title("MNIST")
         fig.set_facecolor('#FFFFFF')
         ax1 = fig.add_subplot(231)

@@ -24,20 +24,22 @@ mnist = mnist_data.read_data_sets("data")
 
 # neural network with 1 layer of 10 softmax neurons
 #
-# · · · · · · · · · ·       (input data, 1-deep)                 X [batch, 28, 28, 1]
-# \x/x\x/x\x/x\x/x\x/    -- fully connected layer (softmax)      W [28*28=784, 10]        b[10]
+# · · · · · · · · · ·       (input data, flattened pixels)       X [batch, 784]        # 784 = 28 * 28
+# \x/x\x/x\x/x\x/x\x/    -- fully connected layer (softmax)      W [784, 10]     b[10]
 #   · · · · · · · ·                                              Y [batch, 10]
 
+# The model is:
+#
 # Y = softmax( X * W + b)
-#                          X: matrix for 100 grayscale images of 28x28 pixels (there are 100 images in a mini-batch)
+#                          X: matrix for 100 grayscale images of 28x28 pixels, flattened (there are 100 images in a mini-batch)
 #                          W: weight matrix with 784 lines and 10 columns
 #                          b: bias vector with 10 dimensions
 #                          +: add with broadcasting: adds the vector to each line of the matrix (numpy)
 #                          softmax(matrix) applies softmax on each line
 #                          softmax(line) applies an exp to each value then divides by the norm of the resulting line
 #                          Y: output matrix with 100 lines and 10 columns
-#
-# input X: 28x28 grayscale images, the first dimension (None) will index images
+
+# input X: 28x28 grayscale images, the first dimension (None) will index the images in the mini-batch
 X = tf.placeholder(tf.float32, [None, 28, 28, 1])
 # weights W[784, 10]   784=28*28
 W = tf.Variable(tf.zeros([784, 10]))
