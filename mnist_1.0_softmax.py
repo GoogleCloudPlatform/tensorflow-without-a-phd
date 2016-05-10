@@ -16,11 +16,7 @@
 import tensorflow as tf
 import mnist_data
 import tensorflowvisu
-
 tf.set_random_seed(0)
-
-# Download images and labels
-mnist = mnist_data.read_data_sets("data")
 
 # neural network with 1 layer of 10 softmax neurons
 #
@@ -31,23 +27,25 @@ mnist = mnist_data.read_data_sets("data")
 # The model is:
 #
 # Y = softmax( X * W + b)
-#                          X: matrix for 100 grayscale images of 28x28 pixels, flattened (there are 100 images in a mini-batch)
-#                          W: weight matrix with 784 lines and 10 columns
-#                          b: bias vector with 10 dimensions
-#                          +: add with broadcasting: adds the vector to each line of the matrix (numpy)
-#                          softmax(matrix) applies softmax on each line
-#                          softmax(line) applies an exp to each value then divides by the norm of the resulting line
-#                          Y: output matrix with 100 lines and 10 columns
+#              X: matrix for 100 grayscale images of 28x28 pixels, flattened (there are 100 images in a mini-batch)
+#              W: weight matrix with 784 lines and 10 columns
+#              b: bias vector with 10 dimensions
+#              +: add with broadcasting: adds the vector to each line of the matrix (numpy)
+#              softmax(matrix) applies softmax on each line
+#              softmax(line) applies an exp to each value then divides by the norm of the resulting line
+#              Y: output matrix with 100 lines and 10 columns
+
+# Download images and labels
+mnist = mnist_data.read_data_sets("data")
 
 # input X: 28x28 grayscale images, the first dimension (None) will index the images in the mini-batch
 X = tf.placeholder(tf.float32, [None, 28, 28, 1])
+# correct answers will go here
+Y_ = tf.placeholder(tf.float32, [None, 10])
 # weights W[784, 10]   784=28*28
 W = tf.Variable(tf.zeros([784, 10]))
 # biases b[10]
 b = tf.Variable(tf.zeros([10]))
-
-# initalisation step
-init = tf.initialize_all_variables()
 
 # flatten the images into a single line of pixels
 # -1 in the shape definition means "the only possible dimension that will preserve the number of elements"
@@ -56,20 +54,15 @@ XX = tf.reshape(X, [-1, 784])
 # The model
 Y = tf.nn.softmax(tf.matmul(XX, W) + b)
 
-# loss function: cross-entropy
-#
-# loss == average( - zi * log(yi))
-#                           y: the computed output vector
-#                           z: the desired output vector
-
-# correct answers will go here
-Y_ = tf.placeholder(tf.float32, [None, 10])
+# loss function: cross-entropy = - sum( Y_i * log(Yi) )
+#                           Y: the computed output vector
+#                           Y_: the desired output vector
 
 # cross-entropy
 # log takes the log of each element, * multiplies the tensors element by element
 # reduce_mean will add all the components in the tensor
 # so here we end up with the total cross-entropy for all images in the batch
-cross_entropy = -tf.reduce_mean(Y_ * tf.log(Y)) * 1000.0  # normalized for batches of size 100,
+cross_entropy = -tf.reduce_mean(Y_ * tf.log(Y)) * 1000.0  # normalized for batches of 100 images,
                                                           # *10 because  "mean" included an unwanted division by 10
 
 # accuracy of the trained model, between 0 (worst) and 1 (best)
@@ -83,12 +76,14 @@ train_step = tf.train.GradientDescentOptimizer(0.005).minimize(cross_entropy)
 allweights = tf.reshape(W, [-1])
 allbiases = tf.reshape(b, [-1])
 I = tensorflowvisu.tf_format_mnist_images(X, Y, Y_)  # assembles 10x10 images by default
-It = tensorflowvisu.tf_format_mnist_images(X, Y, Y_, 1000, lines=25) # 1000 images on 25 lines
+It = tensorflowvisu.tf_format_mnist_images(X, Y, Y_, 1000, lines=25)  # 1000 images on 25 lines
 datavis = tensorflowvisu.MnistDataVis()
 
 # init
+init = tf.initialize_all_variables()
 sess = tf.Session()
 sess.run(init)
+
 
 # You can call this function in a loop to train the model, 100 images at a time
 def training_step(i, update_test_data, update_train_data):
@@ -98,18 +93,18 @@ def training_step(i, update_test_data, update_train_data):
 
     # compute training values for visualisation
     if update_train_data:
-        weights, biases, acc, ces, im_train = sess.run([allweights, allbiases, accuracy, cross_entropy, I], feed_dict={X: batch_X, Y_: batch_Y})
-        datavis.append_training_curves_data(i, acc, ces)
-        datavis.append_data_histograms(i, weights, biases)
-        datavis.update_image1(im_train)
-        print(str(i) + ": accuracy:" + str(acc) + " loss: " + str(ces))
+        a, c, im, w, b = sess.run([accuracy, cross_entropy, I, allweights, allbiases], feed_dict={X: batch_X, Y_: batch_Y})
+        datavis.append_training_curves_data(i, a, c)
+        datavis.append_data_histograms(i, w, b)
+        datavis.update_image1(im)
+        print(str(i) + ": accuracy:" + str(a) + " loss: " + str(c))
 
     # compute test values for visualisation
     if update_test_data:
-        acc, ces, im_test = sess.run([accuracy, cross_entropy, It], feed_dict={X: mnist.test.images, Y_: mnist.test.labels})
-        datavis.append_test_curves_data(i, acc, ces)
-        datavis.update_image2(im_test)
-        print(str(i) + " *test*" + ": accuracy:" + str(acc) + " loss: " + str(ces))
+        a, c, im = sess.run([accuracy, cross_entropy, It], feed_dict={X: mnist.test.images, Y_: mnist.test.labels})
+        datavis.append_test_curves_data(i, a, c)
+        datavis.update_image2(im)
+        print(str(i) + ": ********* epoch " + str(i*100//mnist.train.images.shape[0]+1) + " ********* test accuracy:" + str(a) + " test loss: " + str(c))
 
     # the backpropagation training step
     sess.run(train_step, feed_dict={X: batch_X, Y_: batch_Y})
