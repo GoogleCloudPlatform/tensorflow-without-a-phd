@@ -58,17 +58,25 @@ B4 = tf.Variable(tf.truncated_normal([O], stddev=0.1, mean=0.2))
 W5 = tf.Variable(tf.truncated_normal([O, 10], stddev=0.1))
 B5 = tf.Variable(tf.zeros([10]))
 
-#model
+# Probability of keeping a node during dropout
+# This will be 1.0 at test time (no dropout) and 0.75 at training time (25% neurons dropped)
+pkeep = tf.placeholder(tf.float32)
+
+# The model
 XX = tf.reshape(X, [-1, 28*28])
 Y1l = tf.matmul(XX, W1) + B1
 Y1 = tf.nn.relu(Y1l)
-Y2l = tf.matmul(Y1, W2) + B2
+Y1d = tf.nn.dropout(Y1, pkeep)
+Y2l = tf.matmul(Y1d, W2) + B2
 Y2 = tf.nn.relu(Y2l)
-Y3l = tf.matmul(Y2, W3) + B3
+Y2d = tf.nn.dropout(Y2, pkeep)
+Y3l = tf.matmul(Y2d, W3) + B3
 Y3 = tf.nn.relu(Y3l)
-Y4l = tf.matmul(Y3, W4) + B4
+Y3d = tf.nn.dropout(Y3, pkeep)
+Y4l = tf.matmul(Y3d, W4) + B4
 Y4 = tf.nn.relu(Y4l)
-Ylogits = tf.matmul(Y4, W5) + B5
+Y4d = tf.nn.dropout(Y4, pkeep)
+Ylogits = tf.matmul(Y4d, W5) + B5
 Y = tf.nn.softmax(Ylogits)
 
 # cross-entropy loss function (= -sum(Y_i * log(Yi)) ), normalised for batches of 100  images
@@ -106,7 +114,7 @@ def training_step(i, update_test_data, update_train_data):
 
     # compute training values for visualisation
     if update_train_data:
-        a, c, im, al, aa = sess.run([accuracy, cross_entropy, I, alllogits, allactivations], {X: batch_X, Y_: batch_Y})
+        a, c, im, al, aa = sess.run([accuracy, cross_entropy, I, alllogits, allactivations], {X: batch_X, Y_: batch_Y, pkeep: 1.0})
         print(str(i) + ": accuracy:" + str(a) + " loss: " + str(c))
         datavis.append_training_curves_data(i, a, c)
         datavis.update_image1(im)
@@ -114,22 +122,21 @@ def training_step(i, update_test_data, update_train_data):
 
     # compute test values for visualisation
     if update_test_data:
-        a, c, im = sess.run([accuracy, cross_entropy, It], {X: mnist.test.images, Y_: mnist.test.labels})
+        a, c, im = sess.run([accuracy, cross_entropy, It], {X: mnist.test.images, Y_: mnist.test.labels, pkeep: 1.0})
         print(str(i) + ": ********* epoch " + str(i*100//mnist.train.images.shape[0]+1) + " ********* test accuracy:" + str(a) + " test loss: " + str(c))
         datavis.append_test_curves_data(i, a, c)
         datavis.update_image2(im)
 
     # the backpropagation training step
-    sess.run(train_step, {X: batch_X, Y_: batch_Y})
+    sess.run(train_step, {X: batch_X, Y_: batch_Y, pkeep: 0.75})
 
 datavis.animate(training_step, iterations=10000+1, train_data_update_freq=20, test_data_update_freq=100, more_tests_at_start=True)
 
 # to save the animation as a movie, add save_movie=True as an argument to datavis.animate
 # to disable the visualisation use the following line instead of the datavis.animate line
-# for i in range(10000+1): training_step(i, i % 100 == 0, i % 20 == 0)
+# for i in range(10000+1): training_step(i, i % 100 == 0, i % 2o0 == 0)
 
 print("max test accuracy: " + str(datavis.get_max_test_accuracy()))
 
-# final test accuracy = 0.9801 (sigmoid, 20K iterations - really painful start...)
-# final test accuracy = 0.9829 (relu, 20K iterations - normal quick start ...)
-# with RELUs, accuracy should get above 0.97 in the first 2000 iterations
+# final test accuracy = 0.9816 (relu, 10K iterations, dropout 0.75)
+# accuracy should get above 0.975 in the first 3000 iterations
