@@ -118,4 +118,4 @@ datavis.animate(training_step, iterations=2000+1, train_data_update_freq=10, tes
 
 print("max test accuracy: " + str(datavis.get_max_test_accuracy()))
 
-# final max test accuracy = 0.9268 (10000 iterations). Accuracy should peak above 0.92 in the first 2000 iterations.
+# final max test accuracy = 0.9268 (10K iterations). Accuracy should peak above 0.92 in the first 2000 iterations.

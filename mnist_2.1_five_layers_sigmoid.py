@@ -45,16 +45,16 @@ L = 200
 M = 100
 N = 60
 O = 30
-# Weights and biases initialised with small random values.
-# When using RELUs, make sure biases are initialised with small *positive* values
+# Weights initialised with small random values between -0.2 and +0.2
+# When using RELUs, make sure biases are initialised with small *positive* values for example 0.1 = tf.ones([K])/10
 W1 = tf.Variable(tf.truncated_normal([784, L], stddev=0.1))  # 784 = 28 * 28
-B1 = tf.Variable(tf.truncated_normal([L], stddev=0.1, mean=0.2))
+B1 = tf.Variable(tf.zeros([L]))
 W2 = tf.Variable(tf.truncated_normal([L, M], stddev=0.1))
-B2 = tf.Variable(tf.truncated_normal([M], stddev=0.1, mean=0.2))
+B2 = tf.Variable(tf.zeros([M]))
 W3 = tf.Variable(tf.truncated_normal([M, N], stddev=0.1))
-B3 = tf.Variable(tf.truncated_normal([N], stddev=0.1, mean=0.2))
+B3 = tf.Variable(tf.zeros([N]))
 W4 = tf.Variable(tf.truncated_normal([N, O], stddev=0.1))
-B4 = tf.Variable(tf.truncated_normal([O], stddev=0.1, mean=0.2))
+B4 = tf.Variable(tf.zeros([O]))
 W5 = tf.Variable(tf.truncated_normal([O, 10], stddev=0.1))
 B5 = tf.Variable(tf.zeros([10]))
 
@@ -85,7 +85,8 @@ It = tensorflowvisu.tf_format_mnist_images(X, Y, Y_, 1000, lines=25)
 datavis = tensorflowvisu.MnistDataVis()
 
 # training step, learning rate = 0.003
-train_step = tf.train.AdamOptimizer(0.03).minimize(cross_entropy)
+learning_rate = 0.003
+train_step = tf.train.AdamOptimizer(learning_rate).minimize(cross_entropy)
 
 # init
 init = tf.initialize_all_variables()
@@ -102,7 +103,7 @@ def training_step(i, update_test_data, update_train_data):
     # compute training values for visualisation
     if update_train_data:
         a, c, im, w, b = sess.run([accuracy, cross_entropy, I, allweights, allbiases], {X: batch_X, Y_: batch_Y})
-        print(str(i) + ": accuracy:" + str(a) + " loss: " + str(c))
+        print(str(i) + ": accuracy:" + str(a) + " loss: " + str(c) + " (lr:" + str(learning_rate) + ")")
         datavis.append_training_curves_data(i, a, c)
         datavis.update_image1(im)
         datavis.append_data_histograms(i, w, b)
@@ -117,13 +118,25 @@ def training_step(i, update_test_data, update_train_data):
     # the backpropagation training step
     sess.run(train_step, {X: batch_X, Y_: batch_Y})
 
-datavis.animate(training_step, iterations=10000+1, train_data_update_freq=10, test_data_update_freq=100, more_tests_at_start=True)
+datavis.animate(training_step, iterations=10000+1, train_data_update_freq=20, test_data_update_freq=100, more_tests_at_start=True)
 
 # to save the animation as a movie, add save_movie=True as an argument to datavis.animate
 # to disable the visualisation use the following line instead of the datavis.animate line
-# for i in range(10000+1): training_step(i, i % 100 == 0, i % 10 == 0)
+# for i in range(10000+1): training_step(i, i % 100 == 0, i % 20 == 0)
 
 print("max test accuracy: " + str(datavis.get_max_test_accuracy()))
 
-# final test accuracy = 0.9801 (sigmoid, 20K iterations - really painful start...)
-# final test accuracy = 0.9829 (relu, 20K iterations - normal quick start ...)
+# Some results to expect:
+# (In all runs, if sigmoids are used, all biases are initialised at 0, if RELUs are used,
+# all biases are initialised at 0.1 apart from the last one which is initialised at 0.)
+
+## learning rate = 0.003, 10K iterations
+# final test accuracy = 0.9788 (sigmoid - slow start, training cross-entropy not stabilised in the end)
+# final test accuracy = 0.9825 (relu - above 0.97 in the first 1500 iterations but noisy curves)
+
+## now with learning rate = 0.0001, 10K iterations
+# final test accuracy = 0.9722 (relu - slow but smooth curve, would have gone higher in 20K iterations)
+
+## decaying learning rate from 0.003 to 0.0001 decay_speed 2000, 10K iterations
+# final test accuracy = 0.9746 (sigmoid - training cross-entropy not stabilised)
+# final test accuracy = 0.9824 (relu - training set fully learned, test accuracy stable)
