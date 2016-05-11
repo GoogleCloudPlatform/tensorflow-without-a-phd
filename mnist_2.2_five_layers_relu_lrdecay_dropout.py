@@ -22,13 +22,13 @@ tf.set_random_seed(0)
 # neural network with 5 layers
 #
 # · · · · · · · · · ·       (input data, flattened pixels)       X [batch, 784]   # 784 = 28*28
-# \x/x\x/x\x/x\x/x\x/    -- fully connected layer (sigmoid)      W1 [784, 200]      B1[200]
+# \x/x\x/x\x/x\x/x\x/ -  -- fully connected layer (relu+dropout) W1 [784, 200]      B1[200]
 #  · · · · · · · · ·                                             Y1 [batch, 200]
-#   \x/x\x/x\x/x\x/      -- fully connected layer (sigmoid)      W2 [200, 100]      B2[100]
+#   \x/x\x/x\x/x\x/ -    -- fully connected layer (relu+dropout) W2 [200, 100]      B2[100]
 #    · · · · · · ·                                               Y2 [batch, 100]
-#    \x/x\x/x\x/         -- fully connected layer (sigmoid)      W3 [100, 60]       B3[60]
+#    \x/x\x/x\x/ -       -- fully connected layer (relu+dropout) W3 [100, 60]       B3[60]
 #     · · · · ·                                                  Y3 [batch, 60]
-#     \x/x\x/            -- fully connected layer (sigmoid)      W4 [60, 30]        B4[30]
+#     \x/x\x/ -          -- fully connected layer (relu+dropout) W4 [60, 30]        B4[30]
 #      · · ·                                                     Y4 [batch, 30]
 #      \x/               -- fully connected layer (softmax)      W5 [30, 10]        B5[10]
 #       ·                                                        Y5 [batch, 10]
