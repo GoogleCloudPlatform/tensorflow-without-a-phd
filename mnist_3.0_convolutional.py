@@ -24,20 +24,16 @@ mnist = mnist_data.read_data_sets("data")
 # neural network structure for this sample:
 #
 # · · · · · · · · · ·      (input data, 1-deep)                 X [batch, 28, 28, 1]
-# @ @ @ @ @ @ @ @ @ @   -- conv. layer 5x5x1=>24 stride 1       W1 [5, 5, 1, 24]       B1 [24]
-# ∶∶∶∶∶∶∶∶∶∶∶∶∶∶∶∶∶∶∶                                           Y1 [batch, 28, 28, 24]
-#   @ @ @ @ @ @ @ @     -- conv. layer 5x5x24=>48 stride 2      W2 [5, 5, 24, 48]      B2 [48]
-#   ∶∶∶∶∶∶∶∶∶∶∶∶∶∶∶                                             Y2 [batch, 14, 14, 48]
-#     @ @ @ @ @ @       -- conv. layer 5x5x48=>24 stride 1      W3 [5, 5, 48, 24]      B3 [24]
-#     ∶∶∶∶∶∶∶∶∶∶∶                                               Y3 [batch, 14, 14, 24]
-#       @ @ @ @         -- conv. layer 5x5x24=>48 stride 2      W4 [5, 5, 24, 48]      B4 [48]
-#       ∶∶∶∶∶∶∶                                                 Y4 [batch, 7, 7, 48] reshaped to Z1 [batch, 7*7*48]
-#       \x/x\x/ -       -- fully connected layer (relu+dropout) Wf1 [7*7*48, 1024]     Bf1 [1024]
-#        · · ·                                                  T1 [batch, 1024]
-#        \x/x/ -        -- fully connected layer (relu+dropout) Wf2 [1024, 512]        Bf2 [512]
-#         · ·                                                   T2 [batch, 512]
-#         \x/           -- fully connected layer (softmax)      Ws [512, 10]           Bs [10]
-#          ·                                                    V [batch, 10]
+# @ @ @ @ @ @ @ @ @ @   -- conv. layer 5x5x1=>4 stride 1        W1 [5, 5, 1, 4]        B1 [4]
+# ∶∶∶∶∶∶∶∶∶∶∶∶∶∶∶∶∶∶∶                                           Y1 [batch, 28, 28, 4]
+#   @ @ @ @ @ @ @ @     -- conv. layer 5x5x4=>8 stride 2        W2 [5, 5, 4, 8]        B2 [8]
+#   ∶∶∶∶∶∶∶∶∶∶∶∶∶∶∶                                             Y2 [batch, 14, 14, 8]
+#     @ @ @ @ @ @       -- conv. layer 4x4x8=>12 stride 2       W3 [4, 4, 8, 12]       B3 [12]
+#     ∶∶∶∶∶∶∶∶∶∶∶                                               Y3 [batch, 7, 7, 12] => reshaped to YY [batch, 7*7*12]
+#      \x/x\x\x/  ✞     -- fully connected layer (relu+dropout) W4 [7*7*12, 200]       B4 [200]
+#       · · · ·                                                 Y4 [batch, 200]
+#       \x/x\x/         -- fully connected layer (softmax)      W5 [200, 10]           B5 [10]
+#        · · ·                                                  Y [batch, 20]
 
 # input X: 28x28 grayscale images, the first dimension (None) will index the images in the mini-batch
 X = tf.placeholder(tf.float32, [None, 28, 28, 1])
