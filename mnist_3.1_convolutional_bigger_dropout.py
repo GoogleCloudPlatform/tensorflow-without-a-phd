@@ -16,6 +16,7 @@
 import mnist_data
 import tensorflow as tf
 import tensorflowvisu
+import math
 tf.set_random_seed(0)
 
 # Download images and labels
@@ -51,17 +52,17 @@ L = 12  # second convolutional layer output depth
 M = 24  # third convolutional layer
 N = 200  # fully connected layer
 
-W1 = tf.Variable(tf.truncated_normal([6, 6, 1, K], stddev=0.1))  # 5x5 patch, 1 input channel, K output channels
-B1 = tf.Variable(tf.ones([K])/10)
+W1 = tf.Variable(tf.truncated_normal([6, 6, 1, K], stddev=0.1))  # 6x6 patch, 1 input channel, K output channels
+B1 = tf.Variable(tf.constant(0.1, tf.float32, [K]))
 W2 = tf.Variable(tf.truncated_normal([5, 5, K, L], stddev=0.1))
-B2 = tf.Variable(tf.ones([L])/10)
+B2 = tf.Variable(tf.constant(0.1, tf.float32, [L]))
 W3 = tf.Variable(tf.truncated_normal([4, 4, L, M], stddev=0.1))
-B3 = tf.Variable(tf.ones([M])/10)
+B3 = tf.Variable(tf.constant(0.1, tf.float32, [M]))
 
 W4 = tf.Variable(tf.truncated_normal([7 * 7 * M, N], stddev=0.1))
-B4 = tf.Variable(tf.ones([N])/10)
+B4 = tf.Variable(tf.constant(0.1, tf.float32, [N]))
 W5 = tf.Variable(tf.truncated_normal([N, 10], stddev=0.1))
-B5 = tf.Variable(tf.ones([10])/10)
+B5 = tf.Variable(tf.constant(0.1, tf.float32, [10]))
 
 # The model
 stride = 1  # output is 28x28
@@ -111,8 +112,11 @@ def training_step(i, update_test_data, update_train_data):
     # training on batches of 100 images with 100 labels
     batch_X, batch_Y = mnist.train.next_batch(100)
 
-    # variable learning rate (cheap version)
-    learning_rate = 0.001 if i<20 else 0.01 if i<450 else 0.003 if i< 650 else 0.001 if i<1250 else 0.0003
+    # learning rate decay
+    max_learning_rate = 0.003
+    min_learning_rate = 0.0001
+    decay_speed = 2000
+    learning_rate = min_learning_rate + (max_learning_rate - min_learning_rate) * math.exp(-i/decay_speed)
 
     # compute training values for visualisation
     if update_train_data:
