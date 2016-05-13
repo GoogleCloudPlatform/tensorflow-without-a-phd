@@ -10,6 +10,7 @@ MacOS:
 	pip3 install --upgrade matplotlib
 
 Windows:
+    (This code lab should work under cygwinX, however it had not been tested, which is why Virtualbox is recommended)
 	Install Virtualbox from https://www.virtualbox.org/wiki/Downloads
 	Create an Linux/Ubuntu virtual machine and install Ubuntu from http://www.ubuntu.com/download/desktop/
 	[Optional: In the virtual machine install Virtualbox helpers (allows screen resolution changes) using:
