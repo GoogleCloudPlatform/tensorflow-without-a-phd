@@ -168,4 +168,5 @@ print("max test accuracy: " + str(datavis.get_max_test_accuracy()))
 
 ## decaying learning rate from 0.003 to 0.0001 decay_speed 2000, 10K iterations, no dropout
 # final test accuracy = 0.9746 (sigmoid - training cross-entropy not stabilised)
-# final test accuracy = 0.9824 (relu, no dropout, training cross-entropy down to 0, test cross-entropy goes up significantly, test accuracy stable around 98.2)
+# final test accuracy = 0.9824 (relu, training cross-entropy down to 0, test cross-entropy goes up significantly, test accuracy stable around 98.2)
+# on another run, peak at 0.9836
