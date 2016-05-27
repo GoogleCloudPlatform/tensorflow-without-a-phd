@@ -25,16 +25,20 @@ Ubuntu/Linux:
 	sudo -H apt-get install python3
 	sudo -H apt-get install python3-matplotlib
 	sudo -H apt-get install python3-pip
-	curl -O https://storage.googleapis.com/tensorflow/linux/cpu/tensorflow-0.8.0-cp34-cp34m-linux_x86_64.whl
-	mv tensorflow-0.8.0-cp34-cp34m-linux_x86_64.whl tensorflow-0.8.0-cp35-cp35m-linux_x86_64.whl
-	sudo -H pip3 install --upgrade tensorflow-0.8.0-cp35-cp35m-linux_x86_64.whl
-	sudo -H pip3 install --upgrade cycler
-
-    The cycler install is to work around a bug in the current matplotlib release. It should be fixed in the next one.
-    The renaming of the tensorflow install file is to overcome a bug in tensorflow. This should get fixed too.
+	sudo -H pip3 install --upgrade  https://storage.googleapis.com/tensorflow/linux/cpu/tensorflow-0.8.0-cp34-cp34m-linux_x86_64.whl
+		(if this fails with a “wheel not supported” message, the workaround is to download the file and rename the
+		“cp34”s in the file to “cp35”s and then do the pip3 install. Here are the command lines for the workaround:
+		curl -O https://storage.googleapis.com/tensorflow/linux/cpu/tensorflow-0.8.0-cp34-cp34m-linux_x86_64.whl
+		mv tensorflow-0.8.0-cp34-cp34m-linux_x86_64.whl tensorflow-0.8.0-cp35-cp35m-linux_x86_64.whl
+		sudo -H pip3 install --upgrade tensorflow-0.8.0-cp35-cp35m-linux_x86_64.whl
+		)
+		(When testing the installation, if you get an error about “cycler”, please update cycler using:
+		sudo -H pip3 install --upgrade cycler
+		This is caused by a misconfigured dependency in matplotlib and will hopefully be fixed in the next release.
+		)
 
 TEST YOUR INSTALLATION:
     git clone https://github.com/martin-gorner/tensorflow-mnist-tutorial.git
     cd tensorflow-mnist-tutorial
     python3 mnist_1.0_softmax.py
-    => A window should appear displaying graphical visualisation and you should also see training data in the terminal.
+    => A window should appear displaying a graphical visualisation and you should also see training data in the terminal.
