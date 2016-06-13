@@ -6,7 +6,7 @@ additional installation options (virtualenv, docker) and follow the Python 3 ins
 MacOS:
 	If you do not have it already, install git form https://git-scm.com/download/mac
 	Install the latest version of python 3 from https://www.python.org/downloads/
-	pip3 install --upgrade https://storage.googleapis.com/tensorflow/mac/tensorflow-0.8.0-py3-none-any.whl
+	pip3 install https://storage.googleapis.com/tensorflow/mac/tensorflow-0.9.0rc0-py3-none-any.whl
 	pip3 install --upgrade matplotlib
 
 Windows:
@@ -17,7 +17,7 @@ Windows:
 	 sudo -H apt-get install virtualbox-guest-additions-iso
 	 sudo -H apt-get install virtualbox-guest-dkms
 	 Open “Additional drivers” app and check that the “Virtualbox Graphics Adapter” and “Virtualbox Guest Service” are selected.]
-	Shut down the virtual machine, max out its video RAM and CPU settings, allocate 4GB of RAM and restart.
+	Shut down the virtual machine, max out its Video RAM and CPU settings, allocate 4GB of RAM and restart.
 	Now go to Ubuntu/Linux section.
 
 Ubuntu/Linux:
@@ -25,13 +25,8 @@ Ubuntu/Linux:
 	sudo -H apt-get install python3
 	sudo -H apt-get install python3-matplotlib
 	sudo -H apt-get install python3-pip
-	sudo -H pip3 install --upgrade  https://storage.googleapis.com/tensorflow/linux/cpu/tensorflow-0.8.0-cp34-cp34m-linux_x86_64.whl
-		(if this fails with a “wheel not supported” message, the workaround is to download the file and rename the
-		“cp34”s in the file to “cp35”s and then do the pip3 install. Here are the command lines for the workaround:
-		curl -O https://storage.googleapis.com/tensorflow/linux/cpu/tensorflow-0.8.0-cp34-cp34m-linux_x86_64.whl
-		mv tensorflow-0.8.0-cp34-cp34m-linux_x86_64.whl tensorflow-0.8.0-cp35-cp35m-linux_x86_64.whl
-		sudo -H pip3 install --upgrade tensorflow-0.8.0-cp35-cp35m-linux_x86_64.whl
-		)
+	sudo -H pip3 install --upgrade  https://storage.googleapis.com/tensorflow/linux/cpu/tensorflow-0.9.0rc0-cp35-cp35m-linux_x86_64.whl
+
 		(When testing the installation, if you get an error about “cycler”, please update cycler using:
 		sudo -H pip3 install --upgrade cycler
 		This is caused by a misconfigured dependency in matplotlib and will hopefully be fixed in the next release.
