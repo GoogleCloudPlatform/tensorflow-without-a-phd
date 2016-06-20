@@ -1,12 +1,14 @@
 Python 3 is required for this lab.
 
-If you have problems with these installations instructions, visit tensorflow.org for
-additional installation options (virtualenv, docker) and follow the Python 3 instructions.
+Installation instructions for straightforward pip install below.
+
+If you are a power user under a specific Python environment ((virtualenv, anaconda,
+docker), please visit tensorflow.org and follow the Python 3 instructions.
 
 MacOS:
 	If you do not have it already, install git form https://git-scm.com/download/mac
 	Install the latest version of python 3 from https://www.python.org/downloads/
-	pip3 install https://storage.googleapis.com/tensorflow/mac/tensorflow-0.9.0rc0-py3-none-any.whl
+	pip3 install --upgrade https://storage.googleapis.com/tensorflow/mac/tensorflow-0.9.0rc0-py3-none-any.whl
 	pip3 install --upgrade matplotlib
 
 Windows:
