@@ -17,7 +17,7 @@ import tensorflow as tf
 import mnist_data
 import tensorflowvisu
 tf.set_random_seed(0)
-
+#.ignore
 # neural network with 1 layer of 10 softmax neurons
 #
 # · · · · · · · · · ·       (input data, flattened pixels)       X [batch, 784]        # 784 = 28 * 28
