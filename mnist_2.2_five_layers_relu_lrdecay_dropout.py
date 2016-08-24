@@ -63,23 +63,19 @@ B4 = tf.Variable(tf.ones([O])/10)
 W5 = tf.Variable(tf.truncated_normal([O, 10], stddev=0.1))
 B5 = tf.Variable(tf.zeros([10]))
 
-# The model, adding dropout and making logits (neuron inputs) accessible so that we can visualise them
+# The model, with dropout at each layer
 XX = tf.reshape(X, [-1, 28*28])
 
-Y1l = tf.matmul(XX, W1) + B1
-Y1 = tf.nn.relu(Y1l)
+Y1 = tf.nn.relu(tf.matmul(XX, W1) + B1)
 Y1d = tf.nn.dropout(Y1, pkeep)
 
-Y2l = tf.matmul(Y1d, W2) + B2
-Y2 = tf.nn.relu(Y2l)
+Y2 = tf.nn.relu(tf.matmul(Y1d, W2) + B2)
 Y2d = tf.nn.dropout(Y2, pkeep)
 
-Y3l = tf.matmul(Y2d, W3) + B3
-Y3 = tf.nn.relu(Y3l)
+Y3 = tf.nn.relu(tf.matmul(Y2d, W3) + B3)
 Y3d = tf.nn.dropout(Y3, pkeep)
 
-Y4l = tf.matmul(Y3d, W4) + B4
-Y4 = tf.nn.relu(Y4l)
+Y4 = tf.nn.relu(tf.matmul(Y3d, W4) + B4)
 Y4d = tf.nn.dropout(Y4, pkeep)
 
 Ylogits = tf.matmul(Y4d, W5) + B5
@@ -98,11 +94,9 @@ accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 # matplotlib visualisation
 allweights = tf.concat(0, [tf.reshape(W1, [-1]), tf.reshape(W2, [-1]), tf.reshape(W3, [-1]), tf.reshape(W4, [-1]), tf.reshape(W5, [-1])])
 allbiases  = tf.concat(0, [tf.reshape(B1, [-1]), tf.reshape(B2, [-1]), tf.reshape(B3, [-1]), tf.reshape(B4, [-1]), tf.reshape(B5, [-1])])
-allactivations = tf.concat(0, [tf.reshape(Y1, [-1]), tf.reshape(Y2, [-1]), tf.reshape(Y3, [-1]), tf.reshape(Y4, [-1])])
-alllogits = tf.concat(0, [tf.reshape(Y1l, [-1]), tf.reshape(Y2l, [-1]), tf.reshape(Y3l, [-1]), tf.reshape(Y4l, [-1]), tf.reshape(Ylogits, [-1])])
 I = tensorflowvisu.tf_format_mnist_images(X, Y, Y_)
 It = tensorflowvisu.tf_format_mnist_images(X, Y, Y_, 1000, lines=25)
-datavis = tensorflowvisu.MnistDataVis(title4="Logits", title5="Activations", histogram4colornum=2, histogram5colornum=2)
+datavis = tensorflowvisu.MnistDataVis()
 
 # training step, the learning rate is a placeholder
 train_step = tf.train.AdamOptimizer(lr).minimize(cross_entropy)
@@ -127,11 +121,11 @@ def training_step(i, update_test_data, update_train_data):
 
     # compute training values for visualisation
     if update_train_data:
-        a, c, im, al, aa = sess.run([accuracy, cross_entropy, I, alllogits, allactivations], {X: batch_X, Y_: batch_Y, pkeep: 1.0})
+        a, c, im, w, b = sess.run([accuracy, cross_entropy, I, allweights, allbiases], {X: batch_X, Y_: batch_Y, pkeep: 1.0})
         print(str(i) + ": accuracy:" + str(a) + " loss: " + str(c) + " (lr:" + str(learning_rate) + ")")
         datavis.append_training_curves_data(i, a, c)
         datavis.update_image1(im)
-        datavis.append_data_histograms(i, al, aa)
+        datavis.append_data_histograms(i, w, b)
 
     # compute test values for visualisation
     if update_test_data:

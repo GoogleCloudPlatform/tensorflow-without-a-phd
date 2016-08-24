@@ -16,6 +16,7 @@
 import mnist_data
 import tensorflow as tf
 import tensorflowvisu
+import math
 tf.set_random_seed(0)
 
 # Download images and labels
@@ -107,8 +108,11 @@ def training_step(i, update_test_data, update_train_data):
     # training on batches of 100 images with 100 labels
     batch_X, batch_Y = mnist.train.next_batch(100)
 
-    # variable learning rate (cheap version)
-    learning_rate = 0.001 if i<20 else 0.01 if i<450 else 0.003 if i< 650 else 0.001 if i<1250 else 0.0003
+    # learning rate decay
+    max_learning_rate = 0.003
+    min_learning_rate = 0.0001
+    decay_speed = 2000
+    learning_rate = min_learning_rate + (max_learning_rate - min_learning_rate) * math.exp(-i/decay_speed)
 
     # compute training values for visualisation
     if update_train_data:
