@@ -22,7 +22,7 @@ def learning_rate(lr, i):
 
 mnist = learn.datasets.load_dataset('mnist')
 
-#hello
+
 ### Convolutional network
 def conv_model(X, Y_, mode):
     XX = tf.reshape(X, [-1, 28, 28, 1])
