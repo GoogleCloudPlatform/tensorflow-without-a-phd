@@ -87,7 +87,7 @@ B5 = tf.Variable(tf.zeros([Q]))
 # sigmoid, batch-norm, no scales, no offsets => 96%
 
 # Both scales and offsets are useful with sigmoids.
-# With RELUs, the scale and offset variables can be omitted. They do nothing.
+# With RELUs, the scale and offset variables can be omitted. They do not seem to do anything.
 
 # Steady 98.5% accuracy using these parameters:
 # moving average decay: 0.998 (equivalent to averaging over two epochs)
