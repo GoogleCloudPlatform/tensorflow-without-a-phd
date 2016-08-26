@@ -89,12 +89,12 @@ B5 = tf.Variable(tf.ones([Q])/10)
 # learning rate decay from 0.03 to 0.0001 speed 1000 => max 98.59 at 6500 iterations, 98.54 at 10K it,  98% at 1300it, 98.5% at 3200it
 
 def batchnorm(Ylogits, Offset, Scale, is_test, iteration):
-    exp_moving_avg = tf.train.ExponentialMovingAverage(0.998, iteration)
+    exp_moving_avg = tf.train.ExponentialMovingAverage(0.998, iteration) # adding the iteration prevents from averaging across non-existing iterations
     bnepsilon = 1e-5
     mean, variance = tf.nn.moments(Ylogits, [0])
     update_moving_everages = exp_moving_avg.apply([mean, variance])
     m = tf.cond(is_test, lambda: exp_moving_avg.average(mean), lambda: mean)
-    v = tf.cond(is_test, lambda: exp_moving_avg.average(variance)*100/101, lambda: variance)  # 100 = mini-batch size
+    v = tf.cond(is_test, lambda: exp_moving_avg.average(variance)*100/101, lambda: variance)  # 100 = mini-batch size, to compute unbiased variance
     Ybn = tf.nn.batch_normalization(Ylogits, m, v, Offset, Scale, bnepsilon)
     return Ybn, update_moving_everages
 
@@ -142,7 +142,7 @@ allactivations = tf.concat(0, [tf.reduce_max(Y1, [0]), tf.reduce_max(Y2, [0]), t
 alllogits = tf.concat(0, [tf.reshape(Y1l, [-1]), tf.reshape(Y2l, [-1]), tf.reshape(Y3l, [-1]), tf.reshape(Y4l, [-1])])
 I = tensorflowvisu.tf_format_mnist_images(X, Y, Y_)
 It = tensorflowvisu.tf_format_mnist_images(X, Y, Y_, 1000, lines=25)
-datavis = tensorflowvisu.MnistDataVis(title4="Logits", title5="Activations", histogram4colornum=2, histogram5colornum=2)
+datavis = tensorflowvisu.MnistDataVis(title4="Logits", title5="Max activations across batch", histogram4colornum=2, histogram5colornum=2)
 
 
 # training step, the learning rate is a placeholder
@@ -172,22 +172,21 @@ def training_step(i, update_test_data, update_train_data):
 
     # compute training values for visualisation
     if update_train_data:
-        a, c, im = sess.run([accuracy, cross_entropy, I], {X: batch_X, Y_: batch_Y, tst: False, iter: i})
-        l, ac = sess.run([alllogits, allactivations], {X: batch_X, Y_: batch_Y, tst: False, iter: i})
+        a, c, im, al, ac = sess.run([accuracy, cross_entropy, I, alllogits, allactivations], {X: batch_X, Y_: batch_Y, tst: False})
         print(str(i) + ": accuracy:" + str(a) + " loss: " + str(c) + " (lr:" + str(learning_rate) + ")")
         datavis.append_training_curves_data(i, a, c)
         datavis.update_image1(im)
-        datavis.append_data_histograms(i, l, ac)
+        datavis.append_data_histograms(i, al, ac)
 
     # compute test values for visualisation
     if update_test_data:
-        a, c, im = sess.run([accuracy, cross_entropy, It], {X: mnist.test.images, Y_: mnist.test.labels, tst: True, iter: i})
+        a, c, im = sess.run([accuracy, cross_entropy, It], {X: mnist.test.images, Y_: mnist.test.labels, tst: True})
         print(str(i) + ": ********* epoch " + str(i*100//mnist.train.images.shape[0]+1) + " ********* test accuracy:" + str(a) + " test loss: " + str(c))
         datavis.append_test_curves_data(i, a, c)
         datavis.update_image2(im)
 
     # the backpropagation training step
-    sess.run(train_step, {X: batch_X, Y_: batch_Y, lr: learning_rate, tst: False, iter: i})
+    sess.run(train_step, {X: batch_X, Y_: batch_Y, lr: learning_rate, tst: False})
     sess.run(update_ema, {X: batch_X, Y_: batch_Y, tst: False, iter: i})
 
 datavis.animate(training_step, iterations=10000+1, train_data_update_freq=20, test_data_update_freq=100, more_tests_at_start=True)
