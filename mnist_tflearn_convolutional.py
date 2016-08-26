@@ -8,12 +8,13 @@ from tensorflow.python.platform import tf_logging as logging
 import tensorflow as tf
 import datetime
 import numpy as np
+from functools import partial
 
 tf.set_random_seed(0)
 
 def learning_rate(lr, i):
-    max_learning_rate = tf.constant(0.003, dtype=tf.float32)
-    min_learning_rate = tf.constant(0.0001, dtype=tf.float32)
+    max_learning_rate = tf.constant(0.03, dtype=tf.float32)
+    min_learning_rate = tf.constant(0.001, dtype=tf.float32)
     decay_speed = tf.constant(2000.0, dtype=tf.float32)
     lr = tf.add(min_learning_rate, tf.mul(tf.sub(max_learning_rate, min_learning_rate), tf.exp(tf.div(tf.to_float(-i),decay_speed))))
     return lr
@@ -26,18 +27,19 @@ mnist = learn.datasets.load_dataset('mnist')
 ### Convolutional network
 def conv_model(X, Y_, mode):
     XX = tf.reshape(X, [-1, 28, 28, 1])
-    Y1 = layers.conv2d(XX,  num_outputs=6,  kernel_size=[6, 6], normalizer_fn=layers.batch_norm)
-    Y2 = layers.conv2d(Y1, num_outputs=12, kernel_size=[5, 5], stride=2, normalizer_fn=layers.batch_norm)
-    Y3 = layers.conv2d(Y2, num_outputs=24, kernel_size=[4, 4], stride=2, normalizer_fn=layers.batch_norm)
+    batch_norm = partial(layers.batch_norm, is_training=(mode==learn.ModeKeys.TRAIN))
+    Y1 = layers.conv2d(XX,  num_outputs=6,  kernel_size=[6, 6], normalizer_fn=batch_norm)
+    Y2 = layers.conv2d(Y1, num_outputs=12, kernel_size=[5, 5], stride=2, normalizer_fn=batch_norm)
+    Y3 = layers.conv2d(Y2, num_outputs=24, kernel_size=[4, 4], stride=2, normalizer_fn=batch_norm)
     Y4 = layers.flatten(Y3)
-    Y5 = layers.relu(Y4, 200, normalizer_fn=layers.batch_norm)
+    Y5 = layers.relu(Y4, 200, normalizer_fn=batch_norm)
     #Y6 = layers.dropout(Y5, keep_prob=0.75, is_training=(mode ==learn.ModeKeys.TRAIN))
     Ylogits = layers.linear(Y5, 10)
     #prediction = tf.arg_max(tf.nn.softmax(Ylogits), 1)
     ## dense to one-hot
     Y__ = tf.one_hot(tf.cast(Y_, tf.int32), 10, dtype=tf.float32)
     loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(Ylogits, Y__))
-    train_op = layers.optimize_loss(loss, framework.get_global_step(), 0.003, "Adam", learning_rate_decay_fn=learning_rate)
+    train_op = layers.optimize_loss(loss, framework.get_global_step(), 0.0, "Adam", learning_rate_decay_fn=learning_rate)
     #train_op = layers.optimize_loss(loss, framework.get_global_step(), 0.003, "Adam")
 
     # 10000 iterations with batch normalization on all layers, no dropout : final accuracy 99.42%
@@ -86,7 +88,7 @@ dense_train_labels = mnist.train.labels.astype(np.int64)
 dense_test_labels = mnist.test.labels.astype(np.int64)
 #mon = monitors.ValidationMonitor(mnist.test.images, dense_test_labels, every_n_steps=100)
 classifier = learn.Classifier(model_fn=conv_model, n_classes=10, model_dir="logs/run"+str(datetime.datetime.now().timestamp()))
-classifier.fit(mnist.train.images, dense_train_labels, batch_size=100, steps=10000)
+classifier.fit(mnist.train.images, dense_train_labels, batch_size=100, steps=200)
 score = accuracy_score(mnist.test.labels, classifier.predict(mnist.test.images))
 print('Accuracy: {0:f}'.format(score))
 

@@ -58,20 +58,20 @@ Q = 10
 # When using RELUs, make sure biases are initialised with small *positive* values for example 0.1 = tf.ones([K])/10
 W1 = tf.Variable(tf.truncated_normal([784, L], stddev=0.1))  # 784 = 28 * 28
 B1 = tf.Variable(tf.ones([L])/10)
-S1 = tf.Variable(tf.ones([L]))
-O1 = tf.Variable(tf.zeros([L]))
+S1 = 1.0
+O1 = 0.0
 W2 = tf.Variable(tf.truncated_normal([L, M], stddev=0.1))
 B2 = tf.Variable(tf.ones([M])/10)
-S2 = tf.Variable(tf.ones([M]))
-O2 = tf.Variable(tf.zeros([M]))
+S2 = 1.0
+O2 = 0.0
 W3 = tf.Variable(tf.truncated_normal([M, N], stddev=0.1))
 B3 = tf.Variable(tf.ones([N])/10)
-S3 = tf.Variable(tf.ones([N]))
-O3 = tf.Variable(tf.zeros([N]))
+S3 = 1.0
+O3 = 0.0
 W4 = tf.Variable(tf.truncated_normal([N, P], stddev=0.1))
 B4 = tf.Variable(tf.ones([P])/10)
-S4 = tf.Variable(tf.ones([P]))
-O4 = tf.Variable(tf.zeros([P]))
+S4 = 1.0
+O4 = 0.0
 W5 = tf.Variable(tf.truncated_normal([P, Q], stddev=0.1))
 B5 = tf.Variable(tf.ones([Q])/10)
 
@@ -83,6 +83,8 @@ B5 = tf.Variable(tf.ones([Q])/10)
 # Scales do not seem to be very useful either, even with sigmoids, don't know why
 # On RELUs, you have to display batch-max(activation) to see the nice effect on distribution but
 # it is very visible
+
+# With RELUs, the scale and offset variables can be omitted. They do nothing.
 
 # Steady 98.5% accuracy using these parameters:
 # moving average decay: 0.998 (equivalent to averaging over two epochs)
