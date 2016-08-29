@@ -155,7 +155,7 @@ def training_step(i, update_test_data, update_train_data):
     #decay_speed = 2000
     max_learning_rate = 0.02
     min_learning_rate = 0.0002
-    decay_speed = 2000
+    decay_speed = 1000
     learning_rate = min_learning_rate + (max_learning_rate - min_learning_rate) * math.exp(-i/decay_speed)
 
     # compute training values for visualisation
@@ -207,6 +207,11 @@ print("max test accuracy: " + str(datavis.get_max_test_accuracy()))
 # batch norm 0.998 lr 0.03-0.0001-500 no dropout, with biases replaced with BN offsets as per the book: above 0.99 at 900 iterations (!), max 0.993 (best loss at 2.0879 at 2100 it and went up after that)
 # batch norm 0.998 lr 0.03-0.0001-500 no dropout, offets and scales for BN, no biases: max 0.9935 at 2400 it but going down from there... also dense activations not so regular...
 # batch norm 0.999 + same as above: 0.9935 at 2400 iterations but downhill from there...
-# batch norm 0.999 lr 0.02-0.0002-2000 dropout 0.725, normal biases, no MB scales or offsets: max 0.9949 at 17K it (min test loss: 1.64665 !) 0.994 at 3100 it, 0.9942 at 20K it, 0.9943 average on last 10K it
-# => lr 0.02-0.0002-1000 should work better with less variation
-# => lr 0.02-0.0001-1000 or maybe this because I still see a lot of variation at lr 0.0002
+# batch norm 0.999 lr 0.02-0.0002-2000 dropout 0.75, normal biases, no MB scales or offsets: max 0.9949 at 17K it (min test loss 1.64665 but cruising arounf 1.8) 0.994 at 3100 it, 0.9942 at 20K it, 0.99427 average on last 10K it
+# batch norm 0.999 lr 0.02-0.0001-1000 dropout 0.75, normal biases, no MB scales or offsets: max 0.9944 but oscillating in 0.9935-0.9940 region (test loss stable betwen 1.7 and 1.8 though)
+# batch norm 0.999 lr 0.02-0.0002-1000 dropout 0.75, normal biases, no MB scales or offsets: max 0.995, min test loss 1.49787 cruising below 1.6, then at 8Kit something happens and cruise just above 1.6, 0.99436 average on last 10K it
+# TO TRY to see which setting removes the weird event at 8K ?:
+# lr 0.015-0.0001-1500
+# remove n/n+1 in variation calculation
+# bn 0.998
+# bn 0.9999
