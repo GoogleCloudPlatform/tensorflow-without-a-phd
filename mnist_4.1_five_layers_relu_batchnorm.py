@@ -58,65 +58,66 @@ Q = 10
 # When using RELUs, make sure biases are initialised with small *positive* values for example 0.1 = tf.ones([K])/10
 W1 = tf.Variable(tf.truncated_normal([784, L], stddev=0.1))  # 784 = 28 * 28
 B1 = tf.Variable(tf.ones([L])/10)
-S1 = 1.0
-O1 = 0.0
 W2 = tf.Variable(tf.truncated_normal([L, M], stddev=0.1))
 B2 = tf.Variable(tf.ones([M])/10)
-S2 = 1.0
-O2 = 0.0
 W3 = tf.Variable(tf.truncated_normal([M, N], stddev=0.1))
 B3 = tf.Variable(tf.ones([N])/10)
-S3 = 1.0
-O3 = 0.0
 W4 = tf.Variable(tf.truncated_normal([N, P], stddev=0.1))
 B4 = tf.Variable(tf.ones([P])/10)
-S4 = 1.0
-O4 = 0.0
 W5 = tf.Variable(tf.truncated_normal([P, Q], stddev=0.1))
 B5 = tf.Variable(tf.ones([Q])/10)
 
 ## Batch normalisation conclusions:
-# BN is applied between logits and the activation function
-# On Sigmoids it is very clear that without BN, the sigmoids saturate, with BN, they output
-# a clean gausian distribution of values.
-# Offsets do not seem to be useful which makes sense since they sertve the same purpose as the bias
-# Scales do not seem to be very useful either, even with sigmoids, don't know why
 # On RELUs, you have to display batch-max(activation) to see the nice effect on distribution but
-# it is very visible
-
-# With RELUs, the scale and offset variables can be omitted. They do nothing.
+# it is very visible.
+# With RELUs, the scale and offset variables can be omitted. They do not seem to do anything.
 
 # Steady 98.5% accuracy using these parameters:
 # moving average decay: 0.998 (equivalent to averaging over two epochs)
 # learning rate decay from 0.03 to 0.0001 speed 1000 => max 98.59 at 6500 iterations, 98.54 at 10K it,  98% at 1300it, 98.5% at 3200it
 
-def batchnorm(Ylogits, Offset, Scale, is_test, iteration):
+# relu, no batch-norm, lr(0.003, 0.0001, 2000) => 98.2%
+# relu, batch-norm lr(0.03, 0.0001, 1000) => 98.5% - 98.55%
+# relu, batch-norm, no offsets => 98.5% - 98.55% (no change)
+# relu, batch-norm, no scales => 98.5% - 98.55% (no change)
+# relu, batch-norm, no scales, no offsets => 98.5% - 98.55% (no change) - even peak at 98.59% :-)
+
+# Correct usage of batch norm scale and offset parameters:
+# According to BN paper, offsets should be kept and biases removed, not the other way around - not sure it matters
+# TODO: test it - if true, removing biases from the model above should not change anything
+# "When the next layer is linear (also e.g. `nn.relu`), scaling can be
+# disabled since the scaling can be done by the next layer." So apparently no need of batch norm before a RELU.
+
+def batchnorm(Ylogits, is_test, iteration):
     exp_moving_avg = tf.train.ExponentialMovingAverage(0.998, iteration) # adding the iteration prevents from averaging across non-existing iterations
     bnepsilon = 1e-5
     mean, variance = tf.nn.moments(Ylogits, [0])
     update_moving_everages = exp_moving_avg.apply([mean, variance])
     m = tf.cond(is_test, lambda: exp_moving_avg.average(mean), lambda: mean)
     v = tf.cond(is_test, lambda: exp_moving_avg.average(variance)*100/101, lambda: variance)  # 100 = mini-batch size, to compute unbiased variance
-    Ybn = tf.nn.batch_normalization(Ylogits, m, v, Offset, Scale, bnepsilon)
+    Ybn = tf.nn.batch_normalization(Ylogits, m, v, 0.0, 1.0, bnepsilon)
     return Ybn, update_moving_everages
+
+def no_batchnorm(Ylogits, Offset, Scale, is_test, iteration):
+    return Ylogits, tf.no_op()
 
 # The model
 XX = tf.reshape(X, [-1, 784])
 
 Y1l = tf.matmul(XX, W1) + B1
-Y1bn, update_ema1 = batchnorm(Y1l, O1, S1, tst, iter)
+Y1bn, update_ema1 = batchnorm(Y1l, tst, iter)
 Y1 = tf.nn.relu(Y1bn)
 
 Y2l = tf.matmul(Y1, W2) + B2
-Y2bn, update_ema2 = batchnorm(Y2l, O2, S2, tst, iter)
+Y2bn, update_ema2 = batchnorm(Y2l, tst, iter)
 Y2 = tf.nn.relu(Y2bn)
 
 Y3l = tf.matmul(Y2, W3) + B3
-Y3bn, update_ema3 = batchnorm(Y3l, O3, S3, tst, iter)
+Y3bn, update_ema3 = batchnorm(Y3l, tst, iter)
 Y3 = tf.nn.relu(Y3bn)
 
 Y4l = tf.matmul(Y3, W4) + B4
-Y4bn, update_ema4 = batchnorm(Y4l, O4, S4, tst, iter)
+Y4bn, update_ema4 = batchnorm(Y4l, tst, iter)
 Y4 = tf.nn.relu(Y4bn)
 
 Ylogits = tf.matmul(Y4, W5) + B5
