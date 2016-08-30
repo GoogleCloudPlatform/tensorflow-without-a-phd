@@ -51,7 +51,7 @@ iter = tf.placeholder(tf.int32)
 pkeep = tf.placeholder(tf.float32)
 
 def batchnorm(Ylogits, is_test, iteration, convolutional=False):
-    exp_moving_avg = tf.train.ExponentialMovingAverage(0.999, iteration) # adding the iteration prevents from averaging across non-existing iterations
+    exp_moving_avg = tf.train.ExponentialMovingAverage(0.9999, iteration) # adding the iteration prevents from averaging across non-existing iterations
     bnepsilon = 1e-5
     if convolutional:
         mean, variance = tf.nn.moments(Ylogits, [0, 1, 2])
@@ -154,7 +154,7 @@ def training_step(i, update_test_data, update_train_data):
     #min_learning_rate = 0.0001
     #decay_speed = 2000
     max_learning_rate = 0.02
-    min_learning_rate = 0.0002
+    min_learning_rate = 0.00015
     decay_speed = 1000
     learning_rate = min_learning_rate + (max_learning_rate - min_learning_rate) * math.exp(-i/decay_speed)
 
@@ -207,11 +207,26 @@ print("max test accuracy: " + str(datavis.get_max_test_accuracy()))
 # batch norm 0.998 lr 0.03-0.0001-500 no dropout, with biases replaced with BN offsets as per the book: above 0.99 at 900 iterations (!), max 0.993 (best loss at 2.0879 at 2100 it and went up after that)
 # batch norm 0.998 lr 0.03-0.0001-500 no dropout, offets and scales for BN, no biases: max 0.9935 at 2400 it but going down from there... also dense activations not so regular...
 # batch norm 0.999 + same as above: 0.9935 at 2400 iterations but downhill from there...
-# batch norm 0.999 lr 0.02-0.0002-2000 dropout 0.75, normal biases, no MB scales or offsets: max 0.9949 at 17K it (min test loss 1.64665 but cruising arounf 1.8) 0.994 at 3100 it, 0.9942 at 20K it, 0.99427 average on last 10K it
+# batch norm 0.999 lr 0.02-0.0002-2000 dropout 0.75, normal biases, no MB scales or offsets: max 0.9949 at 17K it (min test loss 1.64665 but cruising around 1.8) 0.994 at 3100 it, 0.9942 at 20K it, 0.99427 average on last 10K it
 # batch norm 0.999 lr 0.02-0.0001-1000 dropout 0.75, normal biases, no MB scales or offsets: max 0.9944 but oscillating in 0.9935-0.9940 region (test loss stable betwen 1.7 and 1.8 though)
-# batch norm 0.999 lr 0.02-0.0002-1000 dropout 0.75, normal biases, no MB scales or offsets: max 0.995, min test loss 1.49787 cruising below 1.6, then at 8Kit something happens and cruise just above 1.6, 0.99436 average on last 10K it
-# TO TRY to see which setting removes the weird event at 8K ?:
-# lr 0.015-0.0001-1500
-# remove n/n+1 in variation calculation
-# bn 0.998
-# bn 0.9999
+# batch norm 0.999 lr 0.02-0.0002-1000 dropout 0.75, normal biases, no MB scales or offsets: max 0.995, min test loss 1.49787 cruising below 1.6, then at 8K it something happens and cruise just above 1.6, 0.99436 average on last 10K it
+# => see which setting removes the weird event at 8K ?:
+# => in everything below batch norm 0.999 lr 0.02-0.0002-1000 dropout 0.75, normal biases, no MB scales or offsets, unles stated otherwise
+# remove n/n+1 in variation calculation: no good, m ax 0.994 buit cruising around 0.993
+# bn 0.9955 for cutoff at 2K it: still something happens at 8K. Max 0.995 but cruising at 0.9942-0.9943 only and downward trend above 15K. Test loss: nice cruise below 1.6
+# bn epsilon e-10 => max 0.9947 cruise around 0.9939, test loss never went below 1.6, barely below 1.7,
+# bn epsilon e-10 run 2=> max 0.9945 cruise around 0.9937, test loss never went below 1.6, barely below 1.7,
+# baseline run 2: max 0.995 cruising around 0.9946 0.9947, test loss cruising between 1.6 and 1.7 (baseline confirmed)
+# bn 0.998 for cutoff at 5K it: max 0.9948, test loss cruising btw 1.6 and 1.8, last 10K avg 0.99421
+# lr 0.015-0.0001-1500: max 0.9938, cruise between 0.993 and 0.994, test loss above 2.0 most of the time (not good)
+# bn 0.9999: max 0.9952, cruise between 0.994 and 0.995 with upward trend, fall in last 2K it. test loss cruise just above 1.6. Avg on last 10K it 0.99441. Could be stopped at 7000 it. Quite noisy overall.
+# bn 0.99955 for cutoff at 20K it: max 0.9948, cruise around 0.9942, test loss cruise around 1.7. Avg on last 10K it 0.99415
+# batch norm 0.999 lr 0.015-0.00015-1500 dropout 0.75, normal biases, no MB scales or offsets: cruise around 0.9937-00994, test loss cruise around 1.95-2.0 (not good)
+# batch norm 0.999 lr 0.03-0.0001-2000 dropout 0.75, normal biases, no MB scales or offsets: stable cruise around 0.9940, test loss cruise around 2.2, good stability in last 10K, bumpy slow start
+# batch norm 0.9999 lr 0.02-0.0001-1500 dropout 0.75, normal biases, no MB scales or offsets: max 0.995, stable btw 0.0040-0.9945, test loss stable around 1.7, good stability in last 4K, avg on last 10K: 0.99414, avg on last 4K
+# *batch norm 0.9999 lr 0.02-0.00015-1000 dropout 0.75, normal biases, no MB scales or offsets: max 0.9956 stable above 0.995!!! test loss stable around 1.6. Avg last 10K 0.99502. Avg 10K-13K 0.99526. Avg 8K-10K: 0.99514. Best example to run in 10K
+# same as above with different rnd seed: max 0.9938 only in 10K it, test loss in 1.9 region (very bad)
+# same as above with dropout 0.8: max 0.9937 only (bad)
+# same as above with dropout 0.66: max 0.9942 only, test loss between 1.7-1.8 (not good)
+# same as above with lr 0.015-0.0001-1200: max 0.9946 at 6500 it but something happens after that it it goes down (not good)
+# best * run 2: max 0.9953, cruising around 0.995 until 12K it, went down a bit after that (still ok) avg 8-10K 0.99484
