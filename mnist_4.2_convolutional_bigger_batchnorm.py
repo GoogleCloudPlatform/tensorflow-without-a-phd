@@ -17,7 +17,7 @@ import mnist_data
 import tensorflow as tf
 import tensorflowvisu
 import math
-tf.set_random_seed(0)
+tf.set_random_seed(0.0)
 
 # Download images and labels
 mnist = mnist_data.read_data_sets("data")
@@ -229,4 +229,8 @@ print("max test accuracy: " + str(datavis.get_max_test_accuracy()))
 # same as above with dropout 0.8: max 0.9937 only (bad)
 # same as above with dropout 0.66: max 0.9942 only, test loss between 1.7-1.8 (not good)
 # same as above with lr 0.015-0.0001-1200: max 0.9946 at 6500 it but something happens after that it it goes down (not good)
-# best * run 2: max 0.9953, cruising around 0.995 until 12K it, went down a bit after that (still ok) avg 8-10K 0.99484
+# best * run 2 (lbl 5.1): max 0.9953, cruising around 0.995 until 12K it, went down a bit after that (still ok) avg 8-10K 0.99484
+# best * run 3 (lbl 5.2 video): max 0.9951, cruising just below 0.995, test loss cruising around 1.6
+# best * run 3-8: not good, usually in the 0.994 range
+# best * run 9: (lbl 5.3 video): max 0.9956, cruising above 0.995, test loss cruising around 1.6, avg 7K-10K it: 0.99518
+# (scales 0.9-0.98, 1.0-2.4 zoom after 2000)
