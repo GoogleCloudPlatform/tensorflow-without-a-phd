@@ -13,28 +13,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import mnist_data
 import tensorflow as tf
 import tensorflowvisu
 import math
+from tensorflow.contrib.learn.python.learn.datasets.mnist import read_data_sets
 tf.set_random_seed(0.0)
 
-# Download images and labels
-mnist = mnist_data.read_data_sets("data")
+# Download images and labels into mnist.test (10K images+labels) and mnist.train (60K images+labels)
+mnist = read_data_sets("data", one_hot=True, reshape=False, validation_size=0)
 
 # neural network structure for this sample:
 #
-# · · · · · · · · · ·      (input data, 1-deep)                 X [batch, 28, 28, 1]
-# @ @ @ @ @ @ @ @ @ @   -- conv. layer 6x6x1=>6 stride 1        W1 [5, 5, 1, 6]        B1 [6]
-# ∶∶∶∶∶∶∶∶∶∶∶∶∶∶∶∶∶∶∶                                           Y1 [batch, 28, 28, 6]
-#   @ @ @ @ @ @ @ @     -- conv. layer 5x5x6=>12 stride 2       W2 [5, 5, 6, 12]        B2 [12]
-#   ∶∶∶∶∶∶∶∶∶∶∶∶∶∶∶                                             Y2 [batch, 14, 14, 12]
-#     @ @ @ @ @ @       -- conv. layer 4x4x12=>24 stride 2      W3 [4, 4, 12, 24]       B3 [24]
-#     ∶∶∶∶∶∶∶∶∶∶∶                                               Y3 [batch, 7, 7, 24] => reshaped to YY [batch, 7*7*24]
-#      \x/x\x\x/ ✞      -- fully connected layer (relu+dropout) W4 [7*7*24, 200]       B4 [200]
-#       · · · ·                                                 Y4 [batch, 200]
-#       \x/x\x/         -- fully connected layer (softmax)      W5 [200, 10]           B5 [10]
-#        · · ·                                                  Y [batch, 20]
+# · · · · · · · · · ·      (input data, 1-deep)                    X [batch, 28, 28, 1]
+# @ @ @ @ @ @ @ @ @ @   -- conv. layer +BN 6x6x1=>6 stride 1       W1 [5, 5, 1, 6]        B1 [6]
+# ∶∶∶∶∶∶∶∶∶∶∶∶∶∶∶∶∶∶∶                                              Y1 [batch, 28, 28, 6]
+#   @ @ @ @ @ @ @ @     -- conv. layer +BN 5x5x6=>12 stride 2      W2 [5, 5, 6, 12]        B2 [12]
+#   ∶∶∶∶∶∶∶∶∶∶∶∶∶∶∶                                                Y2 [batch, 14, 14, 12]
+#     @ @ @ @ @ @       -- conv. layer +BN 4x4x12=>24 stride 2     W3 [4, 4, 12, 24]       B3 [24]
+#     ∶∶∶∶∶∶∶∶∶∶∶                                                  Y3 [batch, 7, 7, 24] => reshaped to YY [batch, 7*7*24]
+#      \x/x\x\x/ ✞      -- fully connected layer (relu+dropout+BN) W4 [7*7*24, 200]       B4 [200]
+#       · · · ·                                                    Y4 [batch, 200]
+#       \x/x\x/         -- fully connected layer (softmax)         W5 [200, 10]           B5 [10]
+#        · · ·                                                     Y [batch, 20]
 
 # input X: 28x28 grayscale images, the first dimension (None) will index the images in the mini-batch
 X = tf.placeholder(tf.float32, [None, 28, 28, 1])
@@ -42,8 +42,6 @@ X = tf.placeholder(tf.float32, [None, 28, 28, 1])
 Y_ = tf.placeholder(tf.float32, [None, 10])
 # variable learning rate
 lr = tf.placeholder(tf.float32)
-# Probability of keeping a node during dropout = 1.0 at test time (no dropout) and 0.75 at training time
-#pkeep = tf.placeholder(tf.float32)
 # test flag for batch norm
 tst = tf.placeholder(tf.bool)
 iter = tf.placeholder(tf.int32)
@@ -186,18 +184,6 @@ datavis.animate(training_step, 20001, train_data_update_freq=20, test_data_updat
 print("max test accuracy: " + str(datavis.get_max_test_accuracy()))
 
 ## All runs 10K iterations:
-# layers 4 8 12 200, patches 5x5str1 5x5str2 4x4str2 best 0.989
-# layers 4 8 12 200, patches 5x5str1 4x4str2 4x4str2 best 0.9892
-# layers 6 12 24 200, patches 5x5str1 4x4str2 4x4str2 best 0.9908 after 10000 iterations but going downhill from 5000 on
-# layers 6 12 24 200, patches 5x5str1 4x4str2 4x4str2 dropout=0.75 best 0.9922  (but above 0.99 after 1400 iterations only)
-# layers 4 8 12 200, patches 5x5str1 4x4str2 4x4str2 dropout=0.75, best 0.9914 at 13700 iterations
-# layers 9 16 25 200, patches 5x5str1 4x4str2 4x4str2 dropout=0.75, best 0.9918 at 10500 (but 0.99 at 1500 iterations already, 0.9915 at 5800)
-# layers 9 16 25 300, patches 5x5str1 4x4str2 4x4str2 dropout=0.75, best 0.9916 at 5500 iterations (but 0.9903 at 1200 iterations already)
-# attempts with 2 fully-connected layers: no better 300 and 100 neurons, dropout 0.75 and 0.5, 6x6 5x5 4x4 patches no better
-# layers 6 12 24 200, patches 6x6str1 5x5str2 4x4str2 no dropout best 0.9906 after 3100 iterations (avove 0.99 from iteration 1400)
-#*layers 6 12 24 200, patches 6x6str1 5x5str2 4x4str2 dropout=0.75 best 0.9928 after 12800 iterations (but consistently above 0.99 after 1300 iterations only, 0.9916 at 2300 iterations, 0.9921 at 5600, 0.9925 at 20000)
-#*same with dacaying learning rate 0.003-0.0001-2000: best 0.9931 (on other runs max accuracy 0.9921, 0.9927, 0.9935, 0.9929, 0.9933)
-
 # batch norm 0.998 lr 0.03-0.0001-1000 no BN offset or scale: best 0.9933 but most of the way under 0.993 and lots of variation. test loss under 2.2 though
 # batch norm 0.998 lr 0.03-0.0001-500 no BN offset or scale: best 0.9933 but really clean curves
 # batch norm 0.998 lr 0.03-0.0001-500 no BN offset or scale, dropout 0.8 on fully connected layer: max 0.9926
@@ -207,11 +193,11 @@ print("max test accuracy: " + str(datavis.get_max_test_accuracy()))
 # batch norm 0.998 lr 0.03-0.0001-500 no dropout, with biases replaced with BN offsets as per the book: above 0.99 at 900 iterations (!), max 0.993 (best loss at 2.0879 at 2100 it and went up after that)
 # batch norm 0.998 lr 0.03-0.0001-500 no dropout, offets and scales for BN, no biases: max 0.9935 at 2400 it but going down from there... also dense activations not so regular...
 # batch norm 0.999 + same as above: 0.9935 at 2400 iterations but downhill from there...
-# batch norm 0.999 lr 0.02-0.0002-2000 dropout 0.75, normal biases, no MB scales or offsets: max 0.9949 at 17K it (min test loss 1.64665 but cruising around 1.8) 0.994 at 3100 it, 0.9942 at 20K it, 0.99427 average on last 10K it
-# batch norm 0.999 lr 0.02-0.0001-1000 dropout 0.75, normal biases, no MB scales or offsets: max 0.9944 but oscillating in 0.9935-0.9940 region (test loss stable betwen 1.7 and 1.8 though)
-# batch norm 0.999 lr 0.02-0.0002-1000 dropout 0.75, normal biases, no MB scales or offsets: max 0.995, min test loss 1.49787 cruising below 1.6, then at 8K it something happens and cruise just above 1.6, 0.99436 average on last 10K it
+# batch norm 0.999 lr 0.02-0.0002-2000 dropout 0.75, normal biases, no BN scales or offsets: max 0.9949 at 17K it (min test loss 1.64665 but cruising around 1.8) 0.994 at 3100 it, 0.9942 at 20K it, 0.99427 average on last 10K it
+# batch norm 0.999 lr 0.02-0.0001-1000 dropout 0.75, normal biases, no BN scales or offsets: max 0.9944 but oscillating in 0.9935-0.9940 region (test loss stable betwen 1.7 and 1.8 though)
+# batch norm 0.999 lr 0.02-0.0002-1000 dropout 0.75, normal biases, no BN scales or offsets: max 0.995, min test loss 1.49787 cruising below 1.6, then at 8K it something happens and cruise just above 1.6, 0.99436 average on last 10K it
 # => see which setting removes the weird event at 8K ?:
-# => in everything below batch norm 0.999 lr 0.02-0.0002-1000 dropout 0.75, normal biases, no MB scales or offsets, unles stated otherwise
+# => in everything below batch norm 0.999 lr 0.02-0.0002-1000 dropout 0.75, normal biases, no MB scales or offsets, unless stated otherwise
 # remove n/n+1 in variation calculation: no good, m ax 0.994 buit cruising around 0.993
 # bn 0.9955 for cutoff at 2K it: still something happens at 8K. Max 0.995 but cruising at 0.9942-0.9943 only and downward trend above 15K. Test loss: nice cruise below 1.6
 # bn epsilon e-10 => max 0.9947 cruise around 0.9939, test loss never went below 1.6, barely below 1.7,
@@ -233,4 +219,3 @@ print("max test accuracy: " + str(datavis.get_max_test_accuracy()))
 # best * run 3 (lbl 5.2 video): max 0.9951, cruising just below 0.995, test loss cruising around 1.6
 # best * run 3-8: not good, usually in the 0.994 range
 # best * run 9: (lbl 5.3 video): max 0.9956, cruising above 0.995, test loss cruising around 1.6, avg 7K-10K it: 0.99518
-# (scales 0.9-0.98, 1.0-2.4 zoom after 2000)

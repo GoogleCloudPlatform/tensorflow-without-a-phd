@@ -13,28 +13,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import mnist_data
 import tensorflow as tf
 import tensorflowvisu
 import math
+from tensorflow.contrib.learn.python.learn.datasets.mnist import read_data_sets
 tf.set_random_seed(0)
 
 # neural network with 5 layers
 #
 # · · · · · · · · · ·       (input data, flattened pixels)       X [batch, 784]   # 784 = 28*28
-# \x/x\x/x\x/x\x/x\x/    -- fully connected layer (relu)         W1 [784, 200]      B1[200]
+# \x/x\x/x\x/x\x/x\x/    -- fully connected layer (relu+BN)      W1 [784, 200]      B1[200]
 #  · · · · · · · · ·                                             Y1 [batch, 200]
-#   \x/x\x/x\x/x\x/      -- fully connected layer (relu)         W2 [200, 100]      B2[100]
+#   \x/x\x/x\x/x\x/      -- fully connected layer (relu+BN)      W2 [200, 100]      B2[100]
 #    · · · · · · ·                                               Y2 [batch, 100]
-#    \x/x\x/x\x/         -- fully connected layer (relu)         W3 [100, 60]       B3[60]
+#    \x/x\x/x\x/         -- fully connected layer (relu+BN)      W3 [100, 60]       B3[60]
 #     · · · · ·                                                  Y3 [batch, 60]
-#     \x/x\x/            -- fully connected layer (relu)         W4 [60, 30]        B4[30]
+#     \x/x\x/            -- fully connected layer (relu+BN)      W4 [60, 30]        B4[30]
 #      · · ·                                                     Y4 [batch, 30]
 #      \x/               -- fully connected layer (softmax)      W5 [30, 10]        B5[10]
 #       ·                                                        Y5 [batch, 10]
 
-# Download images and labels
-mnist = mnist_data.read_data_sets("data")
+# Download images and labels into mnist.test (10K images+labels) and mnist.train (60K images+labels)
+mnist = read_data_sets("data", one_hot=True, reshape=False, validation_size=0)
 
 # input X: 28x28 grayscale images, the first dimension (None) will index the images in the mini-batch
 X = tf.placeholder(tf.float32, [None, 28, 28, 1])
@@ -83,10 +83,12 @@ B5 = tf.Variable(tf.ones([Q])/10)
 # relu, batch-norm, no scales, no offsets => 98.5% - 98.55% (no change) - even peak at 98.59% :-)
 
 # Correct usage of batch norm scale and offset parameters:
-# According to BN paper, offsets should be kept and biases removed, not the other way around - not sure it matters
-# TODO: test it - if true, removing biases from the model above should not change anything
+# According to BN paper, offsets should be kept and biases removed.
+# In practice, it seems to work well with BN without offsets and traditional biases.
 # "When the next layer is linear (also e.g. `nn.relu`), scaling can be
-# disabled since the scaling can be done by the next layer." So apparently no need of batch norm before a RELU.
+# disabled since the scaling can be done by the next layer."
+# So apparently no need of scaling before a RELU.
+# => Using neither scales not offsets with RELUs.
 
 def batchnorm(Ylogits, is_test, iteration):
     exp_moving_avg = tf.train.ExponentialMovingAverage(0.998, iteration) # adding the iteration prevents from averaging across non-existing iterations
