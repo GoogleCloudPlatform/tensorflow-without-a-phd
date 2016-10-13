@@ -153,7 +153,7 @@ def training_step(i, update_test_data, update_train_data):
     #decay_speed = 2000
     max_learning_rate = 0.02
     min_learning_rate = 0.00015
-    decay_speed = 1000
+    decay_speed = 1000.0
     learning_rate = min_learning_rate + (max_learning_rate - min_learning_rate) * math.exp(-i/decay_speed)
 
     # compute training values for visualisation

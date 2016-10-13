@@ -172,7 +172,7 @@ def training_step(i, update_test_data, update_train_data):
     # learning rate decay (with batch norm)
     max_learning_rate = 0.03
     min_learning_rate = 0.0001
-    decay_speed = 1000
+    decay_speed = 1000.0
     learning_rate = min_learning_rate + (max_learning_rate - min_learning_rate) * math.exp(-i/decay_speed)
 
     # compute training values for visualisation
