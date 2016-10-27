@@ -100,7 +100,10 @@ def batchnorm(Ylogits, is_test, iteration):
     Ybn = tf.nn.batch_normalization(Ylogits, m, v, 0.0, 1.0, bnepsilon)
     return Ybn, update_moving_everages
 
-def no_batchnorm(Ylogits, Offset, Scale, is_test, iteration):
+# note: 100/101 probably not useful. The unbiased variance is useful when averaging variances across multiple minibatches
+# but here, since we use an exponential moving average, the number of mini-batches averaged is not clear...
+
+def no_batchnorm(Ylogits, is_test, iteration):
     return Ylogits, tf.no_op()
 
 # The model
