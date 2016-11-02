@@ -57,7 +57,7 @@ def batchnorm(Ylogits, is_test, iteration, convolutional=False):
         mean, variance = tf.nn.moments(Ylogits, [0])
     update_moving_everages = exp_moving_avg.apply([mean, variance])
     m = tf.cond(is_test, lambda: exp_moving_avg.average(mean), lambda: mean)
-    v = tf.cond(is_test, lambda: exp_moving_avg.average(variance)*100/101, lambda: variance)  # 100 = mini-batch size, to compute unbiased variance
+    v = tf.cond(is_test, lambda: exp_moving_avg.average(variance), lambda: variance)
     Ybn = tf.nn.batch_normalization(Ylogits, m, v, 0.0, 1.0, bnepsilon)
     return Ybn, update_moving_everages
 
