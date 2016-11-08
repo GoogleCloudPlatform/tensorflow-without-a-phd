@@ -22,7 +22,7 @@ def train_data_input_fn(mnist):
     EPOCHS=100
     images = tf.train.limit_epochs(tf.constant(mnist.train.images), EPOCHS)
     labels = tf.train.limit_epochs(tf.constant(mnist.train.labels), EPOCHS)
-    return tf.train.shuffle_batch([images, labels], 100, 10000, 1000, enqueue_many=True, shapes=[(784,), ()])
+    return tf.train.shuffle_batch([images, labels], 100, 10000, 1000, enqueue_many=True)
 
 def eval_data_input_fn(mnist):
     images_feed, labels_feed = (mnist.test.images, mnist.test.labels)
