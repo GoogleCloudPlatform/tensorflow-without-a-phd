@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import tensorflow as tf
+from tensorflow.python.framework import tensor_util
 import tensorflowvisu
 import math
 from tensorflow.contrib.learn.python.learn.datasets.mnist import read_data_sets
@@ -47,9 +48,10 @@ tst = tf.placeholder(tf.bool)
 iter = tf.placeholder(tf.int32)
 # dropout probability
 pkeep = tf.placeholder(tf.float32)
+pkeep_conv = tf.placeholder(tf.float32)
 
-def batchnorm(Ylogits, is_test, iteration, convolutional=False):
-    exp_moving_avg = tf.train.ExponentialMovingAverage(0.9999, iteration) # adding the iteration prevents from averaging across non-existing iterations
+def batchnorm(Ylogits, is_test, iteration, offset, convolutional=False):
+    exp_moving_avg = tf.train.ExponentialMovingAverage(0.999, iteration) # adding the iteration prevents from averaging across non-existing iterations
     bnepsilon = 1e-5
     if convolutional:
         mean, variance = tf.nn.moments(Ylogits, [0, 1, 2])
@@ -58,17 +60,22 @@ def batchnorm(Ylogits, is_test, iteration, convolutional=False):
     update_moving_everages = exp_moving_avg.apply([mean, variance])
     m = tf.cond(is_test, lambda: exp_moving_avg.average(mean), lambda: mean)
     v = tf.cond(is_test, lambda: exp_moving_avg.average(variance), lambda: variance)
-    Ybn = tf.nn.batch_normalization(Ylogits, m, v, 0.0, 1.0, bnepsilon)
+    Ybn = tf.nn.batch_normalization(Ylogits, m, v, offset, None, bnepsilon)
     return Ybn, update_moving_everages
 
-def no_batchnorm(Ylogits, is_test, iteration, convolutional=False):
+def no_batchnorm(Ylogits, is_test, iteration, offset, convolutional=False):
     return Ylogits, tf.no_op()
+
+def compatible_convolutional_noise_shape(Y):
+    noiseshape = tf.shape(Y)
+    noiseshape = noiseshape * tf.constant([1,0,0,1]) + tf.constant([0,1,1,0])
+    return noiseshape
 
 # three convolutional layers with their channel counts, and a
 # fully connected layer (tha last layer has 10 softmax neurons)
-K = 6  # first convolutional layer output depth
-L = 12  # second convolutional layer output depth
-M = 24  # third convolutional layer
+K = 24  # first convolutional layer output depth
+L = 48  # second convolutional layer output depth
+M = 64  # third convolutional layer
 N = 200  # fully connected layer
 
 W1 = tf.Variable(tf.truncated_normal([6, 6, 1, K], stddev=0.1))  # 6x6 patch, 1 input channel, K output channels
@@ -89,26 +96,29 @@ B5 = tf.Variable(tf.constant(0.1, tf.float32, [10]))
 
 # The model
 stride = 1  # output is 28x28
-Y1l = tf.nn.conv2d(X, W1, strides=[1, stride, stride, 1], padding='SAME') + B1
-Y1bn, update_ema1 = batchnorm(Y1l, tst, iter, convolutional=True)
-Y1 = tf.nn.relu(Y1bn)
+Y1l = tf.nn.conv2d(X, W1, strides=[1, stride, stride, 1], padding='SAME')
+Y1bn, update_ema1 = batchnorm(Y1l, tst, iter, B1, convolutional=True)
+Y1r = tf.nn.relu(Y1bn)
+Y1 = tf.nn.dropout(Y1r, pkeep_conv, compatible_convolutional_noise_shape(Y1r))
 stride = 2  # output is 14x14
-Y2l = tf.nn.conv2d(Y1, W2, strides=[1, stride, stride, 1], padding='SAME') + B2
-Y2bn, update_ema2 = batchnorm(Y2l, tst, iter, convolutional=True)
-Y2 = tf.nn.relu(Y2bn)
+Y2l = tf.nn.conv2d(Y1, W2, strides=[1, stride, stride, 1], padding='SAME')
+Y2bn, update_ema2 = batchnorm(Y2l, tst, iter, B2, convolutional=True)
+Y2r = tf.nn.relu(Y2bn)
+Y2 = tf.nn.dropout(Y2r, pkeep_conv, compatible_convolutional_noise_shape(Y2r))
 stride = 2  # output is 7x7
-Y3l = tf.nn.conv2d(Y2, W3, strides=[1, stride, stride, 1], padding='SAME') +B3
-Y3bn, update_ema3 = batchnorm(Y3l, tst, iter, convolutional=True)
-Y3 = tf.nn.relu(Y3bn)
+Y3l = tf.nn.conv2d(Y2, W3, strides=[1, stride, stride, 1], padding='SAME')
+Y3bn, update_ema3 = batchnorm(Y3l, tst, iter, B3, convolutional=True)
+Y3r = tf.nn.relu(Y3bn)
+Y3 = tf.nn.dropout(Y3r, pkeep_conv, compatible_convolutional_noise_shape(Y3r))
 
 # reshape the output from the third convolution for the fully connected layer
 YY = tf.reshape(Y3, shape=[-1, 7 * 7 * M])
 
-Y4l = tf.matmul(YY, W4) +B4
-Y4bn, update_ema4 = batchnorm(Y4l, tst, iter)
-Y4 = tf.nn.relu(Y4bn)
-Y4d = tf.nn.dropout(Y4, pkeep)
-Ylogits = tf.matmul(Y4d, W5) + B5
+Y4l = tf.matmul(YY, W4)
+Y4bn, update_ema4 = batchnorm(Y4l, tst, iter, B4)
+Y4r = tf.nn.relu(Y4bn)
+Y4 = tf.nn.dropout(Y4r, pkeep)
+Ylogits = tf.matmul(Y4, W5) + B5
 Y = tf.nn.softmax(Ylogits)
 
 update_ema = tf.group(update_ema1, update_ema2, update_ema3, update_ema4)
@@ -126,11 +136,11 @@ accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 # matplotlib visualisation
 allweights = tf.concat(0, [tf.reshape(W1, [-1]), tf.reshape(W2, [-1]), tf.reshape(W3, [-1]), tf.reshape(W4, [-1]), tf.reshape(W5, [-1])])
 allbiases  = tf.concat(0, [tf.reshape(B1, [-1]), tf.reshape(B2, [-1]), tf.reshape(B3, [-1]), tf.reshape(B4, [-1]), tf.reshape(B5, [-1])])
-conv_activations = tf.concat(0, [tf.reshape(tf.reduce_max(Y1, [0]), [-1]), tf.reshape(tf.reduce_max(Y2, [0]), [-1]), tf.reshape(tf.reduce_max(Y3, [0]), [-1])])
-dense_activations = tf.reduce_max(Y4, [0])
+conv_activations = tf.concat(0, [tf.reshape(tf.reduce_max(Y1r, [0]), [-1]), tf.reshape(tf.reduce_max(Y2r, [0]), [-1]), tf.reshape(tf.reduce_max(Y3r, [0]), [-1])])
+dense_activations = tf.reduce_max(Y4r, [0])
 I = tensorflowvisu.tf_format_mnist_images(X, Y, Y_)
 It = tensorflowvisu.tf_format_mnist_images(X, Y, Y_, 1000, lines=25)
-datavis = tensorflowvisu.MnistDataVis(title4="batch-max conv activations", title5="batch-max dense activations", histogram4colornum=2, histogram5colornum=2)
+datavis = tensorflowvisu.MnistDataVis(title4="batch-max conv activation", title5="batch-max dense activations", histogram4colornum=2, histogram5colornum=2)
 
 # training step, the learning rate is a placeholder
 train_step = tf.train.AdamOptimizer(lr).minimize(cross_entropy)
@@ -148,17 +158,14 @@ def training_step(i, update_test_data, update_train_data):
     batch_X, batch_Y = mnist.train.next_batch(100)
 
     # learning rate decay
-    #max_learning_rate = 0.003
-    #min_learning_rate = 0.0001
-    #decay_speed = 2000
     max_learning_rate = 0.02
-    min_learning_rate = 0.00015
-    decay_speed = 1000.0
+    min_learning_rate = 0.0001
+    decay_speed = 1600
     learning_rate = min_learning_rate + (max_learning_rate - min_learning_rate) * math.exp(-i/decay_speed)
 
     # compute training values for visualisation
     if update_train_data:
-        a, c, im, ca, da = sess.run([accuracy, cross_entropy, I, conv_activations, dense_activations], {X: batch_X, Y_: batch_Y, tst: False, pkeep: 1.0})
+        a, c, im, ca, da = sess.run([accuracy, cross_entropy, I, conv_activations, dense_activations], {X: batch_X, Y_: batch_Y, tst: False, pkeep: 1.0, pkeep_conv: 1.0})
         print(str(i) + ": accuracy:" + str(a) + " loss: " + str(c) + " (lr:" + str(learning_rate) + ")")
         datavis.append_training_curves_data(i, a, c)
         datavis.update_image1(im)
@@ -166,16 +173,16 @@ def training_step(i, update_test_data, update_train_data):
 
     # compute test values for visualisation
     if update_test_data:
-        a, c, im = sess.run([accuracy, cross_entropy, It], {X: mnist.test.images, Y_: mnist.test.labels, tst: True, pkeep: 1.0})
+        a, c, im = sess.run([accuracy, cross_entropy, It], {X: mnist.test.images, Y_: mnist.test.labels, tst: True, pkeep: 1.0, pkeep_conv: 1.0})
         print(str(i) + ": ********* epoch " + str(i*100//mnist.train.images.shape[0]+1) + " ********* test accuracy:" + str(a) + " test loss: " + str(c))
         datavis.append_test_curves_data(i, a, c)
         datavis.update_image2(im)
 
     # the backpropagation training step
-    sess.run(train_step, {X: batch_X, Y_: batch_Y, lr: learning_rate, tst: False, pkeep: 0.75})
-    sess.run(update_ema, {X: batch_X, Y_: batch_Y, tst: False, iter: i})
+    sess.run(train_step, {X: batch_X, Y_: batch_Y, lr: learning_rate, tst: False, pkeep: 0.75, pkeep_conv: 1.0})
+    sess.run(update_ema, {X: batch_X, Y_: batch_Y, tst: False, iter: i, pkeep: 1.0, pkeep_conv: 1.0})
 
-datavis.animate(training_step, 20001, train_data_update_freq=20, test_data_update_freq=100)
+datavis.animate(training_step, 15001, train_data_update_freq=20, test_data_update_freq=100)
 
 # to save the animation as a movie, add save_movie=True as an argument to datavis.animate
 # to disable the visualisation use the following line instead of the datavis.animate line
@@ -197,7 +204,7 @@ print("max test accuracy: " + str(datavis.get_max_test_accuracy()))
 # batch norm 0.999 lr 0.02-0.0001-1000 dropout 0.75, normal biases, no BN scales or offsets: max 0.9944 but oscillating in 0.9935-0.9940 region (test loss stable betwen 1.7 and 1.8 though)
 # batch norm 0.999 lr 0.02-0.0002-1000 dropout 0.75, normal biases, no BN scales or offsets: max 0.995, min test loss 1.49787 cruising below 1.6, then at 8K it something happens and cruise just above 1.6, 0.99436 average on last 10K it
 # => see which setting removes the weird event at 8K ?:
-# => in everything below batch norm 0.999 lr 0.02-0.0002-1000 dropout 0.75, normal biases, no MB scales or offsets, unless stated otherwise
+# => in everything below batch norm 0.999 lr 0.02-0.0002-1000 dropout 0.75, normal biases, no BN scales or offsets, unless stated otherwise
 # remove n/n+1 in variation calculation: no good, m ax 0.994 buit cruising around 0.993
 # bn 0.9955 for cutoff at 2K it: still something happens at 8K. Max 0.995 but cruising at 0.9942-0.9943 only and downward trend above 15K. Test loss: nice cruise below 1.6
 # bn epsilon e-10 => max 0.9947 cruise around 0.9939, test loss never went below 1.6, barely below 1.7,
@@ -219,3 +226,26 @@ print("max test accuracy: " + str(datavis.get_max_test_accuracy()))
 # best * run 3 (lbl 5.2 video): max 0.9951, cruising just below 0.995, test loss cruising around 1.6
 # best * run 3-8: not good, usually in the 0.994 range
 # best * run 9: (lbl 5.3 video): max 0.9956, cruising above 0.995, test loss cruising around 1.6, avg 7K-10K it: 0.99518
+# added BN offests instead of biases as per the BN theory. Offsets initialised to 0.025
+# lr 0.005-0.00015-1000 max accuracy 0.9944 not good
+# lr 0.015-0.0001-1200  max accuracy 0.9950 but it was really a peak
+# same with offsets initialised to -0.25: very bad, not even 0.993, BN offsets stabilise even lower than -0.25
+# same with offsets initialised to 0.1: max accuracy 0.9946 bad
+# same with batch norm and dropout on fully connected layer only: max accuracy 0.9935 very bad
+# BN with no offset but regular biases applied after the BN in convolutional layers. BN with offset on fully connected layer: max accuracy 0.9949
+# BN and dropout on all layers, as per the book: max accuracy 0.9918 very bad
+# back to basics: batch norm 0.9999 lr 0.02-0.00015-1000 dropout 0.75 on dense layer, normal biases, no MB scales or offsets: 0.9935 (bad)
+# by the book: batch norm 0.9999 lr 0.02-0.00015-1000 dropout 0.75 on dense layer, BN offsets init to 0.01, no BN scales: max accuracy 0.9943
+# smaller batch size (33): max accuracy 0.9925 (not good)
+#* by the book: 3 conv layers 24-48-64, batch norm 0.999 lr 0.02-0.0001-1700 dropout 0.5 on dense layer, BN offsets init to 0.01, no BN scales: max accuracy 0.9954, stable around 0.9950, test loss goes as low as 1.45! (on GPU)
+#* by the book: 3 conv layers 24-48-64, batch norm 0.999 lr 0.02-0.0001-1800 dropout 0.5 on dense layer, BN offsets init to 0.01, no BN scales: max accuracy 0.9952, stable around 0.9950 (on GPU)
+# by the book: 3 conv layers 24-48-64, batch norm 0.999 lr 0.02-0.0001-1500 dropout 0.5 on dense layer, BN offsets init to 0.01, no BN scales: max accuracy 0.9947 (on GPU)
+#* by the book: 3 conv layers 24-48-64, batch norm 0.999 lr 0.02-0.0001-1600 dropout 0.5 on dense layer, BN offsets init to 0.01, no BN scales: max accuracy 0.9956, stable around 0.9952 (on GPU)
+#* 2nd run: max accuracy 0.9954, stable around 0.0049, test loss stable around 1.7 (on GPU)
+#* 3rd run: max accuracy 0.9949, stable around  0.9947, test loss stable around 1.6 (on GPU)
+#* 4th run: max accuracy 0.9952, stable around  0.9948, test loss stable around 1.7, 0.9952 at 3200 iterations (on GPU)
+#* 5th run: max accuracy 0.9952, stable around  0.9952, test loss stable around 1.7 (on GPU)
+# same conditions without batch norm: max accuracy below 0.9900 ! (on GPU)
+# same conditions with dropout 0.75: max accuracy 0.9953, stable around  0.9950, test loss stable around 1.6 (on GPU)
+# 2nd run: max accuracy 0.9958 (!), stable around  0.9950, test loss stable around 1.65 (on GPU)
+# 3rd run: max accuracy 0.9955 (!), stable around  0.9951, test loss stable around 1.65 (on GPU)
