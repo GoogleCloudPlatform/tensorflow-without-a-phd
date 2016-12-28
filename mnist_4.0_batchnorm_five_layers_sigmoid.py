@@ -57,19 +57,15 @@ Q = 10
 # Weights initialised with small random values between -0.2 and +0.2
 # When using RELUs, make sure biases are initialised with small *positive* values for example 0.1 = tf.ones([K])/10
 W1 = tf.Variable(tf.truncated_normal([784, L], stddev=0.1))  # 784 = 28 * 28
-B1 = tf.Variable(tf.zeros([L]))
 S1 = tf.Variable(tf.ones([L]))
 O1 = tf.Variable(tf.zeros([L]))
 W2 = tf.Variable(tf.truncated_normal([L, M], stddev=0.1))
-B2 = tf.Variable(tf.zeros([M]))
 S2 = tf.Variable(tf.ones([M]))
 O2 = tf.Variable(tf.zeros([M]))
 W3 = tf.Variable(tf.truncated_normal([M, N], stddev=0.1))
-B3 = tf.Variable(tf.zeros([N]))
 S3 = tf.Variable(tf.ones([N]))
 O3 = tf.Variable(tf.zeros([N]))
 W4 = tf.Variable(tf.truncated_normal([N, P], stddev=0.1))
-B4 = tf.Variable(tf.zeros([P]))
 S4 = tf.Variable(tf.ones([P]))
 O4 = tf.Variable(tf.zeros([P]))
 W5 = tf.Variable(tf.truncated_normal([P, Q], stddev=0.1))
@@ -78,7 +74,7 @@ B5 = tf.Variable(tf.zeros([Q]))
 ## Batch normalisation conclusions with sigmoid activation function:
 # BN is applied between logits and the activation function
 # On Sigmoids it is very clear that without BN, the sigmoids saturate, with BN, they output
-# a clean gausian distribution of values, especially with high initial learning rates.
+# a clean gaussian distribution of values, especially with high initial learning rates.
 
 # sigmoid, no batch-norm, lr(0.003, 0.0001, 2000) => 97.5%
 # sigmoid, batch-norm lr(0.03, 0.0001, 1000) => 98%
@@ -87,7 +83,8 @@ B5 = tf.Variable(tf.zeros([Q]))
 # sigmoid, batch-norm, no scales, no offsets => 96%
 
 # Both scales and offsets are useful with sigmoids.
-# With RELUs, the scale and offset variables can be omitted. They do not seem to do anything.
+# With RELUs, the scale variables can be omitted.
+# Biases are not useful with batch norm, offsets are to be used instead
 
 # Steady 98.5% accuracy using these parameters:
 # moving average decay: 0.998 (equivalent to averaging over two epochs)
@@ -109,19 +106,19 @@ def no_batchnorm(Ylogits, Offset, Scale, is_test, iteration):
 # The model
 XX = tf.reshape(X, [-1, 784])
 
-Y1l = tf.matmul(XX, W1) + B1
+Y1l = tf.matmul(XX, W1)
 Y1bn, update_ema1 = batchnorm(Y1l, O1, S1, tst, iter)
 Y1 = tf.nn.sigmoid(Y1bn)
 
-Y2l = tf.matmul(Y1, W2) + B2
+Y2l = tf.matmul(Y1, W2)
 Y2bn, update_ema2 = batchnorm(Y2l, O2, S2, tst, iter)
 Y2 = tf.nn.sigmoid(Y2bn)
 
-Y3l = tf.matmul(Y2, W3) + B3
+Y3l = tf.matmul(Y2, W3)
 Y3bn, update_ema3 = batchnorm(Y3l, O3, S3, tst, iter)
 Y3 = tf.nn.sigmoid(Y3bn)
 
-Y4l = tf.matmul(Y3, W4) + B4
+Y4l = tf.matmul(Y3, W4)
 Y4bn, update_ema4 = batchnorm(Y4l, O4, S4, tst, iter)
 Y4 = tf.nn.sigmoid(Y4bn)
 
@@ -133,7 +130,7 @@ update_ema = tf.group(update_ema1, update_ema2, update_ema3, update_ema4)
 # cross-entropy loss function (= -sum(Y_i * log(Yi)) ), normalised for batches of 100  images
 # TensorFlow provides the softmax_cross_entropy_with_logits function to avoid numerical stability
 # problems with log(0) which is NaN
-cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits=Ylogits, targets=Y_)
+cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits=Ylogits, labels=Y_)
 cross_entropy = tf.reduce_mean(cross_entropy)*100
 
 # accuracy of the trained model, between 0 (worst) and 1 (best)
@@ -141,8 +138,8 @@ correct_prediction = tf.equal(tf.argmax(Y, 1), tf.argmax(Y_, 1))
 accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 
 # matplotlib visualisation
-allweights = tf.concat(0, [tf.reshape(W1, [-1]), tf.reshape(W2, [-1]), tf.reshape(W3, [-1])])
-allbiases  = tf.concat(0, [tf.reshape(B1, [-1]), tf.reshape(B2, [-1]), tf.reshape(B3, [-1])])
+allweights = tf.concat(0, [tf.reshape(W1, [-1]), tf.reshape(W2, [-1]), tf.reshape(W3, [-1]), tf.reshape(W4, [-1]), tf.reshape(W5, [-1])])
+allbiases  = tf.concat(0, [tf.reshape(O1, [-1]), tf.reshape(O2, [-1]), tf.reshape(O3, [-1]), tf.reshape(O4, [-1]), tf.reshape(B5, [-1])])
 # to use for sigmoid
 allactivations = tf.concat(0, [tf.reshape(Y1, [-1]), tf.reshape(Y2, [-1]), tf.reshape(Y3, [-1]), tf.reshape(Y4, [-1])])
 # to use for RELU
@@ -209,13 +206,6 @@ print("max test accuracy: " + str(datavis.get_max_test_accuracy()))
 # (In all runs, if sigmoids are used, all biases are initialised at 0, if RELUs are used,
 # all biases are initialised at 0.1 apart from the last one which is initialised at 0.)
 
-## learning rate = 0.003, 10K iterations
-# final test accuracy = 0.9788 (sigmoid - slow start, training cross-entropy not stabilised in the end)
-# final test accuracy = 0.9825 (relu - above 0.97 in the first 1500 iterations but noisy curves)
-
-## now with learning rate = 0.0001, 10K iterations
-# final test accuracy = 0.9722 (relu - slow but smooth curve, would have gone higher in 20K iterations)
-
 ## decaying learning rate from 0.003 to 0.0001 decay_speed 2000, 10K iterations
-# final test accuracy = 0.9746 (sigmoid - training cross-entropy not stabilised)
-# final test accuracy = 0.9824 (relu - training set fully learned, test accuracy stable)
+# final test accuracy = 0.9813 (sigmoid - training cross-entropy not stabilised)
+# final test accuracy = 0.9842 (relu - training set fully learned, test accuracy stable)

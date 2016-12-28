@@ -26,11 +26,11 @@ mnist = read_data_sets("data", one_hot=True, reshape=False, validation_size=0)
 # neural network structure for this sample:
 #
 # · · · · · · · · · ·      (input data, 1-deep)                    X [batch, 28, 28, 1]
-# @ @ @ @ @ @ @ @ @ @   -- conv. layer +BN 6x6x1=>6 stride 1       W1 [5, 5, 1, 6]        B1 [6]
+# @ @ @ @ @ @ @ @ @ @   -- conv. layer +BN 6x6x1=>24 stride 1      W1 [5, 5, 1, 24]        B1 [24]
 # ∶∶∶∶∶∶∶∶∶∶∶∶∶∶∶∶∶∶∶                                              Y1 [batch, 28, 28, 6]
-#   @ @ @ @ @ @ @ @     -- conv. layer +BN 5x5x6=>12 stride 2      W2 [5, 5, 6, 12]        B2 [12]
+#   @ @ @ @ @ @ @ @     -- conv. layer +BN 5x5x6=>48 stride 2      W2 [5, 5, 6, 48]        B2 [48]
 #   ∶∶∶∶∶∶∶∶∶∶∶∶∶∶∶                                                Y2 [batch, 14, 14, 12]
-#     @ @ @ @ @ @       -- conv. layer +BN 4x4x12=>24 stride 2     W3 [4, 4, 12, 24]       B3 [24]
+#     @ @ @ @ @ @       -- conv. layer +BN 4x4x12=>64 stride 2     W3 [4, 4, 12, 64]       B3 [64]
 #     ∶∶∶∶∶∶∶∶∶∶∶                                                  Y3 [batch, 7, 7, 24] => reshaped to YY [batch, 7*7*24]
 #      \x/x\x\x/ ✞      -- fully connected layer (relu+dropout+BN) W4 [7*7*24, 200]       B4 [200]
 #       · · · ·                                                    Y4 [batch, 200]
@@ -80,21 +80,19 @@ N = 200  # fully connected layer
 
 W1 = tf.Variable(tf.truncated_normal([6, 6, 1, K], stddev=0.1))  # 6x6 patch, 1 input channel, K output channels
 B1 = tf.Variable(tf.constant(0.1, tf.float32, [K]))
-#S1 = tf.Variable(tf.constant(1.0, tf.float32, [K]))
 W2 = tf.Variable(tf.truncated_normal([5, 5, K, L], stddev=0.1))
 B2 = tf.Variable(tf.constant(0.1, tf.float32, [L]))
-#S2 = tf.Variable(tf.constant(1.0, tf.float32, [L]))
 W3 = tf.Variable(tf.truncated_normal([4, 4, L, M], stddev=0.1))
 B3 = tf.Variable(tf.constant(0.1, tf.float32, [M]))
-#S3 = tf.Variable(tf.constant(1.0, tf.float32, [M]))
 
 W4 = tf.Variable(tf.truncated_normal([7 * 7 * M, N], stddev=0.1))
 B4 = tf.Variable(tf.constant(0.1, tf.float32, [N]))
-#S4 = tf.Variable(tf.constant(1.0, tf.float32, [N]))
 W5 = tf.Variable(tf.truncated_normal([N, 10], stddev=0.1))
 B5 = tf.Variable(tf.constant(0.1, tf.float32, [10]))
 
 # The model
+# batch norm scaling is not useful with relus
+# batch norm offsets are used instead of biases
 stride = 1  # output is 28x28
 Y1l = tf.nn.conv2d(X, W1, strides=[1, stride, stride, 1], padding='SAME')
 Y1bn, update_ema1 = batchnorm(Y1l, tst, iter, B1, convolutional=True)
@@ -126,7 +124,7 @@ update_ema = tf.group(update_ema1, update_ema2, update_ema3, update_ema4)
 # cross-entropy loss function (= -sum(Y_i * log(Yi)) ), normalised for batches of 100  images
 # TensorFlow provides the softmax_cross_entropy_with_logits function to avoid numerical stability
 # problems with log(0) which is NaN
-cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits=Ylogits, targets=Y_)
+cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits=Ylogits, labels=Y_)
 cross_entropy = tf.reduce_mean(cross_entropy)*100
 
 # accuracy of the trained model, between 0 (worst) and 1 (best)
@@ -182,7 +180,7 @@ def training_step(i, update_test_data, update_train_data):
     sess.run(train_step, {X: batch_X, Y_: batch_Y, lr: learning_rate, tst: False, pkeep: 0.75, pkeep_conv: 1.0})
     sess.run(update_ema, {X: batch_X, Y_: batch_Y, tst: False, iter: i, pkeep: 1.0, pkeep_conv: 1.0})
 
-datavis.animate(training_step, 15001, train_data_update_freq=20, test_data_update_freq=100)
+datavis.animate(training_step, 10001, train_data_update_freq=20, test_data_update_freq=100)
 
 # to save the animation as a movie, add save_movie=True as an argument to datavis.animate
 # to disable the visualisation use the following line instead of the datavis.animate line

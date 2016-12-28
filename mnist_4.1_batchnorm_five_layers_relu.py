@@ -90,36 +90,42 @@ B5 = tf.Variable(tf.ones([Q])/10)
 # So apparently no need of scaling before a RELU.
 # => Using neither scales not offsets with RELUs.
 
-def batchnorm(Ylogits, is_test, iteration):
-    exp_moving_avg = tf.train.ExponentialMovingAverage(0.998, iteration) # adding the iteration prevents from averaging across non-existing iterations
+def batchnorm(Ylogits, is_test, iteration, offset, convolutional=False):
+    exp_moving_avg = tf.train.ExponentialMovingAverage(0.999, iteration) # adding the iteration prevents from averaging across non-existing iterations
     bnepsilon = 1e-5
-    mean, variance = tf.nn.moments(Ylogits, [0])
+    if convolutional:
+        mean, variance = tf.nn.moments(Ylogits, [0, 1, 2])
+    else:
+        mean, variance = tf.nn.moments(Ylogits, [0])
     update_moving_everages = exp_moving_avg.apply([mean, variance])
     m = tf.cond(is_test, lambda: exp_moving_avg.average(mean), lambda: mean)
     v = tf.cond(is_test, lambda: exp_moving_avg.average(variance), lambda: variance)
-    Ybn = tf.nn.batch_normalization(Ylogits, m, v, 0.0, 1.0, bnepsilon)
+    Ybn = tf.nn.batch_normalization(Ylogits, m, v, offset, None, bnepsilon)
     return Ybn, update_moving_everages
 
-def no_batchnorm(Ylogits, is_test, iteration):
+def no_batchnorm(Ylogits, is_test, iteration, offset, convolutional=False):
     return Ylogits, tf.no_op()
 
 # The model
 XX = tf.reshape(X, [-1, 784])
 
-Y1l = tf.matmul(XX, W1) + B1
-Y1bn, update_ema1 = batchnorm(Y1l, tst, iter)
+# batch norm scaling is not useful with relus
+# batch norm offsets are used instead of biases
+
+Y1l = tf.matmul(XX, W1)
+Y1bn, update_ema1 = batchnorm(Y1l, tst, iter, B1)
 Y1 = tf.nn.relu(Y1bn)
 
-Y2l = tf.matmul(Y1, W2) + B2
-Y2bn, update_ema2 = batchnorm(Y2l, tst, iter)
+Y2l = tf.matmul(Y1, W2)
+Y2bn, update_ema2 = batchnorm(Y2l, tst, iter, B2)
 Y2 = tf.nn.relu(Y2bn)
 
-Y3l = tf.matmul(Y2, W3) + B3
-Y3bn, update_ema3 = batchnorm(Y3l, tst, iter)
+Y3l = tf.matmul(Y2, W3)
+Y3bn, update_ema3 = batchnorm(Y3l, tst, iter, B3)
 Y3 = tf.nn.relu(Y3bn)
 
-Y4l = tf.matmul(Y3, W4) + B4
-Y4bn, update_ema4 = batchnorm(Y4l, tst, iter)
+Y4l = tf.matmul(Y3, W4)
+Y4bn, update_ema4 = batchnorm(Y4l, tst, iter, B4)
 Y4 = tf.nn.relu(Y4bn)
 
 Ylogits = tf.matmul(Y4, W5) + B5
@@ -130,7 +136,7 @@ update_ema = tf.group(update_ema1, update_ema2, update_ema3, update_ema4)
 # cross-entropy loss function (= -sum(Y_i * log(Yi)) ), normalised for batches of 100  images
 # TensorFlow provides the softmax_cross_entropy_with_logits function to avoid numerical stability
 # problems with log(0) which is NaN
-cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits=Ylogits, targets=Y_)
+cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits=Ylogits, labels=Y_)
 cross_entropy = tf.reduce_mean(cross_entropy)*100
 
 # accuracy of the trained model, between 0 (worst) and 1 (best)
@@ -206,13 +212,6 @@ print("max test accuracy: " + str(datavis.get_max_test_accuracy()))
 # (In all runs, if sigmoids are used, all biases are initialised at 0, if RELUs are used,
 # all biases are initialised at 0.1 apart from the last one which is initialised at 0.)
 
-## learning rate = 0.003, 10K iterations
-# final test accuracy = 0.9788 (sigmoid - slow start, training cross-entropy not stabilised in the end)
-# final test accuracy = 0.9825 (relu - above 0.97 in the first 1500 iterations but noisy curves)
-
-## now with learning rate = 0.0001, 10K iterations
-# final test accuracy = 0.9722 (relu - slow but smooth curve, would have gone higher in 20K iterations)
-
 ## decaying learning rate from 0.003 to 0.0001 decay_speed 2000, 10K iterations
-# final test accuracy = 0.9746 (sigmoid - training cross-entropy not stabilised)
-# final test accuracy = 0.9824 (relu - training set fully learned, test accuracy stable)
+# final test accuracy = 0.9813 (sigmoid - training cross-entropy not stabilised)
+# final test accuracy = 0.9842 (relu - training set fully learned, test accuracy stable)
