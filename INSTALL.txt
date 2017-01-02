@@ -6,7 +6,7 @@ If you are a power user under a specific Python environment ((virtualenv, anacon
 docker), please visit tensorflow.org and follow the Python 3 instructions.
 
 MacOS:
-	If you do not have it already, install git form https://git-scm.com/download/mac
+	If you do not have it already, install git from https://git-scm.com/download/mac
 	Install the latest version of python 3 from https://www.python.org/downloads/
 	pip3 install --upgrade tensorflow
 	pip3 install --upgrade matplotlib
@@ -18,10 +18,9 @@ Ubuntu/Linux:
 	sudo -H apt-get install python3-pip
 	sudo -H pip3 install --upgrade tensorflow
 
-	(A Tensorflow release for Python 3.4 exists: replace "cp35-cp35m" in the URL above with "cp34-cp34m")
-
 Windows:
-    (This code lab should work under cygwinX, however it had not been tested, which is why Virtualbox is recommended)
+    Tensorflow has not yet been released for Windows. It has been reported to work under the Windows 10 bash environment
+    so feel free to try it. However, for this lab, the recommended setup on PCs is Virtualbox:
 	Install Virtualbox from https://www.virtualbox.org/wiki/Downloads
 	Create an Linux/Ubuntu virtual machine and install Ubuntu from http://www.ubuntu.com/download/desktop/
 	[Optional: In the virtual machine install Virtualbox helpers (allows screen resolution changes) using:
