@@ -15,6 +15,8 @@
 
 import tensorflow as tf
 
+# helper to print expected and inferred digits on pictures.
+
 def digits_right():
     d= tf.convert_to_tensor(
         [[[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],

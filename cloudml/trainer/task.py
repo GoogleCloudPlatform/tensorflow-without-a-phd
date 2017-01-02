@@ -14,7 +14,6 @@ import tensorflow as tf
 from tensorflow.contrib import learn
 from tensorflow.contrib import layers
 from tensorflow.contrib import metrics
-#from tensorflow.contrib.learn import monitors
 from tensorflow.contrib import framework
 from tensorflow.contrib.learn.python.learn import learn_runner
 from tensorflow.python.platform import tf_logging as logging
@@ -22,6 +21,10 @@ from tensorflow.contrib.learn.python.learn.metric_spec import MetricSpec
 
 import tempfile
 from tensorflow.examples.tutorials.mnist import input_data
+
+# To run this:
+# cd to the directory containing the "trainer" directory and thre "config.yaml" file
+# gcloud beta ml jobs submit training job22 --package-path=trainer --module-name=trainer.task --staging-bucket=gs://ml1-demo-martin/jobs --config=config.yaml -- --train_dir=gs://ml1-demo-martin/jobs/train22
 
 logging.set_verbosity(logging.INFO)
 # Basic model parameters as external flags.
@@ -73,7 +76,6 @@ trainingConfig = tf.contrib.learn.RunConfig(save_checkpoints_secs=60)
 def experiment_fn(output_dir):
     ITERATIONS = 10000
     mnist = input_data.read_data_sets(tempfile.mkdtemp())
-    #finalMonitor = learn.monitors.ExportMonitor(ITERATIONS, output_dir) # something deprecated in there
     return learn.Experiment(
     estimator=learn.Estimator(model_fn=conv_model, model_dir=output_dir, config=trainingConfig),
     train_input_fn=lambda: train_data_input_fn(mnist),
@@ -82,7 +84,6 @@ def experiment_fn(output_dir):
     eval_steps=1,
     local_eval_frequency=30, #secs between evals (?) - deprecated but learn_runner needs updating...
     eval_metrics=evaluationMetrics
-    #train_monitors=[finalMonitor]
 )
 
 def main(argv=None):
@@ -90,7 +91,3 @@ def main(argv=None):
 
 if __name__ == '__main__':
     main()
-
-# To run this:
-# cd to the directory containing "trainer"
-# gcloud beta ml jobs submit training job22 --package-path=trainer --module-name=trainer.task2 --staging-bucket=gs://ml1-demo-martin/jobs --config=config.yaml -- --train_dir=gs://ml1-demo-martin/jobs/train22
