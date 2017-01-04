@@ -1,4 +1,4 @@
-Python 3 is required for this lab.
+Python 3 is recommended for this lab. Python 2 works as well if you adapt the installation instructions.
 
 Installation instructions for straightforward pip install below.
 
