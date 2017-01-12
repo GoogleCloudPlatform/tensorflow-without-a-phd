@@ -1,4 +1,4 @@
-![Image](https://pbs.twimg.com/media/CjTXEk1XAAA5sE9.jpg)
+![Image](https://codelabs.developers.google.com/codelabs/cloud-tensorflow-mnist/img/93d5f08a4f82d4c.png)
 
 This is support code for the codelab "[Tensorflow and deep learning - without a PhD](https://codelabs.developers.google.com/codelabs/cloud-tensorflow-mnist)"
 
