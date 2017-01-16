@@ -24,7 +24,7 @@ from tensorflow.examples.tutorials.mnist import input_data
 
 # To run this:
 # cd to the directory containing the "trainer" directory and thre "config.yaml" file
-# gcloud beta ml jobs submit training job22 --package-path=trainer --module-name=trainer.task --staging-bucket=gs://ml1-demo-martin/jobs --config=config.yaml -- --train_dir=gs://ml1-demo-martin/jobs/train22
+# gcloud beta ml jobs submit training job22 --package-path=trainer --module-name=trainer.task --staging-bucket=gs://ml1-demo-martin --config=config.yaml -- --train_dir=gs://ml1-demo-martin/jobs/train22
 
 logging.set_verbosity(logging.INFO)
 # Basic model parameters as external flags.
