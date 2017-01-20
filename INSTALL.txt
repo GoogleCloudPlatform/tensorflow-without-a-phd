@@ -19,8 +19,11 @@ Ubuntu/Linux:
 	sudo -H pip3 install --upgrade tensorflow
 
 Windows:
-    Tensorflow has not yet been released for Windows. It has been reported to work under the Windows 10 bash environment
-    so feel free to try it. However, for this lab, the recommended setup on PCs is Virtualbox:
+	Install Anaconda, Python 3 version: https://www.continuum.io/downloads#windows
+	Anaconda comes with matplotlib built in.
+	In the Anaconda shell type: pip install --upgrade tensorflow
+	
+Windows/Virtualbox:
 	Install Virtualbox from https://www.virtualbox.org/wiki/Downloads
 	Create an Linux/Ubuntu virtual machine and install Ubuntu from http://www.ubuntu.com/download/desktop/
 	[Optional: In the virtual machine install Virtualbox helpers (allows screen resolution changes) using:
