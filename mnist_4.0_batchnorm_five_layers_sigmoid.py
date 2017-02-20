@@ -154,7 +154,7 @@ datavis = tensorflowvisu.MnistDataVis(title4="Logits", title5="activations", his
 train_step = tf.train.AdamOptimizer(lr).minimize(cross_entropy)
 
 # init
-init = tf.initialize_all_variables()
+init = tf.global_variables_initializer()
 sess = tf.Session()
 sess.run(init)
 

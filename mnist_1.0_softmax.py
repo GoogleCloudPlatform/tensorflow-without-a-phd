@@ -80,7 +80,7 @@ It = tensorflowvisu.tf_format_mnist_images(X, Y, Y_, 1000, lines=25)  # 1000 ima
 datavis = tensorflowvisu.MnistDataVis()
 
 # init
-init = tf.initialize_all_variables()
+init = tf.global_variables_initializer()
 sess = tf.Session()
 sess.run(init)
 
