@@ -30,9 +30,9 @@ gcloud ml-engine predict --model <model_name> --json-instances digits.json
 ```
 
 ## Local predictions
-You can also simulate the prediction service locally, replace XXXXXXXX with the # of your saved model:
+You can also simulate the prediction service locally, replace XXXXX with the # of your saved model:
 ```bash
-gcloud ml-engine local predict --model-dir checkpoints/export/Servo/XXXXXXXX --json-instances digits.json
+gcloud ml-engine local predict --model-dir checkpoints/export/Servo/XXXXX --json-instances digits.json
 ```
 
 ---
