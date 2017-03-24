@@ -35,7 +35,7 @@ You can also simulate the prediction service locally, replace XXXXXXXX with the 
 gcloud ml-engine local predict --model-dir checkpoints/export/Servo/XXXXXXXX --json-instances digits.json
 ```
 
-##Misc.
+## Misc.
 If you want to experiment with TF Records, the sandard Tensorflow
 data format, you can run this script ((availble in the tensorflow distribution)
 to reformat the MNIST dataset into TF Records. It is not necessary for this sample though.
