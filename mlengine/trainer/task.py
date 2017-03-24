@@ -24,12 +24,9 @@ from tensorflow.examples.tutorials.mnist import input_data
 import argparse
 import sys
 
-# To run this:
-# Make sure you have your Google Cloud Platform <project> with ML Engine enabled.
-# Make sure you have a Google Cloud Storage <bucket> where you can write.
-# cd to the directory containing the "trainer" directory and the "config.yaml" file and run:
-# (jobXXX, jobs/jobXXX, <project> and <bucket> must be replaced by your own values)
-# gcloud ml-engine jobs submit training jobXXX --job-dir gs://<bucket>/jobs/jobXXX --project <project> --config=config.yaml --module-name trainer.task --package-path trainer
+#
+# To run this: see README.md
+#
 
 logging.set_verbosity(logging.INFO)
 
@@ -88,8 +85,6 @@ def conv_model(X, Y_, mode):
         eval_metric_ops=eval_metrics
     )
 
-#INPUT_COLS = [layers.real_valued_column(column_name='image', dimension=28*28)]
-
 training_config = tf.contrib.learn.RunConfig(save_checkpoints_secs=None, save_checkpoints_steps=1000, gpu_memory_fraction=0.9)
 export_strategy=saved_model_export_utils.make_export_strategy(export_input_fn=serving_input_fn)
 
@@ -100,7 +95,6 @@ def experiment_fn(output_dir, data, **kwargs):
     estimator=learn.Estimator(model_fn=conv_model, model_dir=output_dir, config=training_config),
     train_input_fn=lambda: train_data_input_fn(mnist),
     eval_input_fn=lambda: eval_data_input_fn(mnist),
-    #eval_metrics=evaluationMetrics,
     train_steps=ITERATIONS,
     eval_steps=1,
     export_strategies=export_strategy
