@@ -13,3 +13,5 @@
 trainingInput:
   # Use a cluster with many workers and a few parameter servers.
   scaleTier: STANDARD_1
+  #scaleTier: BASIC_GPU
+  #scaleTier: PREMIUM_1
