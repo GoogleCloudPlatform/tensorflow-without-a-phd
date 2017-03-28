@@ -28,12 +28,6 @@ Then call the online predictions service, replacing <model_name> with the name y
 ```bash
 gcloud ml-engine predict --model <model_name> --json-instances digits.json
 ```
-
-## Local predictions
-You can also simulate the prediction service locally, replace XXXXX with the # of your saved model:
-```bash
-gcloud ml-engine local predict --model-dir checkpoints/export/Servo/XXXXX --json-instances digits.json
-```
 It should return a perfect scorecard:
 
 | CLASSES  | PREDICTIONS |
@@ -43,6 +37,11 @@ It should return a perfect scorecard:
 | 7  | [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0]  |
 | 5  | [0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0]  |
 | 5  | [0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0]  |
+## Local predictions
+You can also simulate the prediction service locally, replace XXXXX with the # of your saved model:
+```bash
+gcloud ml-engine local predict --model-dir checkpoints/export/Servo/XXXXX --json-instances digits.json
+```
 
 ---
 ### Misc.
