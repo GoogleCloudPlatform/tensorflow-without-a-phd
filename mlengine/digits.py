@@ -165,8 +165,16 @@ digit5b = [[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
 
 def scale(x): return (np.array(x)*63).tolist()
 
-# for online predictions, use this format
-print(json.dumps([scale(digit8), scale(digit7a), scale(digit7b), scale(digit5a), scale(digit5b)]))
+sdigit8  = scale(digit8)
+sdigit7a = scale(digit7a)
+sdigit7b = scale(digit7b)
+sdigit5a = scale(digit5a)
+sdigit5b = scale(digit5b)
+test_digits = [sdigit8, sdigit7a, sdigit7b, sdigit5a, sdigit5b]
 
-# for local predictions, use this format
-#print(json.dumps(scale(digit2)))
+if __name__ == '__main__':
+    # for online predictions, use this format
+    print(json.dumps([sdigit8, sdigit7a, sdigit7b, sdigit5a, sdigit5b]))
+
+    # for local predictions, use this format
+    # print(json.dumps(sdigit8))
