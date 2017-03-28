@@ -53,3 +53,7 @@ to reformat the MNIST dataset into TF Records. It is not necessary for this samp
 python <YOUR-TF-DIR>/tensorflow/examples/how_tos/reading_data/convert_to_records.py --directory=data --validation_size=0
 ```
 
+| First Header  | Second Header |
+| ------------- | ------------- |
+| Content Cell  | Content Cell  |
+| Content Cell  | Content Cell  |
