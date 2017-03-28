@@ -36,6 +36,7 @@ gcloud ml-engine local predict --model-dir checkpoints/export/Servo/XXXXX --json
 ```
 It should return a perfect scorecard:
 | CLASSES | PREDICTIONS                                         |
+|---------|-----------------------------------------------------|
 |  8      |  [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0] |
 |  7      |  [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0] |
 |  7      |  [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0] |
