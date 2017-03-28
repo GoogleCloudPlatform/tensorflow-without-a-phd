@@ -34,6 +34,13 @@ You can also simulate the prediction service locally, replace XXXXX with the # o
 ```bash
 gcloud ml-engine local predict --model-dir checkpoints/export/Servo/XXXXX --json-instances digits.json
 ```
+It should return a perfect scorecard:
+| CLASSES | PREDICTIONS                                         |
+|  8      |  [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0] |
+|  7      |  [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0] |
+|  7      |  [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0] |
+|  5      |  [0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0] |
+|  5      |  [0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0] |
 
 ---
 ### Misc.
