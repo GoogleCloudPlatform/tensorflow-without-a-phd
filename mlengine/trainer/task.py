@@ -119,6 +119,7 @@ def experiment_fn_with_params(output_dir, data, **kwargs):
     eval_input_fn=lambda: eval_data_input_fn(mnist),
     train_steps=ITERATIONS,
     eval_steps=1,
+    min_eval_frequency=1000,
     export_strategies=export_strategy
 )
 
