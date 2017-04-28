@@ -25,6 +25,9 @@ Windows:
 	Install Anaconda, Python 3 version: https://www.continuum.io/downloads#windows
 	Anaconda comes with matplotlib built in.
 	In the Anaconda shell type: pip install --upgrade tensorflow
+		If you get the error "Could not find a version that satisfies the requirement (...)" try the following alternative:
+		conda config --add channels conda-forge
+		conda install tensorflow
 
 TEST YOUR INSTALLATION:
     git clone https://github.com/martin-gorner/tensorflow-mnist-tutorial.git
