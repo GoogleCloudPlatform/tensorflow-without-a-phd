@@ -46,7 +46,7 @@ lr = tf.placeholder(tf.float32)
 pkeep = tf.placeholder(tf.float32)
 
 # three convolutional layers with their channel counts, and a
-# fully connected layer (tha last layer has 10 softmax neurons)
+# fully connected layer (the last layer has 10 softmax neurons)
 K = 6  # first convolutional layer output depth
 L = 12  # second convolutional layer output depth
 M = 24  # third convolutional layer
