@@ -34,7 +34,7 @@ mnist = read_data_sets("data", one_hot=True, reshape=False, validation_size=0)
 #      \x/x\x\x/ ✞      -- fully connected layer (relu+dropout) W4 [7*7*24, 200]       B4 [200]
 #       · · · ·                                                 Y4 [batch, 200]
 #       \x/x\x/         -- fully connected layer (softmax)      W5 [200, 10]           B5 [10]
-#        · · ·                                                  Y [batch, 20]
+#        · · ·                                                  Y [batch, 10]
 
 # input X: 28x28 grayscale images, the first dimension (None) will index the images in the mini-batch
 X = tf.placeholder(tf.float32, [None, 28, 28, 1])
