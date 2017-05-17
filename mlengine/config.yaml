@@ -11,13 +11,15 @@
 # limitations under the License.
 
 trainingInput:
-  # Use a cluster with many workers and a few parameter servers.
-  scaleTier: STANDARD_1
+  #scaleTier: BASIC
   #scaleTier: BASIC_GPU
+  #scaleTier: STANDARD_1
   #scaleTier: PREMIUM_1
 
-  #scaleTier: CUSTOM
-  #masterType: standard
-  #workerCount: 10
-  #workerType: standard_gpu
+  scaleTier: CUSTOM
+  masterType: standard_gpu
+  parameterServerCount: 1
+  parameterServerType: standard_gpu
+  workerCount: 3
+  workerType: standard_gpu
 
