@@ -16,11 +16,12 @@
 import tensorflow as tf
 import tensorflowvisu
 import math
-from tensorflow.contrib.learn.python.learn.datasets.mnist import read_data_sets
+from tensorflow.examples.tutorials.mnist import input_data as mnist_data
+print("Tensorflow version " + tf.__version__)
 tf.set_random_seed(0)
 
 # Download images and labels into mnist.test (10K images+labels) and mnist.train (60K images+labels)
-mnist = read_data_sets("data", one_hot=True, reshape=False, validation_size=0)
+mnist = mnist_data.read_data_sets("data", one_hot=True, reshape=False, validation_size=0)
 
 # neural network structure for this sample:
 #

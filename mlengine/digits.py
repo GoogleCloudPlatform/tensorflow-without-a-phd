@@ -163,7 +163,7 @@ digit5b = [[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
            ]
 
-def scale(x): return (np.array(x)*63).tolist()
+def scale(x): return (np.array(x)/4.0).tolist()
 
 sdigit8  = scale(digit8)
 sdigit7a = scale(digit7a)
