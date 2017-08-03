@@ -95,11 +95,11 @@ def batchnorm(Ylogits, Offset, Scale, is_test, iteration):
     exp_moving_avg = tf.train.ExponentialMovingAverage(0.998, iteration) # adding the iteration prevents from averaging across non-existing iterations
     bnepsilon = 1e-5
     mean, variance = tf.nn.moments(Ylogits, [0])
-    update_moving_everages = exp_moving_avg.apply([mean, variance])
+    update_moving_averages = exp_moving_avg.apply([mean, variance])
     m = tf.cond(is_test, lambda: exp_moving_avg.average(mean), lambda: mean)
     v = tf.cond(is_test, lambda: exp_moving_avg.average(variance), lambda: variance)
     Ybn = tf.nn.batch_normalization(Ylogits, m, v, Offset, Scale, bnepsilon)
-    return Ybn, update_moving_everages
+    return Ybn, update_moving_averages
 
 def no_batchnorm(Ylogits, Offset, Scale, is_test, iteration):
     return Ylogits, tf.no_op()
