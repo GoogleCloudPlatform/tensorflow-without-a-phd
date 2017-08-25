@@ -12,15 +12,13 @@
 
 import numpy as np
 import tensorflow as tf
-from tensorflow.contrib.learn.python.learn.utils import saved_model_export_utils
-from tensorflow.contrib.learn.python.learn import learn_runner
 from tensorflow.python.platform import tf_logging as logging
 from tensorflow.examples.tutorials.mnist import input_data as mnist_data
 import argparse
 import math
 import sys
-print("Tensorflow version " + tf.__version__)
 logging.set_verbosity(logging.INFO)
+logging.log(logging.INFO, "Tensorflow version " + tf.__version__)
 
 #
 # To run this: see README.md
@@ -30,21 +28,24 @@ logging.set_verbosity(logging.INFO)
 def serving_input_fn():
     inputs = {'image': tf.placeholder(tf.float32, [None, 28, 28])}
     # Here, you can transform the data received from the API call
-    features = [inputs['image']]
-    # Compatibility warning: this will move to tf.estimator.export.ServingInputReceiver in TF 1.2
-    return tf.contrib.learn.utils.InputFnOps(features, None, inputs)
+    features = inputs
+    return tf.estimator.export.ServingInputReceiver(features, inputs)
 
 
 # In memory training data for this simple case.
 # When data is too large to fit in memory, use Tensorflow queues.
 def train_data_input_fn(mnist):
-    return tf.train.shuffle_batch([tf.constant(mnist.train.images), tf.constant(mnist.train.labels)],
-                                  batch_size=100, capacity=1100, min_after_dequeue=1000, enqueue_many=True)
+    features, labels = tf.train.shuffle_batch([tf.constant(mnist.train.images), tf.constant(mnist.train.labels)],
+                                            batch_size=100, capacity=5000, min_after_dequeue=2000, enqueue_many=True)
+    features = {'image': features}
+    return features, labels
 
 
 # Eval data is an in-memory constant here.
 def eval_data_input_fn(mnist):
-    return tf.constant(mnist.test.images), tf.constant(mnist.test.labels)
+    features, labels = tf.constant(mnist.test.images), tf.constant(mnist.test.labels)
+    features = {'image': features}
+    return features, labels
 
 
 # Model loss (not needed in INFER mode)
@@ -55,10 +56,10 @@ def conv_model_loss(Ylogits, Y_, mode):
 
 # Model optimiser (only needed in TRAIN mode)
 def conv_model_train_op(loss, mode):
-    # Compatibility warning: optimize_loss is still in contrib. This will change in Tensorflow 1.2
+    # Compatibility warning: optimize_loss is still in contrib. This will change in Tensorflow 1.4
     return tf.contrib.layers.optimize_loss(loss, tf.train.get_global_step(), learning_rate=0.003, optimizer="Adam",
         # to remove learning rate decay, comment the next line
-        learning_rate_decay_fn=lambda lr, step: 0.0001 + tf.train.exponential_decay(lr, step, -2000, math.e)
+        learning_rate_decay_fn=lambda lr, step: 0.0001 + tf.train.exponential_decay(lr, step, -1000, math.e)
         ) if mode == tf.estimator.ModeKeys.TRAIN else None
 
 
@@ -71,7 +72,7 @@ def conv_model_eval_metrics(classes, Y_, mode):
 
 # Model
 def conv_model(features, labels, mode):
-    X = features
+    X = features['image']
     Y_ = labels
     XX = tf.reshape(X, [-1, 28, 28, 1])
     biasInit = tf.constant_initializer(0.1, dtype=tf.float32)
@@ -81,7 +82,7 @@ def conv_model(features, labels, mode):
     Y4 = tf.reshape(Y3, [-1, 24*7*7])
     Y5 = tf.layers.dense(Y4, 200, activation=tf.nn.relu, bias_initializer=biasInit)
     # to deactivate dropout on the dense layer, set rate=1. The rate is the % of dropped neurons.
-    Y5d = tf.layers.dropout(Y5, rate=0.25, training=mode==tf.estimator.ModeKeys.TRAIN)
+    Y5d = tf.layers.dropout(Y5, rate=0.3, training=mode==tf.estimator.ModeKeys.TRAIN)
     Ylogits = tf.layers.dense(Y5d, 10)
     predict = tf.nn.softmax(Ylogits)
     classes = tf.cast(tf.argmax(predict, 1), tf.uint8)
@@ -90,32 +91,32 @@ def conv_model(features, labels, mode):
     train_op = conv_model_train_op(loss, mode)
     eval_metrics = conv_model_eval_metrics(classes, Y_, mode)
 
-    # Compatibility warning: this will move to tf.estimator.EstimatorSpec in TF 1.2
-    return tf.contrib.learn.ModelFnOps(
+    return tf.estimator.EstimatorSpec(
         mode=mode,
         predictions={"predictions": predict, "classes": classes}, # name these fields as you like
         loss=loss,
         train_op=train_op,
-        eval_metric_ops=eval_metrics
+        eval_metric_ops=eval_metrics,
+        # ???
+        export_outputs={'classes': tf.estimator.export.PredictOutput({"predictions": predict, "classes": classes})}
     )
 
-# Compatibility warning: this will move to tf.estimator.run_config.RunConfing in TF 1.2
+# Compatibility warning: this will move to tf.estimator.run_config.RunConfing in TF 1.4
 training_config = tf.contrib.learn.RunConfig(save_checkpoints_secs=None, save_checkpoints_steps=1000)
 
 # This will export a model at every checkpoint, including the transformations needed for online predictions.
 # Bug: exports_to_keep=None is mandatory otherwise training crashes.
-# Compatibility warning: make_export_strategy is currently in contrib. It will move in TF 1.2
-export_strategy=saved_model_export_utils.make_export_strategy(serving_input_fn=serving_input_fn, exports_to_keep=None)
+# Compatibility warning: make_export_strategy is currently in contrib. It will move in TF 1.4
+export_strategy = tf.contrib.learn.utils.saved_model_export_utils.make_export_strategy(serving_input_fn=serving_input_fn)
 
 
 # The Experiment is an Estimator with data loading functions and other parameters
 def experiment_fn_with_params(output_dir, data_dir, **kwargs):
     ITERATIONS = 10000
     mnist = mnist_data.read_data_sets(data_dir, reshape=True, one_hot=False, validation_size=0) # loads training and eval data in memory
-    # Compatibility warning: Experiment will move
+    # Compatibility warning: Experiment will move out of contrib in 1.4
     return tf.contrib.learn.Experiment(
-    # Compatibility warning: this will move to tf.estimator.Estimator
-    estimator=tf.contrib.learn.Estimator(model_fn=conv_model, model_dir=output_dir, config=training_config),
+    estimator=tf.estimator.Estimator(model_fn=conv_model, model_dir=output_dir, config=training_config),
     train_input_fn=lambda: train_data_input_fn(mnist),
     eval_input_fn=lambda: eval_data_input_fn(mnist),
     train_steps=ITERATIONS,
@@ -141,7 +142,7 @@ def main(argv):
     output_dir = arguments.pop('job_dir')
     experiment_fn = lambda output_dir: experiment_fn_with_params(output_dir, **arguments)
     # Compatibility warning: learn_runner is currently in contrib. It will move in TF 1.2
-    learn_runner.run(experiment_fn, output_dir)
+    tf.contrib.learn.learn_runner.run(experiment_fn, output_dir)
 
 
 if __name__ == '__main__':

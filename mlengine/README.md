@@ -10,8 +10,9 @@ gcloud ml-engine local train --module-name trainer.task --package-path trainer
 ## Train in the cloud
 (jobXXX, jobs/jobXXX, &lt;<project&gt; and &lt;bucket&gt; must be replaced with your own values)
 ```bash
-gcloud ml-engine jobs submit training jobXXX --job-dir gs://<bucket>/jobs/jobXXX --project <project> --config config.yaml --module-name trainer.task --package-path trainer
+gcloud ml-engine jobs submit training jobXXX --job-dir gs://<bucket>/jobs/jobXXX --project <project> --config config.yaml --module-name trainer.task --package-path trainer --runtime-version 1.2
 ```
+Do not forget the  --runtime-version 1.2 in the command. The default on ML Engine is Tensorflow 1.0 but this code has been updated for 1.2 and will not work on 1.0
 ## Predictions from the cloud
 Use the Cloud ML Engine UI to create a model and a version from
 the saved data from your training run.

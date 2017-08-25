@@ -174,7 +174,7 @@ test_digits = [sdigit8, sdigit7a, sdigit7b, sdigit5a, sdigit5b]
 
 if __name__ == '__main__':
     # for online predictions, use this format
-    print(json.dumps([sdigit8, sdigit7a, sdigit7b, sdigit5a, sdigit5b]))
+    print(json.dumps({'image': [sdigit8, sdigit7a, sdigit7b, sdigit5a, sdigit5b]}))
 
-    # for local predictions, use this format
-    # print(json.dumps(sdigit8))
+    # this format works for both local and online predictions
+    #print(json.dumps({'image': sdigit8}))
