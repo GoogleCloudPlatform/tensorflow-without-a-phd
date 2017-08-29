@@ -3,44 +3,38 @@ trainingInput:
   hyperparameters:
     goal: MAXIMIZE
     hyperparameterMetricTag: accuracy
-    maxTrials: 63
+    maxTrials: 35
     maxParallelTrials: 7
     params:
-      - parameterName: hp-dropout
-        type: DOUBLE
-        minValue: 0.1
-        maxValue: 0.5
-        scaleType: UNIT_LINEAR_SCALE
       - parameterName: hp-conv1
         type: INTEGER
         minValue: 6
-        maxValue: 24
+        maxValue: 11
         scaleType: UNIT_LINEAR_SCALE
       - parameterName: hp-conv2
         type: INTEGER
         minValue: 12
-        maxValue: 48
+        maxValue: 23
         scaleType: UNIT_LINEAR_SCALE
       - parameterName: hp-conv3
         type: INTEGER
         minValue: 24
-        maxValue: 64
+        maxValue: 48
         scaleType: UNIT_LINEAR_SCALE
-# best
-# "trialId": "15",
-#        "hyperparameters": {
-#          "hp-conv3": "27",
-#          "hp-conv2": "46",
-#          "hp-conv1": "24",
-#          "hp-dropout": "0.14640591144228143"
-#        },
-#        "finalMetric": {
-#          "trainingStep": "10000",
-#          "objectiveValue": 0.99169999361
-#        }
+# best:
+#"trialId": "4",
+#      "hyperparameters": {
+#        "hp-conv1": "11",
+#        "hp-conv2": "23",
+#        "hp-conv3": "48"
+#      },
+#      "finalMetric": {
+#        "trainingStep": "10000",
+#        "objectiveValue": 0.993200004101
+#      }
 # Other params:
 # three conv layers: with patch sizes 6x6 5x5 4x4
 # dense layer: 200
 # activation: relu
 #
-# comment: mostly non-sensical experiments, even the best one. Poor results overall.
+# comment: good results, the largest network wins
