@@ -1,0 +1,36 @@
+trainingInput:
+  scaleTier: BASIC_GPU
+  hyperparameters:
+    goal: MAXIMIZE
+    hyperparameterMetricTag: accuracy
+    maxTrials: 24
+    maxParallelTrials: 4
+    params:
+      - parameterName: hp-lr0
+        type: DOUBLE
+        minValue: 0.0005
+        maxValue: 0.05
+        scaleType: UNIT_LOG_SCALE
+      - parameterName: hp-lr2
+        type: INTEGER
+        minValue: 500
+        maxValue: 5000
+        scaleType: UNIT_LINEAR_SCALE
+
+# "trialId": "11",
+#      "hyperparameters": {
+#        "hp-lr2": "4831",
+#        "hp-lr0": "0.002930563297230477"
+#      },
+#      "finalMetric": {
+#        "trainingStep": "10000",
+#        "objectiveValue": 0.991100013256
+#      }
+# Other params:
+# learning rate lr1=0
+# dropout rate: 0.3
+# conv layers: 6-12-24 with patch sizes 6x6 5x5 4x4
+# dense layer: 200
+# activation: elu
+#
+# comment: elu instead of relu does not seem to benefit this model across a range of learning rate options

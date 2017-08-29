@@ -1,0 +1,41 @@
+trainingInput:
+  scaleTier: BASIC
+  hyperparameters:
+    goal: MAXIMIZE
+    hyperparameterMetricTag: accuracy
+    maxTrials: 64
+    maxParallelTrials: 16
+    params:
+      - parameterName: hp-lr0
+        type: DOUBLE
+        minValue: 0.0005
+        maxValue: 0.05
+        scaleType: UNIT_LOG_SCALE
+      - parameterName: hp-lr1
+        type: DOUBLE
+        minValue: 0.00005
+        maxValue: 0.005
+        scaleType: UNIT_LOG_SCALE
+      - parameterName: hp-lr2
+        type: INTEGER
+        minValue: 500
+        maxValue: 5000
+        scaleType: UNIT_LINEAR_SCALE
+# best
+# "trialId": "50",
+#      "hyperparameters": {
+#        "hp-lr0": "0.007843003453087442",
+#        "hp-lr1": "0.00018932634077961129",
+#        "hp-lr2": "3228"
+#      },
+#      "finalMetric": {
+#        "trainingStep": "10000",
+#        "objectiveValue": 0.992900013924
+#      }
+# Other params:
+# dropout rate: 0.3
+# conv layers: 6-12-24 with patch sizes 6x6 5x5 4x4
+# dense layer: 200
+# activation: relu
+#
+# comment: selecting learning rate parameters 0.01 - 0.0 - 3200 for future runs
