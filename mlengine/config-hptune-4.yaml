@@ -1,0 +1,54 @@
+trainingInput:
+  scaleTier: BASIC_GPU
+  hyperparameters:
+    goal: MAXIMIZE
+    hyperparameterMetricTag: accuracy
+    maxTrials: 53
+    maxParallelTrials: 7
+    params:
+      - parameterName: hp-dropout
+        type: DOUBLE
+        minValue: 0.0
+        maxValue: 0.5
+        scaleType: UNIT_LINEAR_SCALE
+      - parameterName: hp-bnexp
+        type: DOUBLE
+        minValue: 0.99
+        maxValue: 0.999
+        scaleType: UNIT_LINEAR_SCALE
+      - parameterName: hp-lr2
+        type: INTEGER
+        minValue: 500
+        maxValue: 5000
+        scaleType: UNIT_LINEAR_SCALE
+
+# "trialId": "52",
+#  "hyperparameters": {
+#    "hp-dropout": "0.48624408265726871",
+#    "hp-bnexp": "0.992337852381846",
+#    "hp-lr2": "4816"
+#  },
+#  "finalMetric": {
+#    "trainingStep": "10000",
+#    "objectiveValue": 0.994400024414
+#  }
+#},
+#{
+#  "trialId": "25",
+#  "hyperparameters": {
+#    "hp-lr2": "4373",
+#    "hp-dropout": "0.28940954179107492",
+#    "hp-bnexp": "0.9966047152381351"
+#  },
+#  "finalMetric": {
+#    "trainingStep": "10000",
+#    "objectiveValue": 0.99430000782
+#  }
+# Other params:
+# learning rate lr1=0.005-0.0002-xxx
+# conv layers: 6-12-24 with patch sizes 6x6 5x5 4x4 with batch norm
+# dense layer: 200 batch norm
+# activation: relu
+#
+# comment: fast learning rates (lr2=4000 is slow decay) work best with batch norm
+# dropout is best turned on but does not seem to have that much influence (0.3 is ok).

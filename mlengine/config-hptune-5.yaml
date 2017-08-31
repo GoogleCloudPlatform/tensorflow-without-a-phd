@@ -1,0 +1,49 @@
+trainingInput:
+  scaleTier: BASIC_GPU
+  hyperparameters:
+    goal: MINIMIZE
+    hyperparameterMetricTag: loss
+    maxTrials: 53
+    maxParallelTrials: 7
+    params:
+      - parameterName: hp-dropout
+        type: DOUBLE
+        minValue: 0.0
+        maxValue: 0.5
+        scaleType: UNIT_LINEAR_SCALE
+      - parameterName: hp-bnexp
+        type: DOUBLE
+        minValue: 0.99
+        maxValue: 0.999
+        scaleType: UNIT_LINEAR_SCALE
+
+# best:
+#"trialId": "10",
+#      "hyperparameters": {
+#        "hp-dropout": "0.27102401082943173",
+#        "hp-bnexp": "0.99343926909222713"
+#      },
+#      "finalMetric": {
+#        "trainingStep": "10000",
+#        "objectiveValue": 1.70213770866
+#      }
+#    },
+# => final accuracy 0.9950
+#    {
+#      "trialId": "48",
+#      "hyperparameters": {
+#        "hp-dropout": "0.44979540190629241",
+#        "hp-bnexp": "0.99291605229359048"
+#      },
+#      "finalMetric": {
+#        "trainingStep": "10000",
+#        "objectiveValue": 1.81940686703
+#      }
+# => final accuracy 0.9947
+# Other params:
+# learning rate lr1=0.005-0.0002-4000
+# conv layers: 6-12-48 with patch sizes 6x6 5x5 4x4 with batch norm
+# dense layer: 200 batch norm
+# activation: relu
+#
+# comment: this run reached 0.9950

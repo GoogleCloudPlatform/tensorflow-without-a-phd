@@ -32,9 +32,21 @@ trainingInput:
 #        "trainingStep": "10000",
 #        "objectiveValue": 0.993200004101
 #      }
+# best with batch norm:
+#"trialId": "9",
+#      "hyperparameters": {
+#        "hp-conv1": "6",
+#        "hp-conv3": "48",
+#        "hp-conv2": "12"
+#      },
+#      "finalMetric": {
+#        "trainingStep": "10000",
+#        "objectiveValue": 0.994400024414
+#      }
 # Other params:
 # three conv layers: with patch sizes 6x6 5x5 4x4
 # dense layer: 200
 # activation: relu
 #
-# comment: good results, the largest network wins
+# comment: good results, the largest network wins.
+# In a separate run I got 0.9927 from conv layers 12-24-32

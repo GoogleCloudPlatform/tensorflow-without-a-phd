@@ -75,17 +75,29 @@ def conv_model(features, labels, mode, params):
     X = features['image']
     Y_ = labels
 
-    bias_init = tf.constant_initializer(0.1, dtype=tf.float32)
+    #bias_init = tf.constant_initializer(0.1, dtype=tf.float32)
     weights_init = tf.truncated_normal_initializer(stddev=0.1)
 
+    def batch_norm_cnv(inputs):
+        return tf.layers.batch_normalization(inputs, axis=3, momentum=params['bnexp'], epsilon=1e-5, scale=False, training=(mode == tf.estimator.ModeKeys.TRAIN))
+
+    def batch_norm(inputs):
+        return tf.layers.batch_normalization(inputs, axis=1, momentum=params['bnexp'], epsilon=1e-5, scale=False, training=(mode == tf.estimator.ModeKeys.TRAIN))
+
     XX = tf.reshape(X, [-1, 28, 28, 1])
-    Y1 = tf.layers.conv2d(XX,  filters=params['conv1'],  kernel_size=[6, 6], padding="same", activation=tf.nn.relu, bias_initializer=bias_init, kernel_initializer=weights_init)
-    Y2 = tf.layers.conv2d(Y1, filters=params['conv2'], kernel_size=[5, 5], padding="same", strides=2, activation=tf.nn.relu, bias_initializer=bias_init, kernel_initializer=weights_init)
-    Y3 = tf.layers.conv2d(Y2, filters=params['conv3'], kernel_size=[4, 4], padding="same", strides=2, activation=tf.nn.relu, bias_initializer=bias_init, kernel_initializer=weights_init)
-    Y4 = tf.reshape(Y3, [-1, params['conv3']*7*7])
-    Y5 = tf.layers.dense(Y4, 200, activation=tf.nn.relu, bias_initializer=bias_init, kernel_initializer=weights_init)
+    Y1 = tf.layers.conv2d(XX,  filters=params['conv1'],  kernel_size=[6, 6], padding="same", kernel_initializer=weights_init)
+    Y1bn = tf.nn.relu(batch_norm_cnv(Y1))
+    Y2 = tf.layers.conv2d(Y1bn, filters=params['conv2'], kernel_size=[5, 5], padding="same", strides=2, kernel_initializer=weights_init)
+    Y2bn = tf.nn.relu(batch_norm_cnv(Y2))
+    Y3 = tf.layers.conv2d(Y2bn, filters=params['conv3'], kernel_size=[4, 4], padding="same", strides=2, kernel_initializer=weights_init)
+    Y3bn = tf.nn.relu(batch_norm_cnv(Y3))
+
+    Y4 = tf.reshape(Y3bn, [-1, params['conv3']*7*7])
+    Y5 = tf.layers.dense(Y4, 200, kernel_initializer=weights_init)
+    Y5bn = tf.nn.relu(batch_norm(Y5))
+
     # to deactivate dropout on the dense layer, set rate=1. The rate is the % of dropped neurons.
-    Y5d = tf.layers.dropout(Y5, rate=params['dropout'], training=mode==tf.estimator.ModeKeys.TRAIN)
+    Y5d = tf.layers.dropout(Y5bn, rate=params['dropout'], training=(mode == tf.estimator.ModeKeys.TRAIN))
     Ylogits = tf.layers.dense(Y5d, 10)
     predict = tf.nn.softmax(Ylogits)
     classes = tf.cast(tf.argmax(predict, 1), tf.uint8)
@@ -115,7 +127,7 @@ export_strategy = tf.contrib.learn.utils.saved_model_export_utils.make_export_st
 
 # The Experiment is an Estimator with data loading functions and other parameters
 def experiment_fn_with_params(output_dir, hparams, data_dir, **kwargs):
-    ITERATIONS = 10000
+    ITERATIONS = hparams["iterations"]
     mnist = mnist_data.read_data_sets(data_dir, reshape=True, one_hot=False, validation_size=0) # loads training and eval data in memory
     # Compatibility warning: Experiment will move out of contrib in 1.4
     return tf.contrib.learn.Experiment(
@@ -135,15 +147,20 @@ def main(argv):
     # should be saved. You can define additional user arguments which will have to be specified after
     # an empty arg -- on the command line:
     # gcloud ml-engine jobs submit training jobXXX --job-dir=... --ml-engine-args -- --user-args
+
+    # no batch norm: lr 0.002-0.0002-2000 is ok, over 10000 iterations (final accuracy 0.9937 loss 2.39 job156)
+    # batch norm: lr 0.02-0.0001-600 conv 16-32-64 trains in 3000 iteration (final accuracy 0.0.8849 loss 1.466 job 159)
     parser.add_argument('--job-dir', default="checkpoints", help='GCS or local path where to store training checkpoints')
     parser.add_argument('--data-dir', default="data", help='Where training data will be loaded and unzipped')
-    parser.add_argument('--hp-lr0', default=0.005, type=float, help='Hyperparameter: initial (max) learning rate')
-    parser.add_argument('--hp-lr1', default=0.0002, type=float, help='Hyperparameter: target (min) learning rate')
-    parser.add_argument('--hp-lr2', default=2000, type=float, help='Hyperparameter: learning rate decay speed in steps. Learning rate decays by exp(-1) every N steps.')
-    parser.add_argument('--hp-dropout', default=0.3, type=float, help='Hyperparameter: Dropout rate on dense layers.')
-    parser.add_argument('--hp-conv1', default=6, type=int, help='Hyperparameter: Depth of first convolutional layer.')
-    parser.add_argument('--hp-conv2', default=12, type=int, help='Hyperparameter: Depth of second convolutional layer.')
-    parser.add_argument('--hp-conv3', default=24, type=int, help='Hyperparameter: Depth of third convolutional layer.')
+    parser.add_argument('--hp-lr0', default=0.02, type=float, help='Hyperparameter: initial (max) learning rate')
+    parser.add_argument('--hp-lr1', default=0.0001, type=float, help='Hyperparameter: target (min) learning rate')
+    parser.add_argument('--hp-lr2', default=600, type=float, help='Hyperparameter: learning rate decay speed in steps. Learning rate decays by exp(-1) every N steps.')
+    parser.add_argument('--hp-dropout', default=0.3, type=float, help='Hyperparameter: dropout rate on dense layers.')
+    parser.add_argument('--hp-conv1', default=6, type=int, help='Hyperparameter: depth of first convolutional layer.')
+    parser.add_argument('--hp-conv2', default=12, type=int, help='Hyperparameter: depth of second convolutional layer.')
+    parser.add_argument('--hp-conv3', default=24, type=int, help='Hyperparameter: depth of third convolutional layer.')
+    parser.add_argument('--hp-bnexp', default=0.993, type=float, help='Hyperparameter: exponential decay for batch norm moving averages.')
+    parser.add_argument('--hp-iterations', default=10000, type=int, help='Hyperparameter: number of training iterations.')
     args = parser.parse_args()
     arguments = args.__dict__
 
