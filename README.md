@@ -6,7 +6,9 @@ The presentation explaining the underlying concepts is [here](https://goo.gl/pHe
 
 The lab takes 2.5 hours and takes you through the design and optimisation of a neural network for recognising handwritten digits, from the simplest possible solution all the way to a recognition accuracy above 99%. It covers dense and convolutional networks, as well as techniques such as learning rate decay and dropout.
 
-Installation instructions [here](INSTALL.txt). The short version is: install Python3, then pip3 install tensorflow and matplotlib.   
+Installation instructions [here](INSTALL.txt). The short version is: install Python3, then pip3 install tensorflow and matplotlib.
+   
+The most advanced advanced neural network in this repo achieves 99.5% accuracy on the MNIST dataset (world best is 99.7%) and uses [batch normalization](README_BATCHNORM.md).
 
 ---
 
