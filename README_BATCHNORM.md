@@ -3,7 +3,7 @@
 You can find the theory of batch normalization explained here:
 
 - [Video](https://www.youtube.com/watch?v=vq2nnJ4g6N0&t=76m43s)
-- [Slides](https://docs.google.com/presentation/d/18MiZndRCOxB7g-TcCl2EZOElS5udVaCuxnGznLnmOlE/pub?slide=id.g1245051c73_0_25) to presentation.
+- [Slides](https://docs.google.com/presentation/d/18MiZndRCOxB7g-TcCl2EZOElS5udVaCuxnGznLnmOlE/pub?slide=id.g1245051c73_0_25) - press s to open speaker notes for detailed explanations.
 
 Tensorflow has both a low-level and a high-level implementation for batch normalization:
 
@@ -37,23 +37,23 @@ def model_fn(features, labels, mode):
 ```
 A complete sample is available in [mlengine/trainer/task.py](/mlengine/trainer/task.py)
 
-##### axis
+#### axis
 For dense layers, where the output looks like [batch, features], use axis=1. For convolutional layers, where the output looks like [batch, x, y, patch] use axis=3. Batch norm collects and uses, for each neuron, statistics on the output from that neuron across a batch. In a dense layer, one neuron has one output per data item in the batch. In a convolutional layer, one neuron has one output per data item in the batch and per x,y location. The axis parameter is what identifies individual neurons, all other dimensions of your outputs are for possible output values for that neuron. Using axis=1, stats will be collected with tf.nn.moments([batch]). Using axis=3, stats will be collected using tf.nn.moments([batch, x, y]) which are the correct populations for dense and conv layers respectively.
 
-##### center, scale
-- a bias is not useful when using batch norm on a layer 
+#### center, scale
+- a bias is not useful when using batch norm. Remove biases from layers regularized with batch norm.
 - batch norm offset should always be used (replaces bias) 
 - batch norm scale should be used with scale-dependant activation functions (sigmoid: yes, relu: no)
 
-##### training
+#### training
 Pass in (mode == tf.estimator.ModeKeys.TRAIN) and batch norm will correctly accumulate batch statistics during training
 and use them during evaluation and inference.
 
-##### exponential moving averages of batch stats (mean and variance)
+#### exponential moving averages of batch stats (mean and variance)
 tf.layers.batch_normalization creates variables for the batch norm stats that need to be gathered. These variables are added to tf.GraphKeys.UPDATE_OPS and these UPDATE_OPS are ran automatically when using the Estimator API.
 There is no need to modify your Estimator code for batch normalization to work.
 
-##### batch norm and activation functions
+#### batch norm and activation functions
 Batch norm is normally applied to the output of a neural network layer, before the activation function.
 In the present tf.layers API (TF1.3), there is no one-line syntax for a dense layer with batch norm and relu. The layers API only offers an activity_regularizer parameter which is applied after the activation function.
 Use layers without an activation function, then apply batch norm, then the activation.
