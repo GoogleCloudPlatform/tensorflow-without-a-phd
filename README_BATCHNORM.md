@@ -38,7 +38,21 @@ def model_fn(features, labels, mode):
 A complete sample is available in [mlengine/trainer/task.py](/mlengine/trainer/task.py)
 
 #### axis
-For dense layers, where the output looks like [batch, features], use axis=1. For convolutional layers, where the output looks like [batch, x, y, patch] use axis=3. Batch norm collects and uses, for each neuron, statistics on the output from that neuron across a batch. In a dense layer, one neuron has one output per data item in the batch. In a convolutional layer, one neuron has one output per data item in the batch and per x,y location. The axis parameter is what identifies individual neurons, all other dimensions of your outputs are for possible output values for that neuron. Using axis=1, stats will be collected with tf.nn.moments([batch]). Using axis=3, stats will be collected using tf.nn.moments([batch, x, y]) which are the correct populations for dense and conv layers respectively.
+The default is axis=-1 which means "last axis". This will work for both dense
+and convolutional layers if they are organised as [batch, features]
+or [batch, x, y, filter] for dense and convolutional layers respectively.
+
+For dense layers, where the output looks like [batch, features], the correct value is axis=1.
+For convolutional layers, where the output looks like [batch, x, y, filter]
+it is axis=3. Batch norm collects and uses, for each neuron, statistics on the
+output from that neuron across a batch. In a dense layer, one neuron has one
+output per data item in the batch. In a convolutional layer, one neuron has
+one output per data item in the batch and per x,y location. The axis parameter
+is what identifies individual neurons, all other dimensions of your outputs
+are for possible output values for that neuron. Using axis=1, stats will be
+collected with tf.nn.moments([batch]). Using axis=3, stats will be collected
+using tf.nn.moments([batch, x, y]) which are the correct populations for dense
+and conv layers respectively.
 
 #### center, scale
 - a bias is not useful when using batch norm. Remove biases from layers regularized with batch norm.
