@@ -50,8 +50,17 @@ Pass in (mode == tf.estimator.ModeKeys.TRAIN) and batch norm will correctly accu
 and use them during evaluation and inference.
 
 #### exponential moving averages of batch stats (mean and variance)
-tf.layers.batch_normalization creates variables for the batch norm stats that need to be gathered. These variables are added to tf.GraphKeys.UPDATE_OPS and these UPDATE_OPS are ran automatically when using the Estimator API.
-There is no need to modify your Estimator code for batch normalization to work.
+tf.layers.batch_normalization creates variables for the batch norm stats that need to be gathered. These variables are added to tf.GraphKeys.UPDATE_OPS and these UPDATE_OPS are ran automatically
+when you use the tf.contrib.layers.optimize_loss function to compute the training_op that the Estimator API requires.
+If you want to use a tf.train.XXXOptimizer durectly, add a graph dependency on UPDATE_OPS so that updates happen before your train_op:
+```Python
+update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+with tf.control_dependencies(update_ops):
+    train_op = optimizer.minimize(loss)
+# Note: This code is already present in the
+# tf.contrib.layers.optimize_loss helper function.
+# No need to duplicate if you are using that.
+```
 
 #### batch norm and activation functions
 Batch norm is normally applied to the output of a neural network layer, before the activation function.
