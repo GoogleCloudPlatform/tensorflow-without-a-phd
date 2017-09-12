@@ -40,10 +40,10 @@ A complete sample is available in [mlengine/trainer/task.py](/mlengine/trainer/t
 #### axis
 The default is axis=-1 which means "last axis". This will work for both dense
 and convolutional layers if they are organised as [batch, features]
-or [batch, x, y, filter] for dense and convolutional layers respectively.
+or [batch, x, y, filters] for dense and convolutional layers respectively.
 
 For dense layers, where the output looks like [batch, features], the correct value is axis=1.
-For convolutional layers, where the output looks like [batch, x, y, filter]
+For convolutional layers, where the output looks like [batch, x, y, filters]
 it is axis=3. Batch norm collects and uses, for each neuron, statistics on the
 output from that neuron across a batch. In a dense layer, one neuron has one
 output per data item in the batch. In a convolutional layer, one neuron has
