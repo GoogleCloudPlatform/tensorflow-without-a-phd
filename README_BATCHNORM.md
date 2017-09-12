@@ -52,7 +52,7 @@ and use them during evaluation and inference.
 #### exponential moving averages of batch stats (mean and variance)
 tf.layers.batch_normalization creates variables for the batch norm stats that need to be gathered. These variables are added to tf.GraphKeys.UPDATE_OPS and these UPDATE_OPS are ran automatically
 when you use the tf.contrib.layers.optimize_loss function to compute the training_op that the Estimator API requires.
-If you want to use a tf.train.XXXOptimizer durectly, add a graph dependency on UPDATE_OPS so that updates happen before your train_op:
+If you want to use a tf.train.XXXOptimizer directly, add a graph dependency on UPDATE_OPS so that updates happen before your train_op:
 ```Python
 update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
 with tf.control_dependencies(update_ops):
