@@ -3,3 +3,5 @@ checkpoints
 *.pklz
 *.pklz2
 *.iml
+cloudrunN.txt
+*.pyc
