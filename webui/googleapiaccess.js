@@ -23,10 +23,23 @@ function initMap() {
         center: { lat: 43.629450, lng: 1.364613 }, // Toulouse Blagnac airport
         mapTypeId: google.maps.MapTypeId.SATELLITE
     })
+    google.maps.event.addListenerOnce(googlemap, 'idle', grabPixels)
 }
-
 // Google Auth2, PubSub, CRM API initialisation
 function handleClientLoad() {
+}
+
+function grabPixels() {
+    e = document.getElementById('cap')
+    m = document.getElementById('map')
+    html2canvas(m, {
+        onrendered: function (canvas) {
+            e.appendChild(canvas);
+        },
+        width: 300,
+        height: 300,
+        useCORS: true
+    })
 }
 
 function checkSignIn() {

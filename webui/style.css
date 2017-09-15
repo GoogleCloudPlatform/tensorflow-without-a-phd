@@ -30,3 +30,23 @@ body {
 #map {
     flex: 1;
 }
+
+#cap {
+    position: absolute;
+    top: 30px;
+    left: 30px;
+    border: 3px white solid;
+    width: 300px;
+    height: 300px;
+    background-color: deeppink;
+}
+
+#tap {
+    position: absolute;
+    top: 350px;
+    left: 30px;
+    border: 3px white solid;
+    width: 300px;
+    height: 300px;
+    background-color: white;
+}
