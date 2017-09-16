@@ -1,5 +1,5 @@
 /**
- * Copyright 2016 Google Inc.
+ * Copyright 2017 Google Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,7 +14,15 @@
  * limitations under the License.
  */
 
-var authPromise
+var auth2
+var grabbed
 
 // Google maps API map instance
 var googlemap = null
+var mlengine = null
+// https://ml.googleapis.com/v1/projects/cloudml-demo-martin/models/plane/versions/v1:predict
+
+// all button event handlers
+var analyzeButton = document.getElementById('analyze-button');
+var authorizeButton = document.getElementById('authorize-button');
+var signoutButton = document.getElementById('signout-button');

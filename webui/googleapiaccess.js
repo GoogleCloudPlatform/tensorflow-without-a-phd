@@ -1,5 +1,5 @@
 /**
- * Copyright 2016 Google Inc.
+ * Copyright 2017 Google Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,23 +23,30 @@ function initMap() {
         center: { lat: 43.629450, lng: 1.364613 }, // Toulouse Blagnac airport
         mapTypeId: google.maps.MapTypeId.SATELLITE
     })
-    google.maps.event.addListenerOnce(googlemap, 'idle', grabPixels)
+    google.maps.event.addListener(googlemap, 'idle', grabPixels)
 }
 // Google Auth2, PubSub, CRM API initialisation
 function handleClientLoad() {
+    loadAuth2()
+        .then(initAuth2, checkSignIn)
+        .then(checkSignIn)
+        .then(loadMLEngine, logError)
+        .then(initMLEngine, logError)
 }
 
-function grabPixels() {
-    e = document.getElementById('cap')
-    m = document.getElementById('map')
-    html2canvas(m, {
-        onrendered: function (canvas) {
-            e.appendChild(canvas);
-        },
-        width: 300,
-        height: 300,
-        useCORS: true
+function loadAuth2() {
+    return new Promise(function(resolve, reject) {
+        gapi.load('client:auth2', resolve)
     })
+}
+
+function initAuth2() {
+    var toto = gapi.auth2.init({
+        //client_id: '19808069448-df7e5a57c3ftmfk3e9tptk6s7942qpah.apps.googleusercontent.com',
+        client_id: '606116430098-mjcbomnkksirtv4ped18biue5j10vm87.apps.googleusercontent.com',
+        scope: 'profile https://www.googleapis.com/auth/cloud-platform'
+    })
+    return toto.then() // The API does not return a Promise but an object that returns a Promise from its .then() function
 }
 
 function checkSignIn() {
@@ -50,21 +57,22 @@ function checkSignIn() {
     updateSigninStatus(auth2.isSignedIn.get());
 }
 
+function loadGapiClient() {
+    return new Promise(function(resolve, reject) {
+        gapi.load('client', resolve)
+    })
+}
+
+function loadMLEngine() {
+    return gapi.client.load('ml', 'v1')
+}
+
+function initMLEngine() {
+    mlengine = gapi.client.ml
+}
+
 function logError(err) {
     console.log(err)
 }
 
-function updateSigninStatus(isSignedIn) {
-    if (isSignedIn) {
-        //authorizeButton.style.display = 'none';
-        //signoutButton.style.display = 'block';
-        //angular.element(projectsSelect).scope().loadProjects();
-    } else {
-        //authorizeButton.style.display = 'block';
-        //signoutButton.style.display = 'none';
-        //projectsSelect.style.display = 'none';
-        //topicsSelect.style.display = 'none';
-        //startFetchingRidesButton.style.display = 'none';
-        //stopFetchingRidesButton.style.display = 'none';
-    }
-}
+

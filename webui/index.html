@@ -22,10 +22,15 @@
     <title>Plane spotting</title>
     <link rel="stylesheet" href="style.css" />
 
+    <!-- application scripts, need DOM ready -->
+    <script defer src="globals.js"></script>
+    <script defer src="canvas.js"></script>
+    <script defer src="dash.js"></script>
+
     <!-- Google API scripts -->
+    <script defer src="googleapiaccess.js"></script>
     <script defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDD2NlEXV-Cp3w148ZpPFGwl8Buhw9dxF4&signed_in=true&libraries=visualization,geometry&callback=initMap"></script>
     <script defer src="https://apis.google.com/js/api.js?onload=handleClientLoad"></script>
-    <script src="googleapiaccess.js"></script>
 
     <!-- 3rd party libs -->
     <script src="libs/html2canvas.min.js"></script>
@@ -33,11 +38,31 @@
 </head>
 
 <body>
-
-<div id="container">
-    <div id="map"></div>
-    <div id="cap"></div>
-</div>
+    <div id="container">
+        <div id="dashboard">
+                <div class="uiblock" >
+                    <div class="title">ML Engine</div>
+                    <button id="authorize-button" onclick="authorize()" style="display: none;">Authorize</button>
+                    <button id="signout-button" onclick="signout()" style="display: none;">Sign Out</button>
+                    <button id="analyze-button" onclick="analyze()" style="display:none;">Analyze</button>
+                    <div class="msg" ng-bind="pubsub_status"></div>
+            </div>
+            <div class="uiblock">
+                <div class="title">Capture</div>
+                <canvas width=77 height=77 id="cap"></canvas>
+            </div>
+            <div class="uiblock">
+                <div class="title">Tiles</div>
+                <canvas width=300 height=300 id="tap"></canvas>
+            </div>
+            <div class="uiblock">
+                <div class="title">JSON</div>
+                <div id="jap"></div>
+            </div>
+        </div>
+        <div id="map"></div>
+        <div id="zone-container"><div id="zone"></div></div>
+    </div>
 </body>
 
 </html>
