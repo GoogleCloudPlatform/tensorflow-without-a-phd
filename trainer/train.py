@@ -26,6 +26,7 @@ logging.set_verbosity(logging.INFO)
 logging.log(logging.INFO, "Tensorflow version " + tf.__version__)
 
 
+
 def train_data_input_fn(images, labels):
     features, labels = tf.train.shuffle_batch([tf.constant(images), tf.constant(labels)],
                                               batch_size=100, capacity=5000, min_after_dequeue=2000, enqueue_many=True)
@@ -40,12 +41,34 @@ def eval_data_input_fn(images, labels):
     return features, labels
 
 
+# input function for raw JSON bitmap (uint8)
+# Called when the model is deployed for online predictions on Cloud ML Engine.
+# def serving_input_fn():
+#     inputs = {'image': tf.placeholder(tf.float32, [None, 20, 20, 3])}  # format [batch, x, y, rgb]
+#     features = inputs['image'] / 255.0  # from int to to float
+#     feature_dic = {'image': features}  # current TF implementation forces features to be a dict (bug?)
+#     return tf.estimator.export.ServingInputReceiver(feature_dic, inputs)
+
+
+# input function for base64 encoded JPEG in JSON
 # Called when the model is deployed for online predictions on Cloud ML Engine.
 def serving_input_fn():
-    inputs = {'image': tf.placeholder(tf.float32, [None, 20, 20, 3])}  # format [batch, x, y, rgb]
-    features = inputs['image'] / 255.0  # from int to to float
-    feature_dic = {'image': features}  # current TF implementation forces features to be a dict (bug?)
-    return tf.estimator.export.ServingInputReceiver(feature_dic, inputs)
+    # input expects a list of jpeg images
+
+    # This works for local predictions
+    # input_bytes = {'image_bytes': tf.placeholder(tf.string, [1, None])}  # format [1, nb_images] why the initial "1"? Mystery!
+
+    input_bytes = {'image_bytes': tf.placeholder(tf.string, [None, None])}  # format [1, nb_images] why the initial "1"? Mystery!
+    input_images = input_bytes['image_bytes'][0]
+
+    def jpeg_to_bytes(jpeg):
+        pixels = tf.image.decode_jpeg(jpeg, channels=3)
+        pixels = tf.cast(pixels, tf.float32) / 255.0
+        return pixels
+
+    images = tf.map_fn(jpeg_to_bytes, input_images, dtype=tf.float32)
+    feature_dic = {'image': images}  # current TF implementation forces features to be a dict (bug?)
+    return tf.estimator.export.ServingInputReceiver(feature_dic, input_bytes)
 
 
 # def image_dump(data_image, data_label, data_latlon, data_scnid):

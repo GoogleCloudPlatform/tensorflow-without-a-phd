@@ -15,7 +15,6 @@
  */
 
 function grabPixels() {
-    grabbed = []
     var map = document.getElementById('map')
     var zone = document.getElementById('zone')
     var playground = document.getElementById('tap')
@@ -37,14 +36,44 @@ function processPixels(canvas, sx, sy, sw, sh, visu, playground) {
     var step = sz/3
     var data = sctx.getImageData(sx, sy, sw, sh)
     vctx.putImageData(data, 0, 0)
-    for (var y=0,dy=0; y+sz<=data.height; y+=step,dy+=sz+1)
-        for (var x=0,dx=0; x+sz<=data.width; x+=step,dx+=sz+1) {
-            tile = sctx.getImageData(sx+Math.floor(x), sy+Math.floor(y), sz, sz)
+
+    grabbed = []
+    for (var y=0,dy=0; y+sz<=data.height; y+=step,dy+=sz+1) {
+        for (var x = 0, dx = 0; x + sz <= data.width; x += step, dx += sz + 1) {
+            var tile = sctx.getImageData(sx + Math.floor(x), sy + Math.floor(y), sz, sz)
+            var jpegtile = imageCropAndExport(canvas, sx + Math.floor(x), sy + Math.floor(y), sz, sz)
             //dctx.drawImage(canvas, x, y, sz, sz, dx, dy, sz, sz)
             dctx.putImageData(tile, dx, dy)
-            grabbed.push(imageData2MLEngineFormat(tile))
+            grabbed.push(b64Data2MLEngineFormat(jpegtile))
+            //grabbed.push(imageData2MLEngineFormat(tile))
         }
+    }
     document.getElementById("jap").innerText = JSON.stringify(grabbed)
+}
+
+function imageCropAndExport(img, x, y, w, h) {
+    var offscreen = document.createElement('canvas')
+    offscreen.width = w
+    offscreen.height = h
+    var offcanvas = offscreen.getContext('2d')
+    offcanvas.drawImage(img,x,y,w,h,0,0,w,h)
+    var txt = offscreen.toDataURL('image/jpeg')
+
+    // var nod = document.getElementById('exported')
+    // var imnod = new Image()
+    // imnod.src = txt
+    // nod.appendChild(imnod)
+    // console.info(txt)
+
+    txt = txt.substring("data:image/jpeg;base64,".length)
+    return txt
+}
+
+function b64Data2MLEngineFormat(b64) {
+    // ? URL decode ?
+    var container = new Object()
+    container.b64 = b64
+    return container
 }
 
 function imageData2MLEngineFormat(image) {

@@ -28,10 +28,10 @@ function updateSigninStatus(isSignedIn) {
 function analyze() {
     payload = new Object()
     payload.instances = new Object()
-    payload.instances.image = grabbed
+    payload.instances.image_bytes = grabbed
     payload = JSON.stringify(payload)
     // magic formula: the body of the request goes into the "resource" parameter
-    mlengine.projects.predict({name:"projects/cloudml-demo-martin/models/plane_debug/versions/v1", resource:payload})
+    mlengine.projects.predict({name:"projects/cloudml-demo-martin/models/plane_jpeg/versions/v01", resource:payload})
         .then(function(res) {
             var nb_planes = 0
             var nb_results = 0
@@ -41,7 +41,6 @@ function analyze() {
                     nb_planes++
                 nb_results++
             }
-            console.info(res)
             console.info("Found planes:" + nb_planes)
         }, logError)
 }
