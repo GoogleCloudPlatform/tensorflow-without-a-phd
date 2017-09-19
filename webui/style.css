@@ -39,7 +39,7 @@ body {
     z-index: 1000;
     padding: 2px;
     font-family: sans-serif;
-    width: 310px;
+    width: 210px;
     display: flex;
     flex-direction: column;
     align-items: stretch;
@@ -68,24 +68,25 @@ body {
 }
 
 #cap {
-    width: 100px;
-    height: 100px;
+    width: 200px;
+    height: 200px;
     background-color: white;
 }
 
 #tap {
-    width: 300px;
-    height: 300px;
+    width: 200px;
+    height: 200px;
     background-color: white;
 }
 
-#jap {
-    width: 290px;
-    height: 290px;
+#jap, #sap {
+    width: 190px;
+    height: 190px;
     color: lightblue;
     font-family: monospace;
     padding: 5px;
     overflow: auto;
+    word-wrap: break-word;
     background-color: black;
 }
 
@@ -103,8 +104,8 @@ body {
 }
 #zone {
     position: absolute;
-    width: 100px;
-    height: 100px;
+    width: 200px;
+    height: 200px;
     background-color: transparent;
     outline: 3px solid white;
     opacity: 0.5;
@@ -113,7 +114,7 @@ body {
 .zone-marker {
     position: absolute;
     background-color: transparent;
-    outline: 3px solid deeppink;
-    opacity: 0.7;
+    outline: 3px solid lime;
+    opacity: 0.9;
     margin: 0px;
 }

@@ -81,13 +81,13 @@ def serving_input_fn():
     input_bytes = {'image_bytes': tf.placeholder(tf.string, [None, None])}  # format [1, nb_images] why the initial "1"? Mystery!
     input_images = input_bytes['image_bytes'][0]
 
-    sz = 100.0
+    sz = 200.0
     si = 5.0
     tz = 20
     nz = 6
     zoom = 1.0
     boxes = []
-    for zm in range(nz):
+    while zoom <= sz:
         s = tz*zoom
         x = 0.0
         while x+s <= sz:
@@ -101,7 +101,7 @@ def serving_input_fn():
     crop_size = [tz,tz]
     box_ind = np.zeros(len(boxes))
     boxes = np.stack(boxes, axis=0)
-    # print(str(boxes))
+    print(boxes.shape)
     boxes = tf.constant(boxes, dtype=tf.float32)
 
     def jpeg_to_bytes(jpeg):

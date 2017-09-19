@@ -25,15 +25,20 @@ function grabPixels() {
         height: map.clientHeight,
         useCORS: true
     })
+
+    // reset previous results
 }
 
 function processPixels(canvas, sx, sy, sw, sh, visu, playground) {
+
+    resetResults()
+
     var sctx = canvas.getContext("2d")
     var vctx = visu.getContext("2d")
     var dctx = playground.getContext("2d")
     // copy from source to destination context
-    var sz = 100    //
-    var step = 100 // just one tile
+    var sz = 200    //
+    var step = 200 // just one tile
     var data = sctx.getImageData(sx, sy, sw, sh)
     vctx.putImageData(data, 0, 0)
 
@@ -45,7 +50,6 @@ function processPixels(canvas, sx, sy, sw, sh, visu, playground) {
             //dctx.drawImage(canvas, x, y, sz, sz, dx, dy, sz, sz)
             dctx.putImageData(tile, dx, dy)
             grabbed.push(b64Data2MLEngineFormat(jpegtile))
-            //grabbed.push(imageData2MLEngineFormat(tile))
         }
     }
     document.getElementById("jap").innerText = JSON.stringify(grabbed)
@@ -74,19 +78,4 @@ function b64Data2MLEngineFormat(b64) {
     var container = new Object()
     container.b64 = b64
     return container
-}
-
-function imageData2MLEngineFormat(image) {
-    obj = []
-    // outputting image in [x, y, rgb] format
-    for (var x=0; x<image.width; x++)
-        for (var y = 0; y < image.width; y++) {
-            var offset = x + image.width * y * 4
-            var r = image.data[offset]
-            var g = image.data[offset + 1]
-            var b = image.data[offset + 2]
-            var a = image.data[offset + 3]
-            obj.push([r, g, b])
-        }
-    return obj
 }

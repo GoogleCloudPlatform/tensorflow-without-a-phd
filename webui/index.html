@@ -44,16 +44,20 @@
                 <div class="title">ML Engine</div>
                 <button id="authorize-button" onclick="authorize()" style="display: none;">Authorize</button>
                 <button id="signout-button" onclick="signout()" style="display: none;">Sign Out</button>
-                <button id="analyze-button" onclick="analyze()" style="display:none;">Analyze</button>
                 <div class="msg" ng-bind="pubsub_status"></div>
             </div>
             <div class="uiblock">
+                <div class="title">ML Engine REST call</div>
+                <button id="analyze-button" onclick="analyze()" style="display:none;">Analyze</button>
+                <div id="sap"></div>
+            </div>
+            <div class="uiblock">
                 <div class="title">Capture</div>
-                <canvas width=100 height=100 id="cap"></canvas>
+                <canvas width=200 height=200 id="cap"></canvas>
             </div>
             <div class="uiblock">
                 <div class="title">Tiles</div>
-                <canvas width=300 height=300 id="tap"></canvas>
+                <canvas width=200 height=200 id="tap"></canvas>
                 <div id="exported"></div>
             </div>
             <div class="uiblock">
