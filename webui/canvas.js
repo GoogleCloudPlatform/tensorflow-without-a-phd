@@ -42,17 +42,17 @@ function processPixels(canvas, sx, sy, sw, sh, visu, playground) {
     var data = sctx.getImageData(sx, sy, sw, sh)
     vctx.putImageData(data, 0, 0)
 
-    grabbed = []
+    payload.instances.image_bytes = []
     for (var y=0,dy=0; y+sz<=data.height; y+=step,dy+=sz+1) {
         for (var x = 0, dx = 0; x + sz <= data.width; x += step, dx += sz + 1) {
             var tile = sctx.getImageData(sx + Math.floor(x), sy + Math.floor(y), sz, sz)
             var jpegtile = imageCropAndExport(canvas, sx + Math.floor(x), sy + Math.floor(y), sz, sz)
             //dctx.drawImage(canvas, x, y, sz, sz, dx, dy, sz, sz)
             dctx.putImageData(tile, dx, dy)
-            grabbed.push(b64Data2MLEngineFormat(jpegtile))
+            payload.instances.image_bytes.push(b64Data2MLEngineFormat(jpegtile))
         }
     }
-    document.getElementById("jap").innerText = JSON.stringify(grabbed)
+    displayPayload(payload)
 }
 
 function imageCropAndExport(img, x, y, w, h) {

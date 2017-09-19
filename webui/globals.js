@@ -15,7 +15,10 @@
  */
 
 var auth2
-var grabbed
+
+var payload = new Object()
+payload.instances = new Object()
+payload.instances.image_bytes = []
 
 // Google maps API map instance
 var googlemap = null

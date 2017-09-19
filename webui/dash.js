@@ -27,13 +27,10 @@ function updateSigninStatus(isSignedIn) {
 
 function analyze() {
     resetResults()
-    payload = new Object()
-    payload.instances = new Object()
-    payload.instances.image_bytes = grabbed
-    payload = JSON.stringify(payload)
+    var body = JSON.stringify(payload)
     processingResults()
     // magic formula: the body of the request goes into the "resource" parameter
-    mlengine.projects.predict({name:"projects/cloudml-demo-martin/models/plane_jpeg_scan_200x200", resource:payload})
+    mlengine.projects.predict({name:"projects/cloudml-demo-martin/models/plane_jpeg_scan_200x200", resource:body})
         .then(function(res) {
             if (res.result.error)
                 displayErrorResults(res.result.error)
@@ -94,4 +91,10 @@ function displayErrorResults(err) {
     var sap = document.getElementById("sap")
     if (sap)
         sap.innerText = err
+}
+
+function displayPayload(obj) {
+    var jap = document.getElementById("jap")
+    if (jap)
+        jap.innerText = JSON.stringify(obj)
 }

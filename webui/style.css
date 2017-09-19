@@ -79,7 +79,7 @@ body {
     background-color: white;
 }
 
-#jap, #sap {
+.console {
     width: 190px;
     height: 190px;
     color: lightblue;
@@ -88,6 +88,10 @@ body {
     overflow: auto;
     word-wrap: break-word;
     background-color: black;
+}
+
+#jap {
+    font-size: small;
 }
 
 #zone-container {
