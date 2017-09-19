@@ -30,14 +30,16 @@ logging.log(logging.INFO, "Tensorflow version " + tf.__version__)
 def train_data_input_fn(images, labels):
     features, labels = tf.train.shuffle_batch([tf.constant(images), tf.constant(labels)],
                                               batch_size=100, capacity=5000, min_after_dequeue=2000, enqueue_many=True)
-    features = {'image': features}
+    boxes = tf.zeros(shape=[tf.shape(features)[0],4])
+    features = {'image': features, 'boxes':boxes}
     return features, labels
 
 
 # Eval data is an in-memory constant here.
 def eval_data_input_fn(images, labels):
     features, labels = tf.constant(images), tf.constant(labels)
-    features = {'image': features}
+    boxes = tf.zeros(shape=[tf.shape(features)[0],4])
+    features = {'image': features, 'boxes':boxes}
     return features, labels
 
 
@@ -52,22 +54,66 @@ def eval_data_input_fn(images, labels):
 
 # input function for base64 encoded JPEG in JSON
 # Called when the model is deployed for online predictions on Cloud ML Engine.
+# def serving_input_fn():
+#     # input expects a list of jpeg images
+#
+#     # This works for local predictions
+#     # input_bytes = {'image_bytes': tf.placeholder(tf.string, [1, None])}  # format [1, nb_images] why the initial "1"? Mystery!
+#
+#     input_bytes = {'image_bytes': tf.placeholder(tf.string, [None, None])}  # format [1, nb_images] why the initial "1"? Mystery!
+#     input_images = input_bytes['image_bytes'][0]
+#
+#     def jpeg_to_bytes(jpeg):
+#         pixels = tf.image.decode_jpeg(jpeg, channels=3)
+#         pixels = tf.cast(pixels, tf.float32) / 255.0
+#         return pixels
+#
+#     images = tf.map_fn(jpeg_to_bytes, input_images, dtype=tf.float32)
+#     feature_dic = {'image': images}  # current TF implementation forces features to be a dict (bug?)
+#     return tf.estimator.export.ServingInputReceiver(feature_dic, input_bytes)
+
+
+# input function for base64 encoded JPEG in JSON, with automatic scanning
+# Called when the model is deployed for online predictions on Cloud ML Engine.
 def serving_input_fn():
     # input expects a list of jpeg images
-
-    # This works for local predictions
-    # input_bytes = {'image_bytes': tf.placeholder(tf.string, [1, None])}  # format [1, nb_images] why the initial "1"? Mystery!
 
     input_bytes = {'image_bytes': tf.placeholder(tf.string, [None, None])}  # format [1, nb_images] why the initial "1"? Mystery!
     input_images = input_bytes['image_bytes'][0]
 
+    sz = 100.0
+    si = 5.0
+    tz = 20
+    nz = 6
+    zoom = 1.0
+    boxes = []
+    for zm in range(nz):
+        s = tz*zoom
+        x = 0.0
+        while x+s <= sz:
+            y = 0.0
+            while y+s <= sz:
+                boxes.append(np.array([x, y, x+s-1, y+s-1]) / (sz-1))
+                #print(str((x,y,s)))
+                y += si*zoom
+            x += si*zoom
+        zoom *= 1.2
+    crop_size = [tz,tz]
+    box_ind = np.zeros(len(boxes))
+    boxes = np.stack(boxes, axis=0)
+    # print(str(boxes))
+    boxes = tf.constant(boxes, dtype=tf.float32)
+
     def jpeg_to_bytes(jpeg):
         pixels = tf.image.decode_jpeg(jpeg, channels=3)
         pixels = tf.cast(pixels, tf.float32) / 255.0
+        pixels = tf.image.crop_and_resize(tf.expand_dims(pixels,0), boxes, box_ind, crop_size)
         return pixels
 
+    mapped_boxes = tf.tile(boxes, [tf.shape(input_images)[0], 1])
+
     images = tf.map_fn(jpeg_to_bytes, input_images, dtype=tf.float32)
-    feature_dic = {'image': images}  # current TF implementation forces features to be a dict (bug?)
+    feature_dic = {'image': images, 'boxes': mapped_boxes}  # current TF implementation forces features to be a dict (bug?)
     return tf.estimator.export.ServingInputReceiver(feature_dic, input_bytes)
 
 

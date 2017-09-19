@@ -40,16 +40,16 @@
 <body>
     <div id="container">
         <div id="dashboard">
-                <div class="uiblock" >
-                    <div class="title">ML Engine</div>
-                    <button id="authorize-button" onclick="authorize()" style="display: none;">Authorize</button>
-                    <button id="signout-button" onclick="signout()" style="display: none;">Sign Out</button>
-                    <button id="analyze-button" onclick="analyze()" style="display:none;">Analyze</button>
-                    <div class="msg" ng-bind="pubsub_status"></div>
+            <div class="uiblock" >
+                <div class="title">ML Engine</div>
+                <button id="authorize-button" onclick="authorize()" style="display: none;">Authorize</button>
+                <button id="signout-button" onclick="signout()" style="display: none;">Sign Out</button>
+                <button id="analyze-button" onclick="analyze()" style="display:none;">Analyze</button>
+                <div class="msg" ng-bind="pubsub_status"></div>
             </div>
             <div class="uiblock">
                 <div class="title">Capture</div>
-                <canvas width=77 height=77 id="cap"></canvas>
+                <canvas width=100 height=100 id="cap"></canvas>
             </div>
             <div class="uiblock">
                 <div class="title">Tiles</div>
@@ -62,7 +62,7 @@
             </div>
         </div>
         <div id="map"></div>
-        <div id="zone-container"><div id="zone"></div></div>
+        <div id="zone-container"><div id="zone"></div></div></div>
     </div>
 </body>
 

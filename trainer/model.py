@@ -61,5 +61,5 @@ def model_fn(features, labels, mode, params):
         loss=loss,
         train_op=train_op,
         eval_metric_ops=eval_metrics,
-        export_outputs={'classes': tf.estimator.export.PredictOutput({"predictions": predict, "classes": classes})}
+        export_outputs={'classes': tf.estimator.export.PredictOutput({"predictions": predict, "classes": classes, "boxes": features["boxes"]})}
     )

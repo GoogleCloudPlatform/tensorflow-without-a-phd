@@ -18,12 +18,21 @@ var auth2 // The Sign-In object.
 
 // Google Maps API initialisation
 function initMap() {
+    var query = new URLSearchParams(window.location.search)
+    var lat = query.get("lat")
+    var lng = query.get("lng")
+    var latlng
+    if (!lat || lat == "undefined") // in case 'undefined' ended up in the URL
+        latlng = { lat: 43.629450, lng: 1.364613 } // Toulouse Blagnac airport
+    else
+        latlng = {lat: parseFloat(lat), lng: parseFloat(lng)}
     googlemap = new google.maps.Map(document.getElementById('map'), {
         zoom: 16,
-        center: { lat: 43.629450, lng: 1.364613 }, // Toulouse Blagnac airport
+        center: latlng,
         mapTypeId: google.maps.MapTypeId.SATELLITE
     })
     google.maps.event.addListener(googlemap, 'idle', grabPixels)
+    google.maps.event.addListener(googlemap, 'click', setMapLocationInURL)
 }
 // Google Auth2, PubSub, CRM API initialisation
 function handleClientLoad() {
@@ -73,6 +82,10 @@ function initMLEngine() {
 
 function logError(err) {
     console.log(err)
+}
+
+function setMapLocationInURL(evt) {
+    history.pushState(null,null,'?lat=' + evt.latLng.lat() + '&lng=' + evt.latLng.lng())
 }
 
 

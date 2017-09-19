@@ -68,8 +68,8 @@ body {
 }
 
 #cap {
-    width: 77px;
-    height: 77px;
+    width: 100px;
+    height: 100px;
     background-color: white;
 }
 
@@ -102,10 +102,18 @@ body {
     align-items: center;
 }
 #zone {
-    width: 77px;
-    height: 77px;
+    position: absolute;
+    width: 100px;
+    height: 100px;
     background-color: transparent;
-    border: 3px solid white;
+    outline: 3px solid white;
     opacity: 0.5;
+    margin: 0px;
+}
+.zone-marker {
+    position: absolute;
+    background-color: transparent;
+    outline: 3px solid deeppink;
+    opacity: 0.7;
     margin: 0px;
 }

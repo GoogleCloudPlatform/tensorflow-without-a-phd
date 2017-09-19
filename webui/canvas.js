@@ -32,8 +32,8 @@ function processPixels(canvas, sx, sy, sw, sh, visu, playground) {
     var vctx = visu.getContext("2d")
     var dctx = playground.getContext("2d")
     // copy from source to destination context
-    var sz = 20
-    var step = sz/3
+    var sz = 100    //
+    var step = 100 // just one tile
     var data = sctx.getImageData(sx, sy, sw, sh)
     vctx.putImageData(data, 0, 0)
 
