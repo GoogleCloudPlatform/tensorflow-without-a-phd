@@ -30,3 +30,14 @@ var mlengine = null
 var analyzeButton = document.getElementById('analyze-button');
 var authorizeButton = document.getElementById('authorize-button');
 var signoutButton = document.getElementById('signout-button');
+
+// airports with their coordinates
+var airports = new Object()
+airports.TLS = [43.629450, 1.364613]
+airports.LAX = [33.943560, -118.411534]
+airports.SFO = [37.618887, -122.379771]
+airports.CDG = [49.009441, 2.557194]
+airports.LBG = [48.961900, 2.439519]
+airports.SEA = [47.443495, -122.307206]
+airports.NRT = [35.764783, 140.390962]
+airports.ICN = [37.461626, 126.443786]

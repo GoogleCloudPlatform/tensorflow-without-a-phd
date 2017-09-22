@@ -24,7 +24,7 @@ function initMap() {
     var zoom = query.get("zoom")
     var latlng
     if (!lat || lat == "undefined") // in case 'undefined' ended up in the URL
-        latlng = { lat: 43.629450, lng: 1.364613 } // Toulouse Blagnac airport
+        latlng = { lat: airports.TLS[0], lng: airports.TLS[1] } // Toulouse Blagnac airport
     else
         latlng = {lat: parseFloat(lat), lng: parseFloat(lng)}
     if (!zoom || zoom == "undefined")
@@ -96,6 +96,17 @@ function logError(err) {
 
 function setMapLocationInURL(latlng, zoom) {
     history.pushState(null,null,'?lat=' + latlng.lat() + '&lng=' + latlng.lng() + '&zoom=' + zoom)
+}
+
+function centerMap(lat, lng) {
+    googlemap.setCenter({lat:lat, lng:lng})
+}
+
+function centerMapOnCode(airportCode) {
+    coords = airports[airportCode]
+    if (coords === undefined)
+        coords = airports.TLS
+    centerMap(coords[0], coords[1])
 }
 
 

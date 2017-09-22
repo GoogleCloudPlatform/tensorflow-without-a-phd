@@ -52,7 +52,20 @@
                 <div class="console" id="sap"></div>
             </div>
             <div class="uiblock">
-                <div class="title">Capture</div>
+                <div class="title">Map capture</div>
+                <form name="airsel">
+                    <select name="sel" onchange="centerMapOnCode(document.airsel.sel.value)">
+                        <option value="">--> to airport</option>
+                        <option value="TLS">TLS Toulouse-Blagnac</option>
+                        <option value="LAX">LAX Los Angeles</option>
+                        <option value="SFO">SFO San Francisco</option>
+                        <option value="CDG">CDG Paris Roissy</option>
+                        <option value="LBG">LBG Paris Le Bourget</option>
+                        <option value="SEA">SEA Seattle Tacoma</option>
+                        <option value="NRT">NRT Tokyo Narita</option>
+                        <option value="ICN">ICN Seoul Incheon</option>
+                    </select>
+                </form>
                 <canvas width=200 height=200 id="cap"></canvas>
             </div>
             <!--
