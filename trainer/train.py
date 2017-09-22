@@ -21,10 +21,10 @@ from tensorflow.python.lib.io import file_io as gcsfile
 from tensorflow.python.platform import tf_logging as logging
 
 from trainer import model
+from trainer import boxscan
 
 logging.set_verbosity(logging.INFO)
 logging.log(logging.INFO, "Tensorflow version " + tf.__version__)
-
 
 
 def train_data_input_fn(images, labels):
@@ -78,49 +78,52 @@ def eval_data_input_fn(images, labels):
 def serving_input_fn():
     # input expects a list of jpeg images
 
-    input_bytes = {'image_bytes': tf.placeholder(tf.string, [None, None])}  # format [1, nb_images] why the initial "1"? Mystery!
-    input_images = input_bytes['image_bytes'][0]
+    input_bytes = {'image_bytes': tf.placeholder(tf.string, [None, None]),
+                   'square_size': tf.placeholder(tf.int32)
+                   }
+    input_images = input_bytes['image_bytes'][0]  # why a first dimension that needs to be dropped ?
+    input_tilesz = input_bytes['square_size'][0]  # why a first dimension that needs to be dropped ?
 
-    sz = 200.0
-    si = 5.0
-    tz = 20
-    nz = 6
-    zoom = 1.0
-    boxes = []
-    while zoom <= sz:
-        s = tz*zoom
-        x = 0.0
-        while x+s <= sz:
-            y = 0.0
-            while y+s <= sz:
-                boxes.append(np.array([x, y, x+s-1, y+s-1]) / (sz-1))
-                #print(str((x,y,s)))
-                y += si*zoom
-            x += si*zoom
-        zoom *= 1.2
-    crop_size = [tz,tz]
-    box_ind = np.zeros(len(boxes))
-    boxes = np.stack(boxes, axis=0)
-    print(boxes.shape)
-    boxes = tf.constant(boxes, dtype=tf.float32)
+    trained_tile_size = 20
+    tile_step = 5
+    zoom_step = 1.3
+    boxes100x100 = np.stack(list(boxscan.genBox(100, 100, trained_tile_size, tile_step, zoom_step)), axis=0)/100.0  # 479 tiles
+    boxes200x200 = np.stack(list(boxscan.genBox(200, 200, trained_tile_size, tile_step, zoom_step)), axis=0)/200.0  # 2473 tiles (x5)
+    boxes300x300 = np.stack(list(boxscan.genBox(300, 300, trained_tile_size, tile_step, zoom_step)), axis=0)/300.0  # 6052 tiles
+    boxes400x400 = np.stack(list(boxscan.genBox(400, 400, trained_tile_size, tile_step, zoom_step)), axis=0)/400.0  # 11369 tiles (x5)
+    boxes600x600 = np.stack(list(boxscan.genBox(600, 600, trained_tile_size, tile_step, zoom_step)), axis=0)/600.0  # 26760 tiles
+    boxes900x900 = np.stack(list(boxscan.genBox(900, 900, trained_tile_size, tile_step, zoom_step)), axis=0)/900.0  # 62003 tiles (x5)
+
+    def tile100x100(): return tf.constant(boxes100x100, dtype=tf.float32), tf.constant(np.zeros(len(boxes100x100)), dtype=tf.int32)
+    def tile200x200(): return tf.constant(boxes200x200, dtype=tf.float32), tf.constant(np.zeros(len(boxes200x200)), dtype=tf.int32)
+    def tile300x300(): return tf.constant(boxes300x300, dtype=tf.float32), tf.constant(np.zeros(len(boxes300x300)), dtype=tf.int32)
+    def tile400x400(): return tf.constant(boxes400x400, dtype=tf.float32), tf.constant(np.zeros(len(boxes400x400)), dtype=tf.int32)
+    def tile600x600(): return tf.constant(boxes600x600, dtype=tf.float32), tf.constant(np.zeros(len(boxes600x600)), dtype=tf.int32)
+    def tile900x900(): return tf.constant(boxes900x900, dtype=tf.float32), tf.constant(np.zeros(len(boxes900x900)), dtype=tf.int32)
+
+    boxes, box_ind = tf.case([(tf.equal(input_tilesz, 100), tile100x100),
+                              (tf.equal(input_tilesz, 200), tile200x200),
+                              (tf.equal(input_tilesz, 300), tile300x300),
+                              (tf.equal(input_tilesz, 400), tile400x400),
+                              (tf.equal(input_tilesz, 600), tile600x600),
+                              (tf.equal(input_tilesz, 900), tile900x900)], default=tile100x100, exclusive=True)
 
     def jpeg_to_bytes(jpeg):
         pixels = tf.image.decode_jpeg(jpeg, channels=3)
         pixels = tf.cast(pixels, tf.float32) / 255.0
-        pixels = tf.image.crop_and_resize(tf.expand_dims(pixels,0), boxes, box_ind, crop_size)
+        pixels = tf.image.crop_and_resize(tf.expand_dims(pixels,0), boxes, box_ind, [trained_tile_size, trained_tile_size])
         return pixels
 
     mapped_boxes = tf.tile(boxes, [tf.shape(input_images)[0], 1])
 
     images = tf.map_fn(jpeg_to_bytes, input_images, dtype=tf.float32)
-    feature_dic = {'image': images, 'boxes': mapped_boxes}  # current TF implementation forces features to be a dict (bug?)
+    feature_dic = {'image': images, 'boxes': mapped_boxes}
     return tf.estimator.export.ServingInputReceiver(feature_dic, input_bytes)
 
 
 # def image_dump(data_image, data_label, data_latlon, data_scnid):
-#     with open('{}__{}__{}_{}.png'.format(data_label, data_scnid, data_latlon[0], data_latlon[1]), 'wb') as imfile:
+#     with open('sample_data/images3/{}__{}__{}_{}.png'.format(data_label, data_scnid, data_latlon[0], data_latlon[1]), 'wb') as imfile:
 #         imdata = data_image
-#         imdata = np.swapaxes(imdata, 0, 1) # [y, x, rgb]
 #         imdata = np.reshape(imdata, (-1, 20*3)) # [y, [(r,g,b),(r,g,b),(r,g,b),(r,g,b),...]]
 #         w = png.Writer(20, 20) # expects a list of rows of pixels in (r,g,b) format
 #         w.write(imfile, imdata)
@@ -136,32 +139,36 @@ def load_data(path):
             # unpack dictionary
             data_images = planesnet['data']
             data_labels = np.array(planesnet['labels'])
-            data_latlon = np.array(planesnet['locations'])
-            data_scnids = np.array(planesnet['scene_ids'])
+            #data_latlon = np.array(planesnet['locations'])
+            #data_scnids = np.array(planesnet['scene_ids'])
             assert len(data_images) == len(data_labels)
             #log message
             logging.log(logging.INFO, "Loaded data file " + path)
-            # shuffle the data
-            p = np.random.permutation(len(data_images))
-            data_images = data_images[p]
-            data_labels = data_labels[p]
-            data_latlon = data_latlon[p]
-            data_scnids = data_scnids[p]
+
             # images are provided, as a single array of ints, by color planes first
             # and in each color plane, first row first. Reshaping to [batch, 3, 20, 20]
-            # will give indexing as [batch, rgb, y, x]. Then swap axes -> [batch, x, y, rgb]
+            # will give indexing as [batch, rgb, y, x]. Then swap axes -> [batch, y, x, rgb]
             data_images = np.reshape(data_images, (-1, 3, 20, 20), order="C")
-            data_images = np.swapaxes(data_images, 1, 3)
+            data_images = np.swapaxes(data_images, 1, 2)
+            data_images = np.swapaxes(data_images, 2, 3)
 
             # image dump for debugging
-            #for i in range(64):
+            #for i in range(24000, 32000):
             #    image_dump(data_images[i], data_labels[i], data_latlon[i], data_scnids[i])
+
+            # shuffle the data
+            np.random.seed(0)
+            n = len(data_images)
+            p = np.random.permutation(n)
+            data_images = data_images[p]
+            data_labels = data_labels[p]
 
             # convert images to float
             data_images = (data_images / 255.0).astype(np.float32)
 
             # partition training and test data
-            TEST_SIZE = 5000
+            TEST_SIZE = n // 10
+            TEST_SIZE = 5000 if TEST_SIZE<5000 else 10000 if TEST_SIZE > 10000 else TEST_SIZE
             test_images = data_images[:TEST_SIZE]
             test_labels = data_labels[:TEST_SIZE]
             train_images = data_images[TEST_SIZE:]
@@ -194,7 +201,7 @@ def main(argv):
     # gcloud ml-engine jobs submit training jobXXX --job-dir=... --ml-engine-args -- --user-args
 
     parser.add_argument('--job-dir', default="checkpoints", help='GCS or local path where to store training checkpoints')
-    parser.add_argument('--data', default="planesnet001.pklz", help='Path to data file (can be on Google cloud storage gs://...)')
+    parser.add_argument('--data', default="planesnet32K.pklz", help='Path to data file (can be on Google cloud storage gs://...)')
     parser.add_argument('--hp-iterations', default=5000, type=int, help='Hyperparameter: number of training iterations')
     parser.add_argument('--hp-lr0', default=0.01, type=float, help='Hyperparameter: initial (max) learning rate')
     parser.add_argument('--hp-lr1', default=0.0001, type=float, help='Hyperparameter: target (min) learning rate')

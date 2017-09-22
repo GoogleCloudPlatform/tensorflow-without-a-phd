@@ -30,7 +30,8 @@ function analyze() {
     var body = JSON.stringify(payload)
     processingResults()
     // magic formula: the body of the request goes into the "resource" parameter
-    mlengine.projects.predict({name:"projects/cloudml-demo-martin/models/plane_jpeg_scan_200x200", resource:body})
+    //plane_jpeg_scan_100_200_300_400_600_900
+    mlengine.projects.predict({name:"projects/cloudml-demo-martin/models/plane_jpeg_scan_100_200_300_400_600_900", resource:body})
         .then(function(res) {
             if (res.result.error)
                 displayErrorResults(res.result.error)

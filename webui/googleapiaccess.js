@@ -21,19 +21,29 @@ function initMap() {
     var query = new URLSearchParams(window.location.search)
     var lat = query.get("lat")
     var lng = query.get("lng")
+    var zoom = query.get("zoom")
     var latlng
     if (!lat || lat == "undefined") // in case 'undefined' ended up in the URL
         latlng = { lat: 43.629450, lng: 1.364613 } // Toulouse Blagnac airport
     else
         latlng = {lat: parseFloat(lat), lng: parseFloat(lng)}
+    if (!zoom || zoom == "undefined")
+        zoom = 16
+    else
+        zoom = parseInt(zoom)
     googlemap = new google.maps.Map(document.getElementById('map'), {
-        zoom: 16,
+        zoom: zoom,
         center: latlng,
         mapTypeId: google.maps.MapTypeId.SATELLITE
     })
-    google.maps.event.addListener(googlemap, 'idle', grabPixels)
-    google.maps.event.addListener(googlemap, 'click', setMapLocationInURL)
+    google.maps.event.addListener(googlemap, 'idle', setLocationAndGrabPixels)
 }
+
+function setLocationAndGrabPixels() {
+    setMapLocationInURL(googlemap.getCenter(), googlemap.getZoom())
+    grabPixels()
+}
+
 // Google Auth2, PubSub, CRM API initialisation
 function handleClientLoad() {
     loadAuth2()
@@ -84,8 +94,8 @@ function logError(err) {
     console.log(err)
 }
 
-function setMapLocationInURL(evt) {
-    history.pushState(null,null,'?lat=' + evt.latLng.lat() + '&lng=' + evt.latLng.lng())
+function setMapLocationInURL(latlng, zoom) {
+    history.pushState(null,null,'?lat=' + latlng.lat() + '&lng=' + latlng.lng() + '&zoom=' + zoom)
 }
 
 

@@ -17,8 +17,9 @@
 var auth2
 
 var payload = new Object()
-payload.instances = new Object()
-payload.instances.image_bytes = []
+payload.instances = [new Object()]
+payload.instances[0].image_bytes = []
+payload.instances[0].square_size = 200
 
 // Google maps API map instance
 var googlemap = null

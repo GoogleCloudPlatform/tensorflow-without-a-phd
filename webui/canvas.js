@@ -35,21 +35,29 @@ function processPixels(canvas, sx, sy, sw, sh, visu, playground) {
 
     var sctx = canvas.getContext("2d")
     var vctx = visu.getContext("2d")
-    var dctx = playground.getContext("2d")
+    //var dctx = playground.getContext("2d")
+
+    // TODO: currently generating one instance with multiple images in it. Fix it.
+
     // copy from source to destination context
     var sz = 200    //
     var step = 200 // just one tile
     var data = sctx.getImageData(sx, sy, sw, sh)
     vctx.putImageData(data, 0, 0)
 
-    payload.instances.image_bytes = []
+    // hack: if grab fails, this will be the browser's default background color
+    // forcing a reload usually makes the gab work again
+    if (hasBackgroundInAnyCorner(data))
+        location.reload()
+
+    payload.instances[0].image_bytes = []
     for (var y=0,dy=0; y+sz<=data.height; y+=step,dy+=sz+1) {
         for (var x = 0, dx = 0; x + sz <= data.width; x += step, dx += sz + 1) {
             var tile = sctx.getImageData(sx + Math.floor(x), sy + Math.floor(y), sz, sz)
             var jpegtile = imageCropAndExport(canvas, sx + Math.floor(x), sy + Math.floor(y), sz, sz)
             //dctx.drawImage(canvas, x, y, sz, sz, dx, dy, sz, sz)
-            dctx.putImageData(tile, dx, dy)
-            payload.instances.image_bytes.push(b64Data2MLEngineFormat(jpegtile))
+            //dctx.putImageData(tile, dx, dy)
+            payload.instances[0].image_bytes.push(b64Data2MLEngineFormat(jpegtile))
         }
     }
     displayPayload(payload)
@@ -71,6 +79,15 @@ function imageCropAndExport(img, x, y, w, h) {
 
     txt = txt.substring("data:image/jpeg;base64,".length)
     return txt
+}
+
+function hasBackgroundInAnyCorner(imgdata) {
+    var data = imgdata.data
+    var w = imgdata.width
+    var h = imgdata.height
+    var r=229, g=227, b=223
+    function is_background_pix(x, y) {return data[(y*w+x)*4]==r && data[(y*w+x)*4+1]==g && data[(y*w+x)*4+2]==b}
+    return is_background_pix(0,0) || is_background_pix(w-1, 0) || is_background_pix(0, h-1) || is_background_pix(w-1, h-1)
 }
 
 function b64Data2MLEngineFormat(b64) {
