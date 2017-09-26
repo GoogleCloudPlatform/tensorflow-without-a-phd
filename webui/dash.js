@@ -31,7 +31,7 @@ function analyze() {
     processingResults()
     // magic formula: the body of the request goes into the "resource" parameter
     //plane_jpeg_scan_100_200_300_400_600_900
-    mlengine.projects.predict({name:"projects/cloudml-demo-martin/models/plane_jpeg_scan_100_200_300_400_600_900", resource:body})
+    mlengine.projects.predict({name:"projects/cloudml-demo-martin/models/plane_jpeg_scan_100_200_300_400_600_900/versions/v8", resource:body})
         .then(function(res) {
             if (res.result.error)
                 displayErrorResults(res.result.error)

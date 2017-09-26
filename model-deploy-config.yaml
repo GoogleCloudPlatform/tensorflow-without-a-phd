@@ -1,0 +1,3 @@
+description: "accuracy = 0.9956, global_step = 100000, loss = 1.5604, data = planesnet32K.bkg257K.pln88K.ppln88K.pklz2, 4 conv layers"
+deploymentUri: gs://ml1-demo-martin/jobs/plane065/39/export/Servo/1506464010
+runtimeVersion: '1.2'

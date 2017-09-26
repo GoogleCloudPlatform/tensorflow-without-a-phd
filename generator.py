@@ -10,6 +10,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Generates 20x20 background tiles from the 88 500x500 background tiles
+# in sample_data/USGS_public_domain/tr* into output file backgrounds.pklz
+# Default settings: 20x20px output tiles, 5px overlap between adjacent tiles
+# 1.5x zoom out until source 500x500 tile is fully used, 45° rotations.
+# Can generate as many as 711,000 tiles with these settings.
+# To generate fewer tiles, use the skip setting. With skip=13, only one tile out of 13
+# will be generated. No skipping with skip=1.
+
 import gzip
 import pickle
 import numpy as np
@@ -28,7 +36,7 @@ def genBackgrounds(filename):
             tile_size = 20
             step_size = 15  # 1/4 image overlap
             zoom_step = 1.5
-            skip = 13
+            skip = 3
             with Image.open(loadfilename) as im:
                 i = 0
                 for angle in range(0, 360, 45):
@@ -52,4 +60,4 @@ def genBackgrounds(filename):
         print("Saved {} background images to file {}".format(imcount, filename))
 
 if __name__ == '__main__':
-    genBackgrounds("sample_data/backgrounds.pklz")
+    genBackgrounds("backgrounds.pklz")

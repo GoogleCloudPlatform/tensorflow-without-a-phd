@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 
 CONFIG="config.yaml"
+#CONFIG="config-hptune-2.yaml"
 BUCKET="gs://ml1-demo-martin"
 #BUCKET="gs://ml-eurowest1-martin"
-DATA="gs://ml1-demo-martin/data/planesnet32K.bkg82K.pklz2"
+DATA="gs://ml1-demo-martin/data/planesnet32K.bkg257K.pln88K.ppln88K.pklz2"
 PROJECT="cloudml-demo-martin"
 REGION="us-central1"
 #REGION="euro-west1"

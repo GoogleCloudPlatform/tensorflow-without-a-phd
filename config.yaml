@@ -17,7 +17,7 @@ trainingInput:
   #scaleTier: PREMIUM_1
 
   #scaleTier: CUSTOM
-  #masterType: standard
+  #masterType: complex_model_m_gpu
   #parameterServerType: standard
   #workerType: complex_model_m_gpu
 

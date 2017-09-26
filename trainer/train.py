@@ -81,8 +81,12 @@ def serving_input_fn():
     input_bytes = {'image_bytes': tf.placeholder(tf.string, [None, None]),
                    'square_size': tf.placeholder(tf.int32)
                    }
-    input_images = input_bytes['image_bytes'][0]  # why a first dimension that needs to be dropped ?
-    input_tilesz = input_bytes['square_size'][0]  # why a first dimension that needs to be dropped ?
+
+    # TODO: get inage instances from instances. Currently getting multiple images in each
+    # instance (input_bytes['image_bytes'][0]) because misunderstanding on format.
+
+    input_images = input_bytes['image_bytes'][0]
+    input_tilesz = input_bytes['square_size'][0]
 
     trained_tile_size = 20
     tile_step = 5
@@ -110,13 +114,15 @@ def serving_input_fn():
 
     def jpeg_to_bytes(jpeg):
         pixels = tf.image.decode_jpeg(jpeg, channels=3)
-        pixels = tf.cast(pixels, tf.float32) / 255.0
+        # image format uint8
+        # pixels = tf.cast(pixels, tf.float32) / 255.0
         pixels = tf.image.crop_and_resize(tf.expand_dims(pixels,0), boxes, box_ind, [trained_tile_size, trained_tile_size])
+        pixels = tf.cast(pixels, dtype=tf.uint8)
         return pixels
 
     mapped_boxes = tf.tile(boxes, [tf.shape(input_images)[0], 1])
 
-    images = tf.map_fn(jpeg_to_bytes, input_images, dtype=tf.float32)
+    images = tf.map_fn(jpeg_to_bytes, input_images, dtype=tf.uint8)
     feature_dic = {'image': images, 'boxes': mapped_boxes}
     return tf.estimator.export.ServingInputReceiver(feature_dic, input_bytes)
 
@@ -164,7 +170,8 @@ def load_data(path):
             data_labels = data_labels[p]
 
             # convert images to float
-            data_images = (data_images / 255.0).astype(np.float32)
+            #data_images = (data_images / 255.0).astype(np.float32)
+            # image format uint8
 
             # partition training and test data
             TEST_SIZE = n // 10
@@ -202,7 +209,7 @@ def main(argv):
 
     parser.add_argument('--job-dir', default="checkpoints", help='GCS or local path where to store training checkpoints')
     parser.add_argument('--data', default="planesnet32K.pklz", help='Path to data file (can be on Google cloud storage gs://...)')
-    parser.add_argument('--hp-iterations', default=5000, type=int, help='Hyperparameter: number of training iterations')
+    parser.add_argument('--hp-iterations', default=80000, type=int, help='Hyperparameter: number of training iterations')
     parser.add_argument('--hp-lr0', default=0.01, type=float, help='Hyperparameter: initial (max) learning rate')
     parser.add_argument('--hp-lr1', default=0.0001, type=float, help='Hyperparameter: target (min) learning rate')
     parser.add_argument('--hp-lr2', default=800, type=float, help='Hyperparameter: learning rate decay speed in steps. Learning rate decays by exp(-1) every N steps.')
@@ -210,7 +217,7 @@ def main(argv):
     parser.add_argument('--hp-filter-sizes', default='S' , help='Hyperparameter: convolutional filter sizes S, M, L.')
     parser.add_argument('--hp-conv1', default=16, type=int, help='Hyperparameter: depth of first convolutional layer. Depth then doubles at each layer.')
     parser.add_argument('--hp-bnexp', default=0.993, type=float, help='Hyperparameter: exponential decay for batch norm moving averages.')
-    parser.add_argument('--hp-dense', default=40, type=int, help='Hyperparameter: size of the dense layer')
+    parser.add_argument('--hp-dense', default=80, type=int, help='Hyperparameter: size of the dense layer')
     args = parser.parse_args()
     arguments = args.__dict__
 

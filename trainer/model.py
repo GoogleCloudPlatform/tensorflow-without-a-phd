@@ -19,6 +19,7 @@ def model_fn(features, labels, mode, params):
 
     # layer configurations
     filter_sizes = {'S': [4, 3, 2], 'M': [5, 4, 3], 'L': [6, 5, 4]}
+    #filter_sizes = {'S': [4, 3, 3, 2], 'M': [5, 4, 4, 3], 'L': [6, 5, 5, 4]}
     filter_size = filter_sizes[params['filter_sizes']]
 
     def learn_rate(lr, step):
@@ -38,11 +39,23 @@ def model_fn(features, labels, mode, params):
 
     # model
     X = tf.reshape(features["image"], [-1, 20, 20, 3])  # reshape not necessary here
+    # image format uint8
+    X = tf.to_float(X) / 255.0
     Y_ = labels
+
+    # 4 layer conv
+    #Y1 = layer_conv2d_batch_norm_relu(X,  filters=params['conv1'],   kernel_size=filter_size[0], strides=1)
+    #Y2 = layer_conv2d_batch_norm_relu(Y1, filters=params['conv1']*2, kernel_size=filter_size[1], strides=2)
+    #Y2bis = layer_conv2d_batch_norm_relu(Y2, filters=params['conv1'], kernel_size=filter_size[2], strides=1)
+    #Y3 = layer_conv2d_batch_norm_relu(Y2bis, filters=params['conv1']*2, kernel_size=filter_size[3], strides=2)
+    #Y4 = tf.reshape(Y3, [-1, 2*params['conv1']*5*5])
+
+    # 3 layer conv
     Y1 = layer_conv2d_batch_norm_relu(X,  filters=params['conv1'],   kernel_size=filter_size[0], strides=1)
     Y2 = layer_conv2d_batch_norm_relu(Y1, filters=params['conv1']*2, kernel_size=filter_size[1], strides=2)
     Y3 = layer_conv2d_batch_norm_relu(Y2, filters=params['conv1']*4, kernel_size=filter_size[2], strides=2)
     Y4 = tf.reshape(Y3, [-1, 4*params['conv1']*5*5])
+
     Y5 = layer_dense_batch_norm_relu_dropout(Y4, params['dense'], params['dropout'])
     Ylogits = tf.layers.dense(Y5, 2)
     predict = tf.nn.softmax(Ylogits)

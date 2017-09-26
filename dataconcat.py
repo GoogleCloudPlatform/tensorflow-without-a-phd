@@ -11,7 +11,7 @@
 # limitations under the License.
 
 # Concatenates two or more planesnet data files. The result has the same name as the first file with
-#  ".concat" inseted before the extension. Result picke format is the same as the format of the first file.
+#  ".concat" inserted before the extension. Result picke format is the same as the format of the first file.
 
 import os
 import sys
