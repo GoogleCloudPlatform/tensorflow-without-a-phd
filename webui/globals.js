@@ -14,17 +14,18 @@
  * limitations under the License.
  */
 
-var auth2
+var auth2  // The Sign-In object.
+var googlemap = null  // Google maps API map instance
+var mlengine = null  // ML engine API handle
+var googlemapevtlistener = null
 
-var payload = new Object()
-payload.instances = [new Object()]
-payload.instances[0].image_bytes = []
-payload.instances[0].square_size = 200
+var payload_tiles = []  // extracted images. format {image_bytes: ,pos:{x: ,y: ,sz: }}
 
-// Google maps API map instance
-var googlemap = null
-var mlengine = null
-// https://ml.googleapis.com/v1/projects/cloudml-demo-martin/models/plane/versions/v1:predict
+var zone_width = 660
+var zone_height = 360
+var tile_size = 200  // zone is always tiled with one tile more than necessary in each direction to force overlap
+
+var reload_once = false
 
 // all button event handlers
 var analyzeButton = document.getElementById('analyze-button');

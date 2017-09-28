@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-var auth2 // The Sign-In object.
-
 // Google Maps API initialisation
 function initMap() {
     var query = new URLSearchParams(window.location.search)
@@ -36,12 +34,8 @@ function initMap() {
         center: latlng,
         mapTypeId: google.maps.MapTypeId.SATELLITE
     })
-    google.maps.event.addListener(googlemap, 'idle', setLocationAndGrabPixels)
-}
-
-function setLocationAndGrabPixels() {
-    setMapLocationInURL(googlemap.getCenter(), googlemap.getZoom())
-    grabPixels()
+    google.maps.event.removeListener(googlemapevtlistener)
+    googlemapevtlistener = google.maps.event.addListener(googlemap, 'idle', grabPixels)
 }
 
 // Google Auth2, PubSub, CRM API initialisation
@@ -94,8 +88,11 @@ function logError(err) {
     console.log(err)
 }
 
-function setMapLocationInURL(latlng, zoom) {
-    history.pushState(null,null,'?lat=' + latlng.lat() + '&lng=' + latlng.lng() + '&zoom=' + zoom)
+function setMapLocationInURL(latlng, zoom, reloadonce) {
+    var urlparams = '?lat=' + latlng.lat() + '&lng=' + latlng.lng() + '&zoom=' + zoom
+    if (reloadonce == 1)
+        urlparams += '&r=' + reloadonce
+    history.pushState(null,null, urlparams)
 }
 
 function centerMap(lat, lng) {

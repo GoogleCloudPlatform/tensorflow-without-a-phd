@@ -17,50 +17,67 @@
 function grabPixels() {
     var map = document.getElementById('map')
     var zone = document.getElementById('zone')
-    var playground = document.getElementById('tap')
     var visu = document.getElementById('cap')
+
+    resetResults()
+    disableMapScroll()
+
     html2canvas(map, {
-        onrendered: function(canvas) {processPixels(canvas, zone.offsetLeft, zone.offsetTop, zone.clientWidth, zone.clientHeight, visu, playground)},
+        onrendered: function(canvas) {processPixels(canvas, zone.offsetLeft, zone.offsetTop, zone.clientWidth, zone.clientHeight, visu)},
         width: map.clientWidth,
         height: map.clientHeight,
         useCORS: true
     })
-
-    // reset previous results
 }
 
-function processPixels(canvas, sx, sy, sw, sh, visu, playground) {
-
-    resetResults()
-
+function processPixels(canvas, sx, sy, sw, sh, visu) {
     var sctx = canvas.getContext("2d")
     var vctx = visu.getContext("2d")
-    //var dctx = playground.getContext("2d")
-
-    // TODO: currently generating one instance with multiple images in it. Fix it.
 
     // copy from source to destination context
-    var sz = 200    //
-    var step = 200 // just one tile
+    var sz = tile_size
+    //var step = tile_size
     var data = sctx.getImageData(sx, sy, sw, sh)
     vctx.putImageData(data, 0, 0)
 
     // hack: if grab fails, this will be the browser's default background color
-    // forcing a reload usually makes the gab work again
-    if (hasBackgroundInAnyCorner(data))
-        location.reload()
-
-    payload.instances[0].image_bytes = []
-    for (var y=0,dy=0; y+sz<=data.height; y+=step,dy+=sz+1) {
-        for (var x = 0, dx = 0; x + sz <= data.width; x += step, dx += sz + 1) {
-            var tile = sctx.getImageData(sx + Math.floor(x), sy + Math.floor(y), sz, sz)
-            var jpegtile = imageCropAndExport(canvas, sx + Math.floor(x), sy + Math.floor(y), sz, sz)
-            //dctx.drawImage(canvas, x, y, sz, sz, dx, dy, sz, sz)
-            //dctx.putImageData(tile, dx, dy)
-            payload.instances[0].image_bytes.push(b64Data2MLEngineFormat(jpegtile))
+    // forcing a reload usually makes the grab work again
+    if (hasBackgroundInAnyCorner(data)) {
+        var query = new URLSearchParams(window.location.search)
+        var rlonce = query.get("r")
+        if (rlonce != "1") {
+            setMapLocationInURL(googlemap.getCenter(), googlemap.getZoom(), 1)
+            location.reload()
+            return
         }
     }
-    displayPayload(payload)
+
+    payload_tiles = []
+    // This will always tile with overlapping tiles unless there is s single tile position possible
+    // ex: zone width 500, tile width 200: 3 tile positions on x axis
+    // ex: zone width 200, tile width 200: 1 tile position
+    // ex: zone width 600, tile width 200: 4 tile positions to ensure overlap
+    var nx = Math.floor(data.width / tile_size)
+    var ny = Math.floor(data.height / tile_size)
+    if (nx>=5) nx++ // more overlap for large zones
+    if (ny>=5) ny++
+    var xstep = (data.width - tile_size) / nx
+    var ystep = (data.height - tile_size) / ny
+    xstep = xstep > 0 ? xstep : tile_size
+    ystep = ystep > 0 ? ystep : tile_size
+    for (var y=0; y+sz<=data.height; y+=ystep) {
+        for (var x=0; x + sz <= data.width; x+=xstep) {
+            var xoffset = Math.floor(x)
+            var yoffset = Math.floor(y)
+            var tile = sctx.getImageData(sx + xoffset, sy + yoffset, sz, sz)
+            var b64jpegtile = imageCropAndExport(canvas, sx + xoffset, sy + yoffset, sz, sz)
+            var tile = {image_bytes:b64jpegtile, pos:{x:xoffset, y:yoffset, sz:sz}}
+            payload_tiles.push(tile)
+        }
+    }
+    setMapLocationInURL(googlemap.getCenter(), googlemap.getZoom(), 0)
+    displayPayload(payload_tiles)
+    enableMapScroll()
 }
 
 function imageCropAndExport(img, x, y, w, h) {
@@ -88,11 +105,4 @@ function hasBackgroundInAnyCorner(imgdata) {
     var r=229, g=227, b=223
     function is_background_pix(x, y) {return data[(y*w+x)*4]==r && data[(y*w+x)*4+1]==g && data[(y*w+x)*4+2]==b}
     return is_background_pix(0,0) || is_background_pix(w-1, 0) || is_background_pix(0, h-1) || is_background_pix(w-1, h-1)
-}
-
-function b64Data2MLEngineFormat(b64) {
-    // ? URL decode ?
-    var container = new Object()
-    container.b64 = b64
-    return container
 }
