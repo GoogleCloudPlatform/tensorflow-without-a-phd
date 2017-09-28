@@ -42,36 +42,39 @@ function updateSigninStatus(isSignedIn) {
 
 function analyze() {
     resetResults()
+    var delay = 0
     payload_tiles.map(function (tile) {
-        processingResults(tile)
-        displayProcessingMarker(tile)
-        var body = mlengineJSONify([tile])  // TODO: fix the online prediction serving_input_fn and remove the []
-        // magic formula: the body of the request goes into the "resource" parameter
-        mlengine.projects.predict({
-            name: "projects/cloudml-demo-martin/models/plane_jpeg_scan_100_200_300_400_600_900/versions/v8",
-            resource: body
-        })
-            .then(function (res) {
-                if (res.result.error) {
-                    undisplayProcessingMarker(tile)
-                    displayErrorResults(tile, res.result.error)
-                }
-                else {
-                    var nb_planes = 0
-                    var nb_results = 0
-                    var result_markers = []
-                    res.result.predictions.map(function(prediction) {
-                        if (prediction.classes) {
-                            nb_planes++
-                            result_markers.push(prediction.boxes)
-                        }
-                    })
-                    undisplayProcessingMarker(tile)
-                    displayResultMarkers(tile, result_markers)
-                    displayResults(tile, nb_planes)
-                    console.info("Found planes:" + nb_planes)
-                }
-            }, logError)
+        setTimeout(function() {
+            processingResults(tile)
+            displayProcessingMarker(tile)
+            var body = mlengineJSONify([tile])  // TODO: fix the online prediction serving_input_fn and remove the []
+            // magic formula: the body of the request goes into the "resource" parameter
+            mlengine.projects.predict({
+                name: "projects/cloudml-demo-martin/models/plane_jpeg_scan_100_200_300_400_600_900/versions/v7",
+                resource: body
+            })
+                .then(function (res) {
+                    if (res.result.error) {
+                        undisplayProcessingMarker(tile)
+                        displayErrorResults(tile, res.result.error)
+                    }
+                    else {
+                        var nb_planes = 0
+                        var nb_results = 0
+                        var result_markers = []
+                        res.result.predictions.map(function(prediction) {
+                            if (prediction.classes) {
+                                nb_planes++
+                                result_markers.push(prediction.boxes)
+                            }
+                        })
+                        undisplayProcessingMarker(tile)
+                        displayResultMarkers(tile, result_markers)
+                        displayResults(tile, nb_planes)
+                        console.info("Found planes:" + nb_planes)
+                    }
+                }, logError)
+        }, (delay++)*tile_delay)
     })
 }
 
@@ -109,8 +112,10 @@ function displayProcessingMarker(tile) {
         marker.style.left = tile.pos.x + 'px'
         marker.style.width = tile.pos.sz + 'px'
         marker.style.height = tile.pos.sz + 'px'
+        var opacity = getComputedStyle(marker).opacity
+        marker.style.opacity = 0
         zone.appendChild(marker)
-        setTimeout(function() {marker.style.opacity = 0.4}, 100)
+        setTimeout(function() {marker.style.opacity = opacity}, 10)  // to allow opacity animation
     }
 }
 

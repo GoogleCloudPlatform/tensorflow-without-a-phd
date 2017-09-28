@@ -24,6 +24,8 @@ var payload_tiles = []  // extracted images. format {image_bytes: ,pos:{x: ,y: ,
 var zone_width = 660
 var zone_height = 360
 var tile_size = 200  // zone is always tiled with one tile more than necessary in each direction to force overlap
+// acceptable tile sizes depend on ML Engine model used. Currently plane_jpeg_scan_100_200_300_400_600_900.
+var tile_delay = 20 // delay in ms between consecutive calls to ML Engine online predictions API (can be 0)
 
 var reload_once = false
 

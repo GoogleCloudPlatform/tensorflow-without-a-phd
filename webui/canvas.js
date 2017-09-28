@@ -65,8 +65,9 @@ function processPixels(canvas, sx, sy, sw, sh, visu) {
     var ystep = (data.height - tile_size) / ny
     xstep = xstep > 0 ? xstep : tile_size
     ystep = ystep > 0 ? ystep : tile_size
-    for (var y=0; y+sz<=data.height; y+=ystep) {
-        for (var x=0; x + sz <= data.width; x+=xstep) {
+    var epsilon = 0.0001
+    for (var y=0; y+sz<=data.height+epsilon; y+=ystep) {
+        for (var x=0; x + sz <= data.width+epsilon; x+=xstep) {
             var xoffset = Math.floor(x)
             var yoffset = Math.floor(y)
             var tile = sctx.getImageData(sx + xoffset, sy + yoffset, sz, sz)

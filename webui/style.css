@@ -119,6 +119,6 @@ body {
 .zone-processing-marker {
     position: absolute;
     background-color: lightblue;
-    transition: 0.5s;
-    opacity: 0;
+    transition: 0.7s;
+    opacity: 0.6;
 }
