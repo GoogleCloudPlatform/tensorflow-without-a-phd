@@ -6,8 +6,11 @@ If you are a power user under a specific Python environment ((virtualenv, anacon
 docker), please visit tensorflow.org and follow the Python 3 instructions.
 
 MacOS:
-	If you do not have it already, install git from https://git-scm.com/download/mac
-	Install the latest version of python 3 from https://www.python.org/downloads/
+	# If you do not have it already, install git from https://git-scm.com/download/mac
+	# Install the latest version of python 3 from https://www.python.org/downloads/
+	# and run this on the command line so that python3 can access https:// URLs:
+	sudo /Applications/Python\ 3.6/Install\ Certificates.command
+	# Now you can install tensorflow and matplotlib
 	pip3 install --upgrade tensorflow
 	pip3 install --upgrade matplotlib
 
