@@ -1,8 +1,7 @@
 sample_data
 checkpoints
-*.pklz
-*.pklz2
 *.iml
 cloudrunN.txt
 *.pyc
 sample_results
+USGS_public_domain_airports
