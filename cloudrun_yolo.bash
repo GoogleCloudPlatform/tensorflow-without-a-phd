@@ -1,14 +1,10 @@
 #!/usr/bin/env bash
 
 CONFIG="config.yaml"
-#CONFIG="config-hptune-2.yaml"
 BUCKET="gs://ml1-demo-martin"
-#BUCKET="gs://ml-eurowest1-martin"
-#DATA="gs://ml1-demo-martin/data/planesnet32K.bkg257K.pln88K.ppln88K.pklz2"
-DATA="gs://ml1-demo-martin/data/datasetx"
+DATA="gs://ml1-demo-martin/data/USGS_public_domain_airports"
 PROJECT="cloudml-demo-martin"
 REGION="us-central1"
-#REGION="euro-west1"
 
 # auto-incrementing run number padded with zeros to 3 digits
 NFILE="cloudrunN.txt"
@@ -24,8 +20,8 @@ gcloud ml-engine jobs submit training plane$N \
     --config ${CONFIG} \
     --project ${PROJECT} \
     --region ${REGION} \
-    --module-name trainer.train \
-    --package-path trainer \
+    --module-name trainer_yolo.train \
+    --package-path trainer_yolo \
     --runtime-version 1.2 \
     -- \
     --data "${DATA}"

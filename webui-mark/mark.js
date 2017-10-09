@@ -17,10 +17,10 @@ var defaultMarkerWidth = 50
 var minMarkerWidth = 10
 var markerSaveFilename = ""
 var markersOnDisk = [
+    'USGS_OAK',
     'USGS_FAT',
     'USGS_FLG',
     'USGS_LAX',
-    'USGS_OAK',
     'USGS_PHX',
     'USGS_SFO',
     'USGS_BHM',
@@ -39,7 +39,14 @@ var markersOnDisk = [
     'USGS_DSM',
     'USGS_MSY',
     'USGS_BOS',
-    'USGS_BWI']
+    'USGS_BWI',
+    'USGS_CLT',
+    'USGS_IAH',
+    'USGS_CVG',
+    'USGS_AUS',
+    'USGS_SEA',
+    'USGS_VCV',
+    'USGS_VCV2']
 
 document.addEventListener("DOMContentLoaded", function(event) {
     var image = document.querySelector("#container img")

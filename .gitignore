@@ -5,3 +5,4 @@ cloudrunN.txt
 *.pyc
 sample_results
 USGS_public_domain_airports
+USGS_public_domain_airports_eval

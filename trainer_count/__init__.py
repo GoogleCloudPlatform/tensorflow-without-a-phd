@@ -9,17 +9,4 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-trainingInput:
-  #scaleTier: BASIC
-  scaleTier: BASIC_GPU
-  #scaleTier: STANDARD_1
-  #scaleTier: PREMIUM_1
-
-  #scaleTier: CUSTOM
-  #masterType: standard
-  #parameterServerType: standard_gpu
-  #workerType: standard_gpu
-
-  #parameterServerCount: 1
-  #workerCount: 6
+# ==============================================================================

@@ -10,6 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import sys
 import gzip
 #import png
@@ -22,6 +23,8 @@ from tensorflow.python.platform import tf_logging as logging
 
 from trainer import model
 from trainer import boxscan
+
+cnt = 0
 
 logging.set_verbosity(logging.INFO)
 logging.log(logging.INFO, "Tensorflow version " + tf.__version__)
@@ -41,6 +44,46 @@ def eval_data_input_fn(images, labels):
     boxes = tf.zeros(shape=[tf.shape(features)[0],4])
     features = {'image': features, 'boxes':boxes}
     return features, labels
+
+def load_dataset(directory):
+    files = gcsfile.get_matching_files(directory + "/*")
+    labels = list(map(lambda filename: int(os.path.basename(filename)[0:1] == '1'), files))
+    boxes = tf.zeros(shape=[len(files),4])
+    return tf.contrib.data.Dataset.from_tensor_slices((tf.constant(files), tf.constant(labels), boxes)), len(files)
+
+def gcsload(filename, label, box):
+    global cnt
+    logging.info("{}:{}".format(cnt,filename))
+    cnt +=1
+    return gcsfile.read_file_to_string(filename, binary_mode=True), label, box
+
+def load(filename, label, box):
+    return tf.read_file(filename), label, box
+    #return tf.py_func(gcsload, [filename, label, box], [tf.string, tf.int32, tf.float32])
+
+def decode(img_bytes, label, box):
+    img_decoded = tf.image.decode_image(img_bytes, channels=3)
+    return img_decoded, label, box
+
+def features_and_labels(dataset):
+    it = dataset.make_one_shot_iterator()
+    images, labels, boxes = it.get_next()
+    features = {'image': images, 'boxes': boxes}
+    return features, labels
+
+def dataset_input_fn(dataset):
+    dataset = dataset.map(load)
+    dataset = dataset.map(decode)
+    dataset = dataset.shuffle(20)
+    dataset = dataset.batch(1)
+    dataset = dataset.repeat()  # indefinitely
+    return features_and_labels(dataset)
+
+def dataset_eval_input_fn(dataset, n):
+    dataset = dataset.map(load)
+    dataset = dataset.map(decode)
+    dataset = dataset.batch(n)  # single batch with everything
+    return features_and_labels(dataset)
 
 
 # input function for raw JSON bitmap (uint8)
@@ -190,13 +233,17 @@ def main(argv):
     # The Experiment is an Estimator with data loading functions and other parameters
     def experiment_fn_with_params(output_dir, hparams, data, **kwargs):
         # load data
-        test_images, test_labels, train_images, train_labels = load_data(data)
+        #test_images, test_labels, train_images, train_labels = load_data(data)
+        dataset, nb = load_dataset(data)
+        dataset_eval, nb_eval_files = load_dataset(data + "_eval")
         ITERATIONS = hparams["iterations"]
         # Compatibility warning: Experiment will move out of contrib in 1.4
         return tf.contrib.learn.Experiment(
             estimator=tf.estimator.Estimator(model_fn=model.model_fn, model_dir=output_dir, config=training_config, params=hparams),
-            train_input_fn=lambda: train_data_input_fn(train_images, train_labels),
-            eval_input_fn=lambda: eval_data_input_fn(test_images, test_labels),
+            #train_input_fn=lambda: train_data_input_fn(train_images, train_labels),
+            #eval_input_fn=lambda: eval_data_input_fn(test_images, test_labels),
+            train_input_fn=lambda: dataset_input_fn(dataset),
+            eval_input_fn=lambda: dataset_eval_input_fn(dataset_eval, nb_eval_files),
             train_steps=ITERATIONS,
             eval_steps=1,
             min_eval_frequency=100,
