@@ -51,6 +51,7 @@ function analyze() {
             // magic formula: the body of the request goes into the "resource" parameter
             mlengine.projects.predict({
                 name: "projects/cloudml-demo-martin/models/plane_jpeg_scan_100_200_300_400_600_900/versions/v7",
+                //name: "projects/cloudml-demo-martin/models/plane_jpeg_scan_100_200_300_400_600_900_logged2/versions/v7MININST10",
                 resource: body
             })
                 .then(function (res) {

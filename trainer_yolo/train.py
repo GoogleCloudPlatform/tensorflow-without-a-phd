@@ -19,8 +19,8 @@ import tensorflow as tf
 from tensorflow.python.lib.io import file_io as gcsfile
 from tensorflow.python.platform import tf_logging as logging
 
-from trainer_count import model
-from trainer_count.boxutils import boxintersect
+from trainer_yolo import model
+from trainer_yolo import boxutils
 
 logging.set_verbosity(logging.INFO)
 logging.log(logging.INFO, "Tensorflow version " + tf.__version__)
@@ -50,7 +50,7 @@ def load_file_list(directory):
 
 def decode_json_py(str):
     obj = json.loads(str.decode('utf-8'))
-    rois = np.array([(roi['y'], roi['x'], roi['y']+roi['w'], roi['x']+roi['w']) for roi in obj["markers"]], dtype=np.float32)
+    rois = np.array([(roi['x'], roi['y'], roi['x']+roi['w'], roi['y']+roi['w']) for roi in obj["markers"]], dtype=np.float32)
     return rois
 
 def gcsload(filename):
@@ -75,39 +75,37 @@ def tf_logten(msg, ten):
 def generate(pixels, json_bytes, eval=False):
     # parse json
     rois = tf.py_func(decode_json_py, [json_bytes], [tf.float32])
+    # get a number of slices from the image. This allows us to get an arbitrary number of slices
+    # from one image without loading them all in memory.
+    n = 10 if not eval else 1
+    return tf.contrib.data.Dataset.range(n).flat_map(lambda i: generate_slice(pixels, rois, i))
 
-    # fighting with dynamic image shapes ...
-    img_shape = tf.shape(pixels)  # known shape [height, width, 3]
-    img_shape = tf.reshape(img_shape, [3])
-    img_h, img_w, _ = tf.unstack(tf.cast(img_shape, dtype=tf.float32), axis=0)
-    # KO!
+def generate_eval(pixels, json_bytes):
+    return generate(pixels, json_bytes, eval=True)
 
-    # fighting with dynamic number of rois
+def generate_slice(pixels, rois, idx):
+    # dynamic image shapes
+    img_shape = tf.cast(tf.shape(pixels), tf.float32)  # known shape [height, width, 3]
+    img_shape = tf.reshape(img_shape, [3])  # tensorflow needs help here
+    img_h, img_w, _ = tf.unstack(img_shape)
+
+    # dynamic number of rois
     rois = tf.reshape(rois, [-1, 4])  # I know the shape but Tensorflow does not
-    rois_n = tf.shape(rois)  # known shape [n, 4]
-    rois_n = tf.reshape(rois_n, [2])
-    rois_n, _ = tf.unstack(rois_n, axis=0)
-    #KO!
+    rois_n = tf.shape(rois)[0] # known shape [n, 4]
 
     TILE_SIZE = 256
+    TILE_INTERSECT_FRACTION = 0.75
 
     # random displacements around each ROI
-    N_MAX_OUTPUTS = 3000
-    N_RANDOM_POSITIONS = 100
     RANDOM_MAX_DISTANCE = 1.4*TILE_SIZE  # adjusted so that tiles with 0, 1, 2 or many planes happen with roughly equal frequency
-    if eval:
-        N_RANDOM_POSITIONS = 10
+    N_RANDOM_POSITIONS = 20  # 20 * max nb of planes in one input image = nb of tiles generated in RAM (watch out!)
 
-    limit = tf.floordiv(N_MAX_OUTPUTS, rois_n)
-    nrand = tf.where(tf.less(N_RANDOM_POSITIONS, limit), N_RANDOM_POSITIONS, limit)
-    tf_logten("image slicing limit: ", nrand*rois_n)
-
-    # increase sdtev to reach more zones without airplanes
-    rnd_x = tf.truncated_normal([nrand], mean=0.0, stddev=RANDOM_MAX_DISTANCE/2.0)
-    rnd_y = tf.truncated_normal([nrand], mean=0.0, stddev=RANDOM_MAX_DISTANCE/2.0)
+    # you can increase sdtev to reach more zones without airplanes
+    rnd_x = tf.truncated_normal([N_RANDOM_POSITIONS], mean=0.0, stddev=RANDOM_MAX_DISTANCE/2.0)
+    rnd_y = tf.truncated_normal([N_RANDOM_POSITIONS], mean=0.0, stddev=RANDOM_MAX_DISTANCE/2.0)
 
     def many_tiles_around_this_one(roi):
-        roi_y1, roi_x1, roi_y2, roi_x2 = tf.unstack(roi, axis=0)
+        roi_x1, roi_y1, roi_x2, roi_y2 = tf.unstack(roi, axis=0)
         # center coordinates of the roi
         roi_x = (roi_x1 + roi_x2) / 2.0
         roi_y = (roi_y1 + roi_y2) / 2.0
@@ -119,74 +117,91 @@ def generate(pixels, json_bytes, eval=False):
         roi_y1 = tf.add(roi_y, -TILE_SIZE/2.0)
         roi_x2 = tf.add(roi_x, TILE_SIZE/2.0)
         roi_y2 = tf.add(roi_y, TILE_SIZE/2.0)
-        roisx = tf.stack([roi_y1, roi_x1, roi_y2, roi_x2], axis=1)
+        roisx = tf.stack([roi_x1, roi_y1, roi_x2, roi_y2], axis=1)
         return roisx
 
     # for each roi, generate N_RANDOM_POSITIONS translated ROIs
-    rois = tf.reshape(rois, [-1, 4])  # I know the shape but Tensorflow does not
     tiles = tf.map_fn(many_tiles_around_this_one, rois, dtype=tf.float32, name="jitter")
     tiles = tf.reshape(tiles, [-1, 4])  # flatten all generated random ROIs
+    # dynamic number of tiles
+    tiles_n = tf.shape(tiles)[0]  # known shape [n, 4]
+
+    def count_planes(roi):
+        inter = boxutils.boxintersect(roi, rois, TILE_INTERSECT_FRACTION)
+        return tf.reduce_sum(tf.cast(inter, dtype=tf.int32))
+
+    # plane counting
+    plane_counts = tf.map_fn(count_planes, tiles, dtype=tf.int32)
+    # count up to 1 max (planes/no planes)
+    # or count up to 3 max (0, 1, 2, lots of planes)
+    plane_counts = tf.minimum(plane_counts, 1)
+
+    # debug
+    plane_counts3 = tf.count_nonzero(tf.floor_div(plane_counts, 3))
+    plane_counts2 = tf.count_nonzero(tf.floor_div(plane_counts, 2)) - plane_counts3
+    plane_counts1 = tf.count_nonzero(tf.floor_div(plane_counts, 1)) - plane_counts3 - plane_counts2
+    plane_counts0 = tf.count_nonzero(tf.add(plane_counts, 1))       - plane_counts1 - plane_counts2 - plane_counts3
+    tf_logten("Generating training tiles: ", tiles_n)
+    tf_logten("Tiles with 0 planes : ", plane_counts0)
+    tf_logten("Tiles with 1 plane  : ", plane_counts1)
+    #tf_logten("Labels 2: ", plane_counts2)
+    #tf_logten("Labels 3: ", plane_counts3)
 
     # Vocabulary:
     # "tile": a 256x256 region under consideration
     # "cell": tiles are evenly divided into 4 x 4 = 16 cells
     # "roi": a plane bounding box (gorund thruth)
 
-    # TODO: compute target 
     # Tile divided in GRID_N x GRID_N grid
     GRID_N = 4
     # Recognizing CELL_B boxes per grid cell
-    CELL_B = 3
+    CELL_B = 1
 
-    # TODO: use boxutils...
-    
-
-    # fighting with dynamic number of tiles
-    tiles_n = tf.shape(tiles)  # known shape [n, 4]
-    tiles_n = tf.reshape(tiles_n, [2])
-    tiles_n, _ = tf.unstack(tiles_n, axis=0)
-    #KO!
+    # For each tile, for each grid cell, determine the CELL_B largest ROIs centered in that cell
+    # Output shape [tiles_n, GRID_N, GRID_N, CELL_B, 3]
+    targets = tf.map_fn(lambda tile:
+                        boxutils.n_largest_rois_in_cell_relative(tile, rois, rois_n, GRID_N, CELL_B),
+                        tiles)
 
     # resize rois to units used by crop_and_resize
-    tile_y1, tile_x1, tile_y2, tile_x2 = tf.unstack(tiles, axis=1)
+    tile_x1, tile_y1, tile_x2, tile_y2 = tf.unstack(tiles, axis=1)
     tile_y1 = tile_y1 / img_h
     tile_x1 = tile_x1 / img_w
     tile_y2 = tile_y2 / img_h
     tile_x2 = tile_x2 / img_w
+    # crop_and_resize expects coordinates in format [y1, x1, y2, x2]
     tiles = tf.stack([tile_y1, tile_x1, tile_y2, tile_x2], axis=1)
 
     indices = tf.zeros([tiles_n], dtype=tf.int32) # all the rois refer to image #0 (there is only one)
     # expand_dims needed because crop_and_resize expects a batch of images
     images = tf.image.crop_and_resize(tf.expand_dims(pixels, 0), tiles, indices, [TILE_SIZE, TILE_SIZE])
-    # crop_and_resize does not output a proper pixel depth but the convolutional layers need it
+    # crop_and_resize does not output a defined pixel depth but the convolutional layers need it
     images = tf.reshape(images, [-1, TILE_SIZE, TILE_SIZE, 3])
     images = tf.cast(images, tf.uint8)
-    return tf.contrib.data.Dataset.from_tensor_slices((images, labels))
+    targets = tf.reshape(targets, [-1, GRID_N, GRID_N, CELL_B, 3])
+    return tf.contrib.data.Dataset.from_tensor_slices((images, plane_counts, targets))
+
 
 def load_files(img_filename, roi_filename):
     tf_logten("Loading ", img_filename)
     img_bytes = tf.read_file(img_filename)
-    # This works too bu I do not understand the syntax [toto] =
-    #[img_bytes] = tf.py_func(gcsload, [img_filename], [tf.string])
     pixels = tf.image.decode_image(img_bytes, channels=3)
     pixels = tf.cast(pixels, tf.uint8)
     json_bytes = tf.read_file(roi_filename)
     return pixels, json_bytes
 
-def generate_eval(pixels, json_bytes):
-    return generate(pixels, json_bytes, eval=True)
-
 def features_and_labels(dataset):
     it = dataset.make_one_shot_iterator()
-    images, labels = it.get_next()
-    features = {'image': images}
+    tiles, counts, targets = it.get_next()
+    features = {'image': tiles}
+    labels = {'count': counts, 'target': targets}
     return features, labels
 
 def dataset_input_fn(img_filelist, roi_filelist):
     dataset = tf.contrib.data.Dataset.from_tensor_slices((tf.constant(img_filelist), tf.constant(roi_filelist)))
     dataset = dataset.map(load_files)
     dataset = dataset.flat_map(generate)
-    dataset = dataset.shuffle(1000)
+    #dataset = dataset.shuffle(1000)
     dataset = dataset.batch(50)
     dataset = dataset.repeat()  # indefinitely
     return features_and_labels(dataset)
@@ -195,9 +210,13 @@ def dataset_eval_input_fn(img_filelist, roi_filelist):
     dataset = tf.contrib.data.Dataset.from_tensor_slices((tf.constant(img_filelist), tf.constant(roi_filelist)))
     dataset = dataset.map(load_files)
     dataset = dataset.flat_map(generate_eval)
-    dataset = dataset.batch(191)
+    dataset = dataset.batch(191) # eval dataset 191 markers and will be run 20 times
     return features_and_labels(dataset)
 
+# file list -> dataset
+# dataset.map load files -> dataset of files
+# dataset.flat_map generate(image)
+# in generate: dataset range(10).map(generate_one_slice(image))
 
 # input function for base64 encoded JPEG in JSON, with automatic scanning
 # Called when the model is deployed for online predictions on Cloud ML Engine.
@@ -244,7 +263,7 @@ def main(argv):
             train_input_fn=lambda: dataset_input_fn(img_filelist, roi_filelist),
             eval_input_fn=lambda: dataset_eval_input_fn(img_filelist_eval, roi_filelist_eval),
             train_steps=ITERATIONS,
-            eval_steps=10,
+            eval_steps=20,
             min_eval_frequency=100,
             export_strategies=export_strategy
         )

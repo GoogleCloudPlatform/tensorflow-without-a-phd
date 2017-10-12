@@ -71,7 +71,7 @@ def cxyw_rois(rois):
     # center coordinates of the roi
     rois_x = (rois_x1 + rois_x2) / 2.0
     rois_y = (rois_y1 + rois_y2) / 2.0
-    rois_w = (rois_x2 - rois_x1) / 2.0
+    rois_w = (rois_x2 - rois_x1)
     rois = tf.stack([rois_x, rois_y, rois_w], axis=1) # rois shape [rois_n, 3]
     return rois
 
@@ -91,6 +91,12 @@ def center_in_grid_cell(grid, grid_n, cell_w, rois):
     has_center = tf.logical_and(has_center_x, has_center_y) # shape [grid_n, grid_n, rois_n]
     return has_center
 
+def gen_grid_for_tile(tile, grid_n):
+    tile_x1, tile_y1, tile_x2, tile_y2 = tf.unstack(tile, axis=0) # tile shape [4]
+    cell_w = (tile_x2 - tile_x1) / grid_n
+    grid = gen_grid(grid_n)
+    grid = size_and_move_grid(grid, cell_w, [tile_x1, tile_y1])
+    return grid, cell_w
 
 # Splits the tile into grid_n x grid_n cells.
 # For each cell, computes the n largest rois that are centered in the cell.
@@ -98,10 +104,7 @@ def center_in_grid_cell(grid, grid_n, cell_w, rois):
 # (For now also converts rectangular ROIs to square ones.)
 # If no roi centered in a cell, returns empty roi (0,0,0) for that cell.
 def n_largest_rois_in_cell(tile, rois, rois_n, grid_n, n):
-    tile_x1, tile_y1, tile_x2, tile_y2 = tf.unstack(tile, axis=0) # tile shape [4]
-    cell_w = (tile_x2 - tile_x1) / grid_n
-    grid = gen_grid(grid_n)
-    grid = size_and_move_grid(grid, cell_w, [tile_x1, tile_y1])
+    grid, cell_w = gen_grid_for_tile(tile, grid_n)
 
     # grid shape [grid_n, grid_n, 2]
     # rois shape [rois_n, 3]
@@ -133,6 +136,85 @@ def n_largest_rois_in_cell(tile, rois, rois_n, grid_n, n):
         zero_mask = tf.logical_not(tf.cast(tf.one_hot(largest_indices, rois_n), dtype=tf.bool))
         has_center = tf.logical_and(has_center, zero_mask)
     n_largest = tf.stack(n_largest, axis=2)  # shape [grid_n, grid_n, n, 3]
-    return n_largest # shape [grid_n,grid_n, n, 3]
+    return n_largest # shape [grid_n, grid_n, n, 3]
+
+def make_rois_tile_cell_relative(tile, tiled_rois, grid_n):
+    grid, cell_w = gen_grid_for_tile(tile, grid_n)
+    tile_w = cell_w * grid_n
+
+    # tiled_rois shape [grid_n, grid_n, n, 3] n = CELL_B
+
+    # compute grid cell centers
+    grid_centers = (grid + grid + cell_w) / 2.0  # shape [grid_n, grid_n, 2]
+
+    gc_x, gc_y = tf.unstack(grid_centers, axis=-1)  # shape [grid_n, grid_n]
+    # force broadcasting on correct axis
+    gc_x = tf.expand_dims(gc_x, axis=-1)
+    gc_y = tf.expand_dims(gc_y, axis=-1)
+    tr_x, tr_y, tr_w = tf.unstack(tiled_rois, axis=-1) # shape [grid_n, grid_n, n] n = CELL_B
+
+    ctr_x = (tr_x - gc_x) / (cell_w/2.0)  # constrain x within [-1, 1] in cell center relative coordinates
+    ctr_y = (tr_y - gc_y) / (cell_w/2.0)  # constrain y within [-1, 1] in cell center relative coordinates
+    ctr_w = tr_w / tile_w  # constrain w within [0, 1] in tile-relative coordinates
+
+    # leave x, y coordinates unchanged (as 0) if the width is zero (empty box)
+    ctr_x = tf.where(tf.greater(tr_w, 0), ctr_x, tr_x)
+    ctr_y = tf.where(tf.greater(tr_w, 0), ctr_y, tr_x)
+
+    rois = tf.stack([ctr_x, ctr_y, ctr_w], axis=-1)
+    return rois
+
+def n_largest_rois_in_cell_relative(tile, rois, rois_n, grid_n, n):
+    rois = n_largest_rois_in_cell(tile, rois, rois_n, grid_n, n)
+    rois = make_rois_tile_cell_relative(tile, rois, grid_n)
+    return rois
+
+
+def grid_cell_to_tile_coords(rois, grid_n, tile_size):
+    # converts between coordinates used internally by the model
+    # and coordinates expected by Tensorflow's draw_bounding_boxes function
+    #
+    # input coords:
+    # shape [batch, grid_n, grid_n, n, 3]
+    # coordinates in last dimension are x, y, w
+    # x and y are in [-1, 1] relative to grid cell center and size of grid cell
+    # w is in [0, 1] relatively to tile size. w is a "diameter", not "radius"
+    #
+    # output coords:
+    # shape [batch, grid_n, grid_n, n, 4]
+    # coordinates in last dimension are y1, x1, y2, x2
+    # relatively to tile_size
+
+    # grid for (0,0) based tile of size tile_size
+    cell_w = tile_size/grid_n
+    grid = gen_grid(grid_n) * cell_w
+    # grid cell centers
+    grid_centers = (grid + grid + cell_w) / 2.0  # shape [grid_n, grid_n, 2]
+    # roi coordinates
+    roi_cx, roi_cy, roi_w = tf.unstack(rois, axis=-1) # shape [batch, grid_n, grid_n, n]
+    # grid centers unstacked
+    gr_cx, gr_cy = tf.unstack(grid_centers, axis=-1) # shape [grid_n, grid_n]
+    gr_cx = tf.expand_dims(tf.expand_dims(gr_cx, 0), 3) # shape [1, grid_n, grid_n, 1]
+    gr_cy = tf.expand_dims(tf.expand_dims(gr_cy, 0), 3) # shape [1, grid_n, grid_n, 1]
+    roi_cx = roi_cx * cell_w/2 # roi_x=1 means cell center + cell_w/2
+    roi_cx = roi_cx+gr_cx
+    roi_cy = roi_cy * cell_w/2 # roi_x=1 means cell center + cell_w/2
+    roi_cy = roi_cy+gr_cy
+    roi_w = roi_w * tile_size
+    roi_x1 = roi_cx - roi_w/2
+    roi_x2 = roi_cx + roi_w/2
+    roi_y1 = roi_cy - roi_w/2
+    roi_y2 = roi_cy + roi_w/2
+    rois = tf.stack([roi_y1, roi_x1, roi_y2, roi_x2], axis=4)  # shape [batch, grid_n, grid_n, n, 4]
+    return rois
+
+
+
+
+
+
+
+
+
 
 
