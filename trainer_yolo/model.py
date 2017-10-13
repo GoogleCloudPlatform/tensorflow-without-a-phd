@@ -56,6 +56,10 @@ def model_fn_squeeze(features, labels, mode, params):
         y = tf.layers.conv2d(x, filters=filters, kernel_size=kernel_size, strides=strides, padding="same", activation=None, use_bias=False)
         return tf.nn.relu(batch_normalization(y))
 
+    def layer_conv1x1_batch_norm(x, depth):
+        y = tf.layers.conv2d(x, filters=depth, kernel_size=1, strides=1, padding="same", activation=None, use_bias=False)
+        return batch_normalization(y)
+
     def layer_dense_batch_norm_relu_dropout(x, size, dropout_rate):
         y = tf.layers.dense(x, size, activation=None, use_bias=False)
         z = tf.nn.relu(batch_normalization(y))
@@ -64,11 +68,9 @@ def model_fn_squeeze(features, labels, mode, params):
     # model inputs
     X = features["image"]
     X = tf.to_float(X) / 255.0 # input image format is uint8
-    C_ = labels["count"]
-    T_ = labels["target"]  # shape [4,4,3,3] = [batch, GRID_N, GRID_N, CEL_B, xyw]
 
     N_CLASSES = 2
-    GRID_N = 4  # must be the same as in train.py
+    GRID_N = 16  # must be the same as in train.py
     CELL_B = 1   # must be the same as in train.py
     TILE_SIZE = 256  # must be the same as in train.py
 
@@ -84,22 +86,24 @@ def model_fn_squeeze(features, labels, mode, params):
     Y6l = layer_conv2d_batch_norm_relu(Y5, filters=64, kernel_size=1, strides=1) #expand 1x1
     Y6t = layer_conv2d_batch_norm_relu(Y5, filters=64, kernel_size=3, strides=1) #expand 3x3
     Y6 = tf.concat([Y6l, Y6t], 3)                                                # output 64x64x128
+    f=2
+    g=2
     # maxpool
     Y9 = tf.layers.max_pooling2d(Y6, pool_size=3, strides=2, padding="same")   # output 32x32x128
-    Y10 = layer_conv2d_batch_norm_relu(Y9, filters=32, kernel_size=1, strides=1) #squeeze
-    Y11l = layer_conv2d_batch_norm_relu(Y10, filters=32, kernel_size=1, strides=1) #expand 1x1
-    Y11t = layer_conv2d_batch_norm_relu(Y10, filters=32, kernel_size=3, strides=1) #expand 3x3
+    Y10 = layer_conv2d_batch_norm_relu(Y9, filters=32*f, kernel_size=1, strides=1) #squeeze
+    Y11l = layer_conv2d_batch_norm_relu(Y10, filters=32*f, kernel_size=1, strides=1) #expand 1x1
+    Y11t = layer_conv2d_batch_norm_relu(Y10, filters=32*f, kernel_size=3, strides=1) #expand 3x3
     Y11 = tf.concat([Y11l, Y11t], 3)                                              # output 32x32x64
-    Y12 = layer_conv2d_batch_norm_relu(Y11, filters=16, kernel_size=1, strides=1) #squeeze
-    Y12l = layer_conv2d_batch_norm_relu(Y12, filters=16, kernel_size=1, strides=1) #expand 1x1
-    Y12t = layer_conv2d_batch_norm_relu(Y12, filters=16, kernel_size=3, strides=1) #expand 3x3
+    Y12 = layer_conv2d_batch_norm_relu(Y11, filters=16*2*g*f, kernel_size=1, strides=1) #squeeze
+    Y12l = layer_conv2d_batch_norm_relu(Y12, filters=16*2*g*f, kernel_size=1, strides=1) #expand 1x1
+    Y12t = layer_conv2d_batch_norm_relu(Y12, filters=16*2*g*f, kernel_size=3, strides=1) #expand 3x3
     Y13 = tf.concat([Y12l, Y12t], 3)                                              # output 32x32x32
     #maxpool
     Y16 = tf.layers.max_pooling2d(Y13, pool_size=3, strides=2, padding="same")    # output 16x16x32
-    Y17 = layer_conv2d_batch_norm_relu(Y16, filters=8, kernel_size=1, strides=1) #squeeze
-    Y17l = layer_conv2d_batch_norm_relu(Y17, filters=8, kernel_size=1, strides=1) #expand 1x1
-    Y17t = layer_conv2d_batch_norm_relu(Y17, filters=8, kernel_size=3, strides=1) #expand 3x3
-    Y18 = tf.concat([Y17l, Y17t], 3)                                              # output 16x16x16
+    Y17 = layer_conv2d_batch_norm_relu(Y16, filters=16*g*f, kernel_size=1, strides=1) #squeeze
+    Y17l = layer_conv2d_batch_norm_relu(Y17, filters=16*g*f, kernel_size=1, strides=1) #expand 1x1
+    Y17t = layer_conv2d_batch_norm_relu(Y17, filters=16*g*f, kernel_size=3, strides=1) #expand 3x3
+    Y18 = tf.concat([Y17l, Y17t], 3)                                              # output 16x16x32
 
     # counting head
     C19 = layer_conv2d_batch_norm_relu(Y18, filters=4, kernel_size=1, strides=1) # output 16*16*4
@@ -109,60 +113,98 @@ def model_fn_squeeze(features, labels, mode, params):
     predict = tf.nn.softmax(Clogits)
     classes = tf.cast(tf.argmax(predict, 1), tf.int32)
 
-    # bounding box head
-    T19 = layer_conv2d_batch_norm_relu(Y18, filters=CELL_B*4, kernel_size=1, strides=1) # output 16*16*12
-    T20 = tf.layers.average_pooling2d(T19, pool_size=4, strides=4, padding="valid") # 4x4x12 shape [batch, 4,4,12]
+    # old bounding box head
+    #T19 = layer_conv2d_batch_norm_relu(Y18, filters=CELL_B*4, kernel_size=1, strides=1) # output 16*16*12
+    #T20 = tf.layers.average_pooling2d(T19, pool_size=4, strides=4, padding="valid") # 4x4x12 shape [batch, 4,4,12]
     # for each cell, this has CELL_B predictions of bounding box (x,y,w,c)
     # apply tanh for x, y and sigmoid for w, c
-    TX, TY, TW, TC = tf.split(T20, 4, axis=3)  # shape 4 x [batch, 4,4,3] = 4 x [batch, GRID_N, GRID_N, CELL_B]
-    TX = tf.nn.tanh(TX)
-    TY = tf.nn.tanh(TY)
-    TW = tf.nn.sigmoid(TW)
-    TC = tf.nn.sigmoid(TC)
+    #TX, TY, TW, TC = tf.split(T20, 4, axis=3)  # shape 4 x [batch, 4,4,3] = 4 x [batch, GRID_N, GRID_N, CELL_B]
 
-    TX_, TY_, TW_ = tf.unstack(T_, 3, axis=-1) # shape 3 x [batch, 4,4,3] = [batch, GRID_N, GRID_N, CELL_B]
-    # target probability is 1 if there is a corresponding target box, 0 otherwise
-    TC_ = tf.cast(tf.greater(TW_, 0), tf.float32) # shape [batch, 4,4,3] = [batch, GRID_N, GRID_N, CELL_B]
+    # bounding box head
+    T19 = layer_conv2d_batch_norm_relu(Y18, filters=CELL_B*8*f*g, kernel_size=1, strides=1) # output 16*16*24 if CELL_B=3
+    T20=T19
+    # not needed at GRID_N=16
+    #T20 = tf.layers.average_pooling2d(T19, pool_size=4, strides=4, padding="valid") # 4x4x12 shape [batch, 4,4,12] = [batch, GRID_N, GRID_N, CELL_B*8]
+    # for each cell, this has CELL_B predictions of bounding box (x,y,w,c)
+    # apply tanh for x, y and sigmoid for w, c
+    TX0, TY0, TW0, TC0 = tf.split(T20, 4, axis=3)  # shape 4 x [batch, GRID_N, GRID_N, CELL_B*2]
+    # TODO: idea: batch norm may be bad on this layer
+    # TODO: try with a deeper layer as well
+    # TODO: try a filtered convolution instead of pooling2d, maybe info from cell sides should be weighted differently
+    TX = tf.nn.tanh(layer_conv1x1_batch_norm(TX0, depth=CELL_B))  # shape [batch, 4,4,CELL_B]
+    TY = tf.nn.tanh(layer_conv1x1_batch_norm(TY0, depth=CELL_B))  # shape [batch, 4,4,CELL_B]
+    TW = tf.nn.sigmoid(layer_conv1x1_batch_norm(TW0, depth=CELL_B))  # shape [batch, 4,4,CELL_B]
+    TC = tf.nn.sigmoid(layer_conv1x1_batch_norm(TC0, depth=CELL_B))  # shape [batch, 4,4,CELL_B]
 
     # testing different options for W
     # Woption0
-    real_TW = TW
+    #real_TW = TW
+    # Woption1
+    #real_TW = TW*TW
+    # Woption2
+    #real_TW = TW
+    # Woption3
+    #real_TW = tf.sqrt(TW)
+    # Woption4
+    real_TW = tf.sqrt(TW)
+    # Woption5
+    #real_TW = TW*TW
 
-    # debug: expected and predicted counts
-    debug_img = X
-    debug_img = image_compose(debug_img, get_left_digits(C_))
-    debug_img = image_compose(debug_img, get_right_digits(classes))
-    # debug: ground truth boxes in grey
-    target_rois = boxutils.grid_cell_to_tile_coords(T_, GRID_N, TILE_SIZE)/TILE_SIZE
-    target_rois = tf.reshape(target_rois, [-1, GRID_N*GRID_N*CELL_B, 4])
-    debug_img = draw_color_boxes(debug_img, target_rois, 0.7, 0.7, 0.7)
-    debug_rois = tf.stack([TX,TY,real_TW], axis=-1)  # shape [batch, GRID_N, GRID_N, CEL_B, 3]
-    debug_rois = boxutils.grid_cell_to_tile_coords(debug_rois, GRID_N, TILE_SIZE)/TILE_SIZE # shape [batch, GRID_N, GRID_N, CELL_B, 4]
-    debug_rois = tf.reshape(debug_rois, [-1, GRID_N*GRID_N*CELL_B, 4])
-    # debug: computed ROIs boxes in shades of yellow
-    no_box = tf.zeros(tf.shape(debug_rois))
-    select = tf.reshape(TC, [-1, GRID_N*GRID_N*CELL_B])
-    select = tf.stack([select, select, select, select], axis=-1)
-    for i in range(9):
-        debug_rois_frac = tf.where(tf.greater(select, 0.1*(i+1)), debug_rois, no_box)
-        debug_img = draw_color_boxes(debug_img, debug_rois_frac, 0.1*(i+2), 0.1*(i+2), 0)
-    tf.summary.image("input_image", debug_img, max_outputs=10)
+    rois = tf.stack([TX,TY,real_TW], axis=-1)  # shape [batch, GRID_N, GRID_N, CEL_B, 3]
+    rois = boxutils.grid_cell_to_tile_coords(rois, GRID_N, TILE_SIZE)/TILE_SIZE # shape [batch, GRID_N, GRID_N, CELL_B, 4]
+    rois = tf.reshape(rois, [-1, GRID_N*GRID_N*CELL_B, 4])
+    roiC = tf.reshape(TC, [-1, GRID_N*GRID_N*CELL_B])
 
-    # model outputs
     loss = train_op = eval_metrics = None
     if mode != tf.estimator.ModeKeys.PREDICT:
+        C_ = labels["count"]
+        T_ = labels["target"]  # shape [4,4,3,3] = [batch, GRID_N, GRID_N, CEL_B, xyw]
+        TX_, TY_, TW_ = tf.unstack(T_, 3, axis=-1) # shape 3 x [batch, 4,4,3] = [batch, GRID_N, GRID_N, CELL_B]
+        # target probability is 1 if there is a corresponding target box, 0 otherwise
+        TC_ = tf.cast(tf.greater(TW_, 0), tf.float32) # shape [batch, 4,4,3] = [batch, GRID_N, GRID_N, CELL_B]
+
+        # debug: expected and predicted counts
+        debug_img = X
+        debug_img = image_compose(debug_img, get_left_digits(C_))
+        debug_img = image_compose(debug_img, get_right_digits(classes))
+        # debug: ground truth boxes in grey
+        target_rois = boxutils.grid_cell_to_tile_coords(T_, GRID_N, TILE_SIZE)/TILE_SIZE
+        target_rois = tf.reshape(target_rois, [-1, GRID_N*GRID_N*CELL_B, 4])
+        debug_img = draw_color_boxes(debug_img, target_rois, 0.7, 0.7, 0.7)
+        # debug: computed ROIs boxes in shades of yellow
+        no_box = tf.zeros(tf.shape(rois))
+        select = tf.stack([roiC, roiC, roiC, roiC], axis=-1)
+        for i in range(9):
+            debug_rois = tf.where(tf.greater(select, 0.1*(i+1)), rois, no_box)
+            debug_img = draw_color_boxes(debug_img, debug_rois, 0.1*(i+2), 0.1*(i+2), 0)
+        tf.summary.image("input_image", debug_img, max_outputs=10)
+
+
+        # model outputs
         count_loss = tf.reduce_mean(tf.losses.softmax_cross_entropy(tf.one_hot(C_,N_CLASSES), Clogits))
         position_loss = tf.reduce_mean(TC_ * (tf.square(TX-TX_)+tf.square(TY-TY_)))
         # YOLO trick: take square root of predicted size for loss so as not to drown errors on small boxes
 
         # testing different options for W
         # Woption0
-        size_loss = tf.reduce_mean(TC_ * tf.square(tf.sqrt(TW)-tf.sqrt(TW_)) * 2)
+        #size_loss = tf.reduce_mean(TC_ * tf.square(tf.sqrt(TW)-tf.sqrt(TW_)) * 2)
+        # Woption1
+        #size_loss = tf.reduce_mean(TC_ * tf.square(TW-tf.sqrt(TW_)) * 2)
+        # Woption2
+        #size_loss = tf.reduce_mean(TC_ * tf.square(TW-TW_) * 2)
+        # Woption3
+        #size_loss = tf.reduce_mean(TC_ * tf.square(tf.sqrt(TW)-TW_) * 2)
+        # Woption4
+        size_loss = tf.reduce_mean(TC_ * tf.square(TW-TW_*TW_) * 2)
+        # Woption5
+        #size_loss = tf.reduce_mean(TC_ * tf.square(TW*TW-TW_) * 2)
 
         obj_loss = tf.reduce_mean(TC_ * tf.square(TC - 1))
         noobj_loss = tf.reduce_mean((1-TC_) * tf.square(TC - 0))
         # TODO: idea, add a per-cell plane/no plane detection head. Maybe it can force better gradients (?)
         # because current split of detections "per responsible bounding box" might be hard for a neural network
+        # TODO: similar idea: if only one plane in cell, teach all CELL_B detectors to detect it
+        # if multiple planes, then each one its own detector. This could avoid detectors on areas with planes to be trained to detect nothing.
 
         # YOLO trick: weights the different losses differently
         Lc = 5
@@ -186,9 +228,9 @@ def model_fn_squeeze(features, labels, mode, params):
 
     return tf.estimator.EstimatorSpec(
         mode=mode,
-        predictions={"predictions": predict, "classes": classes},  # name these fields as you like
+        predictions={"predictions": predict, "classes": classes, "rois":rois, "rois_confidence": roiC},  # name these fields as you like
         loss=loss,
         train_op=train_op,
         eval_metric_ops=eval_metrics,
-        export_outputs={'classes': tf.estimator.export.PredictOutput({"predictions": predict, "classes": classes})}
+        export_outputs={'classes': tf.estimator.export.PredictOutput({"predictions": predict, "classes": classes, "rois":rois, "rois_confidence": roiC})}
     )

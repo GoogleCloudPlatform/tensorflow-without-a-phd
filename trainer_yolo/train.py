@@ -77,7 +77,7 @@ def generate(pixels, json_bytes, eval=False):
     rois = tf.py_func(decode_json_py, [json_bytes], [tf.float32])
     # get a number of slices from the image. This allows us to get an arbitrary number of slices
     # from one image without loading them all in memory.
-    n = 10 if not eval else 1
+    n = 3 if not eval else 1
     return tf.contrib.data.Dataset.range(n).flat_map(lambda i: generate_slice(pixels, rois, i))
 
 def generate_eval(pixels, json_bytes):
@@ -153,7 +153,7 @@ def generate_slice(pixels, rois, idx):
     # "roi": a plane bounding box (gorund thruth)
 
     # Tile divided in GRID_N x GRID_N grid
-    GRID_N = 4
+    GRID_N = 16
     # Recognizing CELL_B boxes per grid cell
     CELL_B = 1
 
@@ -221,28 +221,21 @@ def dataset_eval_input_fn(img_filelist, roi_filelist):
 # input function for base64 encoded JPEG in JSON, with automatic scanning
 # Called when the model is deployed for online predictions on Cloud ML Engine.
 def serving_input_fn():
-    # TODO: completely wrong...
+
     # input expects a list of jpeg images
 
-    input_bytes = {'image_bytes': tf.placeholder(tf.string, [None, None]),
+    input_bytes = {'image_bytes': tf.placeholder(tf.string),
                    'square_size': tf.placeholder(tf.int32)}
 
-    input_images = input_bytes['image_bytes'][0]  # accepting only one instance
-    input_tilesz = input_bytes['square_size'][0]
+    input_images = input_bytes['image_bytes']
 
     def jpeg_to_bytes(jpeg):
         pixels = tf.image.decode_jpeg(jpeg, channels=3)
-        # image format uint8
-        # pixels = tf.cast(pixels, tf.float32) / 255.0
-        pixels = tf.image.crop_and_resize(tf.expand_dims(pixels,0), boxes, box_ind, [trained_tile_size, trained_tile_size])
         pixels = tf.cast(pixels, dtype=tf.uint8)
         return pixels
 
-    # TODO: this is just a placeholder for one dummy roi
-    boxes = tf.constant([input_tilesz, input_tilesz], dtype=tf.float32)
-
     images = tf.map_fn(jpeg_to_bytes, input_images, dtype=tf.uint8)
-    feature_dic = {'image': images, 'roi': boxes}
+    feature_dic = {'image': images}
     return tf.estimator.export.ServingInputReceiver(feature_dic, input_bytes)
 
 
