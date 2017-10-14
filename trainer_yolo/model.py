@@ -209,6 +209,8 @@ def model_fn_squeeze(features, labels, mode, params):
         # YOLO trick: weights the different losses differently
         Lc = 5
         Lo = 0.5
+        # TODO: hyperparam tune the hell out of these loss weights
+        # currently not good. Predicts bad sizes, yet size loss in the 0.5e-5 while position loss is around 0.2
         loss = count_loss + Lc*(position_loss + size_loss) + (obj_loss + Lo*noobj_loss)
 
         train_op = tf.contrib.layers.optimize_loss(loss, tf.train.get_global_step(), learning_rate=params['lr0'], optimizer="Adam", learning_rate_decay_fn=learn_rate)

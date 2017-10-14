@@ -47,34 +47,49 @@ function analyze() {
         setTimeout(function() {
             processingResults(tile)
             displayProcessingMarker(tile)
-            var body = mlengineJSONify([tile])  // TODO: fix the online prediction serving_input_fn and remove the []
+            var body = mlengineJSONify(tile)
+            //var body = mlengineJSONify([tile])  // TODO: fix the online prediction serving_input_fn and remove the []
             // magic formula: the body of the request goes into the "resource" parameter
             mlengine.projects.predict({
-                name: "projects/cloudml-demo-martin/models/plane_jpeg_scan_100_200_300_400_600_900/versions/v7",
+                name: "projects/cloudml-demo-martin/models/jpeg_yolo_256x256/versions/v1",
+                //name: "projects/cloudml-demo-martin/models/plane_jpeg_scan_100_200_300_400_600_900/versions/v7",
                 //name: "projects/cloudml-demo-martin/models/plane_jpeg_scan_100_200_300_400_600_900_logged2/versions/v7MININST10",
                 resource: body
             })
                 .then(function (res) {
                     if (res.result.error) {
                         undisplayProcessingMarker(tile)
-                        displayErrorResults(tile, res.result.error)
+                        displayErrorResults(tile, res.result.error)  // Error from ML Emgine
                     }
                     else {
                         var nb_planes = 0
                         var nb_results = 0
                         var result_markers = []
                         res.result.predictions.map(function(prediction) {
-                            if (prediction.classes) {
-                                nb_planes++
-                                result_markers.push(prediction.boxes)
+                            for (var i=0; i<prediction.rois.length; i++) {
+                                var roi = prediction.rois[i]
+                                var confidence = prediction.rois_confidence[i]
+                                if (confidence > 0.5) {
+                                    nb_planes++
+                                    result_markers.push(roi)
+                                }
                             }
+                            // code for endpoint plane_jpeg_scan_100_200_300_400_600_900
+                            //if (prediction.classes) {
+                            //    nb_planes++
+                            //    result_markers.push(prediction.boxes)
+                            //}
                         })
                         undisplayProcessingMarker(tile)
                         displayResultMarkers(tile, result_markers)
                         displayResults(tile, nb_planes)
                         console.info("Found planes:" + nb_planes)
                     }
-                }, logError)
+                }, function(e) {
+                    displayErrorMarker(tile)
+                    displayRequestStatusError(tile, e)  // HTTP Error
+                    logError(e)
+                })
         }, (delay++)*tile_delay)
     })
 }
@@ -126,6 +141,12 @@ function undisplayProcessingMarker(tile) {
         marker.style.opacity = "0"
 }
 
+function displayErrorMarker(tile) {
+    var marker = document.getElementById(posIdentifier(tile, "processing_"))
+    if (marker)
+        marker.style.backgroundColor = "red"
+}
+
 function displayResultMarkers(tile, markers) {
     var zone = document.getElementById("zone")
     if (zone) {
@@ -148,6 +169,16 @@ function processingResults(tile) {
     }
 }
 
+function displayRequestStatusError(tile, e) {
+    var reqInfoMsg = document.getElementById(posIdentifier(tile, "reqid_"))
+    if (reqInfoMsg) {
+        var msg = ""
+        if (e.result)
+            msg = e.result.error.message
+        reqInfoMsg.innerText = "Error " + e.status + ", " + msg
+    }
+}
+
 function displayResults(tile, nb) {
     var reqInfoMsg = document.getElementById(posIdentifier(tile, "reqid_"))
     if (reqInfoMsg) {
@@ -167,7 +198,8 @@ function displayPayload(tiles) {
         jap.innerText = mlengineJSONify(tiles)
 }
 
-function mlengineJSONify(tiles) {
+// Deprecated: remove as soon ad endoint is updated
+function mlengineJSONifyMulti(tiles) {
     var payload = new Object()
     payload.instances = [new Object()]  // single instance
     payload.instances[0].square_size = tile_size
@@ -177,6 +209,16 @@ function mlengineJSONify(tiles) {
         container.b64 = tile.image_bytes
         payload.instances[0].image_bytes.push(container)
     })
+    json_payload = JSON.stringify(payload)
+    return json_payload
+}
+
+function mlengineJSONify(tile) {
+    var payload = new Object()
+    payload.instances = [new Object()]  // single instance
+    payload.instances[0].square_size = tile_size
+    payload.instances[0].image_bytes = new Object()
+    payload.instances[0].image_bytes.b64 = tile.image_bytes
     json_payload = JSON.stringify(payload)
     return json_payload
 }
