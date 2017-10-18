@@ -15,15 +15,32 @@ import tensorflow as tf
 import trainer_yolo.digits as dd
 from trainer_yolo import boxutils
 
-def get_left_digits(classes):
-    digits = tf.image.grayscale_to_rgb(dd.digits_left())
-    digits = tf.image.resize_bilinear(digits, [256, 256])
-    return tf.gather(digits, tf.minimum(classes,9)) # correct digits to be printed on the images
+N_CLASSES = 2
+GRID_N = 16  # must be the same as in train.py
+CELL_B = 1   # must be the same as in train.py
+TILE_SIZE = 256  # must be the same as in train.py
 
-def get_right_digits(classes):
-    digits = tf.image.grayscale_to_rgb(dd.digits_right())
-    digits = tf.image.resize_bilinear(digits, [256, 256])
-    return tf.gather(digits, tf.minimum(classes,9)) # correct digits to be printed on the images
+def get_bottom_left_digits(classes):
+    digits = tf.image.grayscale_to_rgb(dd.digits_bottom_left(TILE_SIZE//8, TILE_SIZE//8))
+    digits = tf.image.resize_bilinear(digits, [TILE_SIZE, TILE_SIZE])
+    return tf.gather(digits, tf.minimum(classes,9))  # correct digits to be printed on the images
+
+def get_bottom_right_digits(classes):
+    digits = tf.image.grayscale_to_rgb(dd.digits_bottom_right(TILE_SIZE//8, TILE_SIZE//8))
+    digits = tf.image.resize_bilinear(digits, [TILE_SIZE, TILE_SIZE])
+    return tf.gather(digits, tf.minimum(classes,9))  # correct digits to be printed on the images
+
+def get_top_right_red_white_digits(classes):
+    digits = dd.digits_top_right(TILE_SIZE//8, TILE_SIZE//8)
+    zeros = tf.zeros(tf.shape(digits))
+    digits_red = tf.concat([digits, zeros, zeros], -1)
+    digits_white = tf.concat([digits, digits, digits], -1)
+    d0,d1,d2,d3,d4,d5,d6,d7,d8,d9 = tf.split(digits_red, 10)
+    b0,b1,b2,b3,b4,b5,b6,b7,b8,b9 = tf.split(digits_white, 10)
+    # zero is white, other digits are red
+    digits = tf.concat([b0,d1,d2,d3,d4,d5,d6,d7,d8,d9], axis=0)
+    digits = tf.image.resize_bilinear(digits, [TILE_SIZE, TILE_SIZE])
+    return tf.gather(digits, tf.minimum(classes,9))  # correct digits to be printed on the images
 
 def image_compose(img1, img2):
     # img1 has the real image
@@ -60,19 +77,9 @@ def model_fn_squeeze(features, labels, mode, params):
         y = tf.layers.conv2d(x, filters=depth, kernel_size=1, strides=1, padding="same", activation=None, use_bias=False)
         return batch_normalization(y)
 
-    def layer_dense_batch_norm_relu_dropout(x, size, dropout_rate):
-        y = tf.layers.dense(x, size, activation=None, use_bias=False)
-        z = tf.nn.relu(batch_normalization(y))
-        return tf.layers.dropout(z, rate=dropout_rate, training=(mode == tf.estimator.ModeKeys.TRAIN))
-
     # model inputs
     X = features["image"]
     X = tf.to_float(X) / 255.0 # input image format is uint8
-
-    N_CLASSES = 2
-    GRID_N = 16  # must be the same as in train.py
-    CELL_B = 1   # must be the same as in train.py
-    TILE_SIZE = 256  # must be the same as in train.py
 
     # simplified small squeezenet architecture
     Y1 = layer_conv2d_batch_norm_relu(X, filters=32, kernel_size=6, strides=2)  # output 128x128x32
@@ -124,7 +131,9 @@ def model_fn_squeeze(features, labels, mode, params):
     T19 = layer_conv2d_batch_norm_relu(Y18, filters=CELL_B*8*f*g, kernel_size=1, strides=1) # output 16*16*24 if CELL_B=3
     T20=T19
     # not needed at GRID_N=16
-    #T20 = tf.layers.average_pooling2d(T19, pool_size=4, strides=4, padding="valid") # 4x4x12 shape [batch, 4,4,12] = [batch, GRID_N, GRID_N, CELL_B*8]
+    # for GRID_N=8, need pool_size=2, strides=2
+    # for GRID_N=4, need pool_size=4, strides=4
+    #T20 = tf.layers.average_pooling2d(T19, pool_size=2, strides=2, padding="valid") # 4x4x12 shape [batch, 4,4,12] = [batch, GRID_N, GRID_N, CELL_B*8]
     # for each cell, this has CELL_B predictions of bounding box (x,y,w,c)
     # apply tanh for x, y and sigmoid for w, c
     TX0, TY0, TW0, TC0 = tf.split(T20, 4, axis=3)  # shape 4 x [batch, GRID_N, GRID_N, CELL_B*2]
@@ -142,97 +151,171 @@ def model_fn_squeeze(features, labels, mode, params):
     # Woption1
     #real_TW = TW*TW
     # Woption2
-    #real_TW = TW
+    real_TW = TW
     # Woption3
     #real_TW = tf.sqrt(TW)
     # Woption4
-    real_TW = tf.sqrt(TW)
+    #real_TW = tf.sqrt(TW)
     # Woption5
     #real_TW = TW*TW
 
     rois = tf.stack([TX,TY,real_TW], axis=-1)  # shape [batch, GRID_N, GRID_N, CEL_B, 3]
     rois = boxutils.grid_cell_to_tile_coords(rois, GRID_N, TILE_SIZE)/TILE_SIZE # shape [batch, GRID_N, GRID_N, CELL_B, 4]
-    rois = tf.reshape(rois, [-1, GRID_N*GRID_N*CELL_B, 4])
-    roiC = tf.reshape(TC, [-1, GRID_N*GRID_N*CELL_B])
+    rsrois = tf.reshape(rois, [-1, GRID_N*GRID_N*CELL_B, 4])
+    rsroiC = tf.reshape(TC, [-1, GRID_N*GRID_N*CELL_B])
 
     loss = train_op = eval_metrics = None
     if mode != tf.estimator.ModeKeys.PREDICT:
+        ZERO_W = 0.0001
         C_ = labels["count"]
         T_ = labels["target"]  # shape [4,4,3,3] = [batch, GRID_N, GRID_N, CEL_B, xyw]
         TX_, TY_, TW_ = tf.unstack(T_, 3, axis=-1) # shape 3 x [batch, 4,4,3] = [batch, GRID_N, GRID_N, CELL_B]
         # target probability is 1 if there is a corresponding target box, 0 otherwise
-        TC_ = tf.cast(tf.greater(TW_, 0), tf.float32) # shape [batch, 4,4,3] = [batch, GRID_N, GRID_N, CELL_B]
+        TC_ = tf.greater(TW_, ZERO_W)
+        fTC_ = tf.cast(tf.greater(TW_, ZERO_W), tf.float32) # shape [batch, 4,4,3] = [batch, GRID_N, GRID_N, CELL_B]
+
+        # accuracy
+        DETECTION_TRESHOLD = 0.5  # plane "detected" if predicted C>0.5
+        ERROR_TRESHOLD = 0.3  # plane correctly localized if predicted x,y,w within % of ground truth
+        detect_correct = tf.logical_not(tf.logical_xor(tf.greater(TC, DETECTION_TRESHOLD), TC_))
+        ones = tf.ones(tf.shape(TW_))
+        nonzero_TW_ = tf.where(TC_, TW_, ones)
+        # true if correct size where there is a planne, nonsense value where there is no plane
+        size_correct = tf.less(tf.abs(real_TW - TW_) / nonzero_TW_, ERROR_TRESHOLD)
+        # true if correct position where there is a planne, nonsense value where there is no plane
+        position_correct = tf.less(tf.sqrt(tf.square(TX-TX_) + tf.square(TY-TY_)) / nonzero_TW_ / GRID_N, ERROR_TRESHOLD)
+        truth_no_plane = tf.logical_not(TC_)
+        size_correct = tf.logical_or(size_correct, truth_no_plane)
+        position_correct = tf.logical_or(position_correct, truth_no_plane)
+        size_correct = tf.logical_and(detect_correct, size_correct)
+        position_correct = tf.logical_and(detect_correct, position_correct)
+        all_correct = tf.logical_and(size_correct, position_correct)
+        mistakes = tf.reduce_sum(tf.cast(tf.logical_not(all_correct), tf.int32), axis=[1,2,3])  # shape [batch]
 
         # debug: expected and predicted counts
         debug_img = X
-        debug_img = image_compose(debug_img, get_left_digits(C_))
-        debug_img = image_compose(debug_img, get_right_digits(classes))
+        debug_img = image_compose(debug_img, get_bottom_left_digits(C_))
+        debug_img = image_compose(debug_img, get_bottom_right_digits(classes))
+        debug_img = image_compose(debug_img, get_top_right_red_white_digits(mistakes))
         # debug: ground truth boxes in grey
         target_rois = boxutils.grid_cell_to_tile_coords(T_, GRID_N, TILE_SIZE)/TILE_SIZE
-        target_rois = tf.reshape(target_rois, [-1, GRID_N*GRID_N*CELL_B, 4])
-        debug_img = draw_color_boxes(debug_img, target_rois, 0.7, 0.7, 0.7)
+        rstarget_rois = tf.reshape(target_rois, [-1, GRID_N*GRID_N*CELL_B, 4])
+        debug_img = draw_color_boxes(debug_img, rstarget_rois, 0.7, 0.7, 0.7)
         # debug: computed ROIs boxes in shades of yellow
-        no_box = tf.zeros(tf.shape(rois))
-        select = tf.stack([roiC, roiC, roiC, roiC], axis=-1)
-        for i in range(9):
-            debug_rois = tf.where(tf.greater(select, 0.1*(i+1)), rois, no_box)
-            debug_img = draw_color_boxes(debug_img, debug_rois, 0.1*(i+2), 0.1*(i+2), 0)
-        tf.summary.image("input_image", debug_img, max_outputs=10)
+        no_box = tf.zeros(tf.shape(rsrois))
+        select = tf.stack([rsroiC, rsroiC, rsroiC, rsroiC], axis=-1)
+        select_correct = tf.reshape(all_correct, [-1, GRID_N*GRID_N*CELL_B])
+        select_size_correct = tf.reshape(size_correct, [-1, GRID_N*GRID_N*CELL_B])
+        select_position_correct = tf.reshape(position_correct, [-1, GRID_N*GRID_N*CELL_B])
 
+        select_correct = tf.stack([select_correct,select_correct,select_correct,select_correct], axis=2)
+        select_size_correct = tf.stack([select_size_correct,select_size_correct,select_size_correct,select_size_correct], axis=2)
+        select_position_correct = tf.stack([select_position_correct,select_position_correct,select_position_correct,select_position_correct], axis=2)
+
+        correct_rois = tf.where(select_correct, rsrois, no_box)
+        other_rois = tf.where(tf.logical_not(select_correct), rsrois, no_box)
+        correct_size_rois = tf.where(select_size_correct, other_rois, no_box)
+        other_rois = tf.where(tf.logical_not(select_size_correct), other_rois, no_box)
+        correct_pos_rois = tf.where(select_position_correct, other_rois, no_box)
+        other_rois = tf.where(tf.logical_not(select_position_correct), other_rois, no_box)
+        # correct rois in yellow
+        for i in range(9):
+            debug_rois = tf.where(tf.greater(select, 0.1*(i+1)), correct_rois, no_box)
+            debug_img = draw_color_boxes(debug_img, debug_rois, 0.1*(i+2), 0.1*(i+2), 0)
+        # size only correct rois in blue
+        for i in range(9):
+            debug_rois = tf.where(tf.greater(select, 0.1*(i+1)), correct_size_rois, no_box)
+            debug_img = draw_color_boxes(debug_img, debug_rois, 0, 0, 0.1*(i+2))
+        # position only correct rois in green
+        for i in range(9):
+            debug_rois = tf.where(tf.greater(select, 0.1*(i+1)), correct_pos_rois, no_box)
+            debug_img = draw_color_boxes(debug_img, debug_rois, 0, 0.1*(i+2), 0)
+        # incorrect rois in red
+        for i in range(9):
+            debug_rois = tf.where(tf.greater(select, 0.1*(i+1)), other_rois, no_box)
+            debug_img = draw_color_boxes(debug_img, debug_rois, 0.1*(i+2), 0, 0)
+        tf.summary.image("input_image", debug_img, max_outputs=10)
 
         # model outputs
         count_loss = tf.reduce_mean(tf.losses.softmax_cross_entropy(tf.one_hot(C_,N_CLASSES), Clogits))
-        position_loss = tf.reduce_mean(TC_ * (tf.square(TX-TX_)+tf.square(TY-TY_)))
+        position_loss = tf.reduce_mean(fTC_ * (tf.square(TX-TX_)+tf.square(TY-TY_)))
         # YOLO trick: take square root of predicted size for loss so as not to drown errors on small boxes
 
         # testing different options for W
         # Woption0
-        #size_loss = tf.reduce_mean(TC_ * tf.square(tf.sqrt(TW)-tf.sqrt(TW_)) * 2)
+        #size_loss = tf.reduce_mean(fTC_ * tf.square(tf.sqrt(TW)-tf.sqrt(TW_)) * 2)
         # Woption1
-        #size_loss = tf.reduce_mean(TC_ * tf.square(TW-tf.sqrt(TW_)) * 2)
+        #size_loss = tf.reduce_mean(fTC_ * tf.square(TW-tf.sqrt(TW_)) * 2)
         # Woption2
-        #size_loss = tf.reduce_mean(TC_ * tf.square(TW-TW_) * 2)
+        size_loss = tf.reduce_mean(fTC_ * tf.square(TW-TW_) * 2)
         # Woption3
-        #size_loss = tf.reduce_mean(TC_ * tf.square(tf.sqrt(TW)-TW_) * 2)
+        #size_loss = tf.reduce_mean(fTC_ * tf.square(tf.sqrt(TW)-TW_) * 2)
         # Woption4
-        size_loss = tf.reduce_mean(TC_ * tf.square(TW-TW_*TW_) * 2)
+        #size_loss = tf.reduce_mean(fTC_ * tf.square(TW-TW_*TW_) * 2)
         # Woption5
-        #size_loss = tf.reduce_mean(TC_ * tf.square(TW*TW-TW_) * 2)
+        #size_loss = tf.reduce_mean(fTC_ * tf.square(TW*TW-TW_) * 2)
 
-        obj_loss = tf.reduce_mean(TC_ * tf.square(TC - 1))
-        noobj_loss = tf.reduce_mean((1-TC_) * tf.square(TC - 0))
+        obj_loss = tf.reduce_mean(fTC_ * tf.square(TC - 1))
+        noobj_loss = tf.reduce_mean((1-fTC_) * tf.square(TC - 0))
+
         # TODO: idea, add a per-cell plane/no plane detection head. Maybe it can force better gradients (?)
         # because current split of detections "per responsible bounding box" might be hard for a neural network
         # TODO: similar idea: if only one plane in cell, teach all CELL_B detectors to detect it
         # if multiple planes, then each one its own detector. This could avoid detectors on areas with planes to be trained to detect nothing.
+        # TODO: try proper softmax loss for plane/no plane prediction
+        # TODO: try two or more grids, shifted by 1/2 cell size: This could make it easier to have cells detect planes in their center,
+        # if that is an actual problem they have (no idea)
+        # TODO: compute detection box loss agains all ROI, not just assigned ROIs: if neighboring cell detects something
+        # that aligns well with ground truth, no reason to penalise
+        # TODO: improve randomness in training tile selection. Currently, only one batch of random displacements, applied
+        # during entire training
+        # TODO: idea, try using TC instead of TC_ in position loss and size loss
 
         # YOLO trick: weights the different losses differently
-        Lc = 5
-        Lo = 0.5
+        LW0 = 10.0
+        LW1 = params['lw1']
+        LW2 = params['lw2']
+        LW3 = params['lw3']
+        LW4 = params['lw4']
+        LWT = LW0+LW1+LW2+LW3+LW4
         # TODO: hyperparam tune the hell out of these loss weights
         # currently not good. Predicts bad sizes, yet size loss in the 0.5e-5 while position loss is around 0.2
-        loss = count_loss + Lc*(position_loss + size_loss) + (obj_loss + Lo*noobj_loss)
+        w_count_loss = count_loss*(LW0/LWT)*0.00001
+        #w_count_loss = 0
+        w_position_loss = position_loss*(LW1/LWT)
+        w_size_loss = size_loss*(LW2/LWT)
+        w_obj_loss = obj_loss*(LW3/LWT)
+        w_noobj_loss = noobj_loss*(LW4/LWT)
+        loss = w_count_loss + w_position_loss + w_size_loss + w_obj_loss + w_noobj_loss
+
+        # average number of mistakes per image
+        nb_mistakes = tf.reduce_sum(mistakes)
 
         train_op = tf.contrib.layers.optimize_loss(loss, tf.train.get_global_step(), learning_rate=params['lr0'], optimizer="Adam", learning_rate_decay_fn=learn_rate)
-        eval_metrics = {"counting_accuracy": tf.metrics.accuracy(classes, C_),
-                        "counting_error": tf.metrics.mean(count_loss),
-                        "position_error": tf.metrics.mean(Lc*position_loss),
-                        "size_error": tf.metrics.mean(Lc*size_loss),
-                        "plane_confidence_error": tf.metrics.mean(obj_loss),
-                        "no_plane_confidence_error": tf.metrics.mean(Lo*noobj_loss)}
+        eval_metrics = {
+                        "counting_accuracy": tf.metrics.accuracy(classes, C_),
+                        "counting_error": tf.metrics.mean(w_count_loss),
+                        "position_error": tf.metrics.mean(w_position_loss),
+                        "size_error": tf.metrics.mean(w_size_loss),
+                        "plane_confidence_error": tf.metrics.mean(w_obj_loss),
+                        "no_plane_confidence_error": tf.metrics.mean(w_noobj_loss),
+                        "mistakes": tf.metrics.mean(nb_mistakes)}
         #debug
-        tf.summary.scalar("counting_error", count_loss)
-        tf.summary.scalar("position_error", Lc*position_loss)
-        tf.summary.scalar("size_error", Lc*size_loss)
-        tf.summary.scalar("plane_confidence_error", obj_loss)
-        tf.summary.scalar("no_plane_confidence_error", noobj_loss)
+        tf.summary.scalar("counting_error", w_count_loss)
+        tf.summary.scalar("position_error", w_position_loss)
+        tf.summary.scalar("size_error", w_size_loss)
+        tf.summary.scalar("plane_confidence_error", w_obj_loss)
+        tf.summary.scalar("no_plane_confidence_error", w_noobj_loss)
         tf.summary.scalar("loss", loss)
+        tf.summary.scalar("mistakes", nb_mistakes)
 
     return tf.estimator.EstimatorSpec(
         mode=mode,
-        predictions={"predictions": predict, "classes": classes, "rois":rois, "rois_confidence": roiC},  # name these fields as you like
+        predictions={"predictions": predict, "classes": classes, "rois":rsrois, "rois_confidence": rsroiC},  # name these fields as you like
+        #predictions={"rois":rsrois, "rois_confidence": rsroiC},  # name these fields as you like
         loss=loss,
         train_op=train_op,
         eval_metric_ops=eval_metrics,
-        export_outputs={'classes': tf.estimator.export.PredictOutput({"predictions": predict, "classes": classes, "rois":rois, "rois_confidence": roiC})}
+        export_outputs={'classes': tf.estimator.export.PredictOutput({"predictions": predict, "classes": classes, "rois":rsrois, "rois_confidence": rsroiC})}
+        #export_outputs={'classes': tf.estimator.export.PredictOutput({"rois":rsrois, "rois_confidence": rsroiC})}
     )

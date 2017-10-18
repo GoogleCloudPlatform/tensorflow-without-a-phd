@@ -21,5 +21,5 @@ trainingInput:
   #parameterServerType: standard_gpu
   #workerType: standard_gpu
 
-  #parameterServerCount: 1
-  #workerCount: 6
+  #parameterServerCount: 2
+  #workerCount: 10

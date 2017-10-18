@@ -266,14 +266,16 @@ def main(argv):
     # gcloud ml-engine jobs submit training jobXXX --job-dir=... --ml-engine-args -- --user-args
 
     parser.add_argument('--job-dir', default="checkpoints", help='GCS or local path where to store training checkpoints')
-    parser.add_argument('--data', default="planesnet32K.pklz", help='Path to data file (can be on Google cloud storage gs://...)')
+    parser.add_argument('--data', default="sample_data/USGS_public_domain_airports", help='Path to data file (can be on Google cloud storage gs://...)')
     parser.add_argument('--hp-iterations', default=50000, type=int, help='Hyperparameter: number of training iterations')
     parser.add_argument('--hp-lr0', default=0.01, type=float, help='Hyperparameter: initial (max) learning rate')
     parser.add_argument('--hp-lr1', default=0.0001, type=float, help='Hyperparameter: target (min) learning rate')
     parser.add_argument('--hp-lr2', default=3000, type=float, help='Hyperparameter: learning rate decay speed in steps. Learning rate decays by exp(-1) every N steps.')
-    parser.add_argument('--hp-dropout', default=0.3, type=float, help='Hyperparameter: dropout rate on dense layers.')
     parser.add_argument('--hp-bnexp', default=0.993, type=float, help='Hyperparameter: exponential decay for batch norm moving averages.')
-    parser.add_argument('--hp-dense', default=80, type=int, help='Hyperparameter: size of the dense layer')
+    parser.add_argument('--hp-lw1', default=50, type=float, help='Hyperparameter: loss weight LW1')
+    parser.add_argument('--hp-lw2', default=50, type=float, help='Hyperparameter: loss weight LW2')
+    parser.add_argument('--hp-lw3', default=10, type=float, help='Hyperparameter: loss weight LW3')
+    parser.add_argument('--hp-lw4', default=5, type=float, help='Hyperparameter: loss weight Lw4')
     args = parser.parse_args()
     arguments = args.__dict__
 

@@ -14,6 +14,7 @@ import tensorflow as tf
 import numpy as np
 import unittest
 from trainer_yolo.boxutils import *
+from trainer_yolo.digits import *
 
 class BoxRoiUtilsTest(unittest.TestCase):
 
@@ -214,6 +215,55 @@ class BoxRoiUtilsTest(unittest.TestCase):
         self.assertTrue(d1<1e-6, "n_largest_rois_in_cell generation test failed")
         self.assertTrue(d2<1e-6, "n_largest_rois_in_cell generation test failed")
         self.assertTrue(d3<1e-6, "n_largest_rois_in_cell generation test failed")
+
+    def test_digits(self):
+        correct_tl = np.array([[0, 0, 0, 0, 0, 0],
+                               [0, 1, 1, 1, 0, 0],
+                               [0, 1, 0, 1, 0, 0],
+                               [0, 1, 1, 1, 0, 0],
+                               [0, 0, 0, 1, 0, 0],
+                               [0, 1, 1, 1, 0, 0],
+                               [0, 0, 0, 0, 0, 0],
+                               [0, 0, 0, 0, 0, 0]], np.uint8)
+        correct_bl = np.array([[0, 0, 0, 0, 0, 0],
+                               [0, 0, 0, 0, 0, 0],
+                               [0, 1, 1, 1, 0, 0],
+                               [0, 1, 0, 1, 0, 0],
+                               [0, 1, 1, 1, 0, 0],
+                               [0, 0, 0, 1, 0, 0],
+                               [0, 1, 1, 1, 0, 0],
+                               [0, 0, 0, 0, 0, 0]], np.uint8)
+        correct_br = np.array([[0, 0, 0, 0, 0, 0],
+                               [0, 0, 0, 0, 0, 0],
+                               [0, 0, 1, 1, 1, 0],
+                               [0, 0, 1, 0, 1, 0],
+                               [0, 0, 1, 1, 1, 0],
+                               [0, 0, 0, 0, 1, 0],
+                               [0, 0, 1, 1, 1, 0],
+                               [0, 0, 0, 0, 0, 0]], np.uint8)
+        correct_tr = np.array([[0, 0, 0, 0, 0, 0],
+                               [0, 0, 1, 1, 1, 0],
+                               [0, 0, 1, 0, 1, 0],
+                               [0, 0, 1, 1, 1, 0],
+                               [0, 0, 0, 0, 1, 0],
+                               [0, 0, 1, 1, 1, 0],
+                               [0, 0, 0, 0, 0, 0],
+                               [0, 0, 0, 0, 0, 0]], np.uint8)
+        dtl = digits_top_left(6, 8)
+        dtr = digits_top_right(6, 8)
+        dbl = digits_bottom_left(6, 8)
+        dbr = digits_bottom_right(6, 8)
+        with tf.Session() as sess:
+            tl, tr, bl, br = sess.run([dtl, dtr, dbl, dbr])
+            tl9 = tl[9]
+            tr9 = tr[9]
+            bl9 = bl[9]
+            br9 = br[9]
+            d1 = np.linalg.norm(np.reshape(tl9, [-1])-np.reshape(correct_tl, [-1]))
+            d2 = np.linalg.norm(np.reshape(tr9, [-1])-np.reshape(correct_tr, [-1]))
+            d3 = np.linalg.norm(np.reshape(bl9, [-1])-np.reshape(correct_bl, [-1]))
+            d4 = np.linalg.norm(np.reshape(br9, [-1])-np.reshape(correct_br, [-1]))
+            self.assertTrue(d1+d2+d3+d4<1e-6, "digits test failed")
 
 
 

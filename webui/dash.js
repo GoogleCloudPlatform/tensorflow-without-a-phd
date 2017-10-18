@@ -51,7 +51,7 @@ function analyze() {
             //var body = mlengineJSONify([tile])  // TODO: fix the online prediction serving_input_fn and remove the []
             // magic formula: the body of the request goes into the "resource" parameter
             mlengine.projects.predict({
-                name: "projects/cloudml-demo-martin/models/jpeg_yolo_256x256/versions/v1",
+                name: "projects/cloudml-demo-martin/models/jpeg_yolo_256x256/versions/v4",
                 //name: "projects/cloudml-demo-martin/models/plane_jpeg_scan_100_200_300_400_600_900/versions/v7",
                 //name: "projects/cloudml-demo-martin/models/plane_jpeg_scan_100_200_300_400_600_900_logged2/versions/v7MININST10",
                 resource: body

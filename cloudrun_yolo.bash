@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 CONFIG="config.yaml"
+#CONFIG="config-hptune-yolo1.yaml"
 BUCKET="gs://ml1-demo-martin"
 DATA="gs://ml1-demo-martin/data/USGS_public_domain_airports"
 PROJECT="cloudml-demo-martin"
@@ -24,5 +25,9 @@ gcloud ml-engine jobs submit training plane$N \
     --package-path trainer_yolo \
     --runtime-version 1.2 \
     -- \
-    --data "${DATA}"
-
+    --data "${DATA}" \
+    --hp-iterations 50000 \
+    --hp-lw1 10 \
+    --hp-lw2 10 \
+    --hp-lw3 10 \
+    --hp-lw4 10 \
