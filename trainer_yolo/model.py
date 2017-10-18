@@ -112,14 +112,6 @@ def model_fn_squeeze(features, labels, mode, params):
     Y17t = layer_conv2d_batch_norm_relu(Y17, filters=16*g*f, kernel_size=3, strides=1) #expand 3x3
     Y18 = tf.concat([Y17l, Y17t], 3)                                              # output 16x16x32
 
-    # counting head
-    C19 = layer_conv2d_batch_norm_relu(Y18, filters=4, kernel_size=1, strides=1) # output 16*16*4
-    C20 = tf.layers.average_pooling2d(C19, pool_size=4, strides=4, padding="valid") # 4x4x4
-    C21 = tf.reshape(C20, [-1, 4*4*4])
-    Clogits = tf.layers.dense(C21, N_CLASSES)
-    predict = tf.nn.softmax(Clogits)
-    classes = tf.cast(tf.argmax(predict, 1), tf.int32)
-
     # old bounding box head
     #T19 = layer_conv2d_batch_norm_relu(Y18, filters=CELL_B*4, kernel_size=1, strides=1) # output 16*16*12
     #T20 = tf.layers.average_pooling2d(T19, pool_size=4, strides=4, padding="valid") # 4x4x12 shape [batch, 4,4,12]
@@ -194,8 +186,8 @@ def model_fn_squeeze(features, labels, mode, params):
 
         # debug: expected and predicted counts
         debug_img = X
-        debug_img = image_compose(debug_img, get_bottom_left_digits(C_))
-        debug_img = image_compose(debug_img, get_bottom_right_digits(classes))
+        #debug_img = image_compose(debug_img, get_bottom_left_digits(C_))
+        #debug_img = image_compose(debug_img, get_bottom_right_digits(classes))
         debug_img = image_compose(debug_img, get_top_right_red_white_digits(mistakes))
         # debug: ground truth boxes in grey
         target_rois = boxutils.grid_cell_to_tile_coords(T_, GRID_N, TILE_SIZE)/TILE_SIZE
@@ -237,7 +229,6 @@ def model_fn_squeeze(features, labels, mode, params):
         tf.summary.image("input_image", debug_img, max_outputs=10)
 
         # model outputs
-        count_loss = tf.reduce_mean(tf.losses.softmax_cross_entropy(tf.one_hot(C_,N_CLASSES), Clogits))
         position_loss = tf.reduce_mean(fTC_ * (tf.square(TX-TX_)+tf.square(TY-TY_)))
         # YOLO trick: take square root of predicted size for loss so as not to drown errors on small boxes
 
@@ -276,32 +267,25 @@ def model_fn_squeeze(features, labels, mode, params):
         LW1 = params['lw1']
         LW2 = params['lw2']
         LW3 = params['lw3']
-        LW4 = params['lw4']
-        LWT = LW0+LW1+LW2+LW3+LW4
+        LWT = LW0+LW1+LW2+LW3
         # TODO: hyperparam tune the hell out of these loss weights
-        # currently not good. Predicts bad sizes, yet size loss in the 0.5e-5 while position loss is around 0.2
-        w_count_loss = count_loss*(LW0/LWT)*0.00001
-        #w_count_loss = 0
+        w_obj_loss = obj_loss*(LW0/LWT)
         w_position_loss = position_loss*(LW1/LWT)
         w_size_loss = size_loss*(LW2/LWT)
-        w_obj_loss = obj_loss*(LW3/LWT)
-        w_noobj_loss = noobj_loss*(LW4/LWT)
-        loss = w_count_loss + w_position_loss + w_size_loss + w_obj_loss + w_noobj_loss
+        w_noobj_loss = noobj_loss*(LW3/LWT)
+        loss = w_position_loss + w_size_loss + w_obj_loss + w_noobj_loss
 
         # average number of mistakes per image
         nb_mistakes = tf.reduce_sum(mistakes)
 
         train_op = tf.contrib.layers.optimize_loss(loss, tf.train.get_global_step(), learning_rate=params['lr0'], optimizer="Adam", learning_rate_decay_fn=learn_rate)
         eval_metrics = {
-                        "counting_accuracy": tf.metrics.accuracy(classes, C_),
-                        "counting_error": tf.metrics.mean(w_count_loss),
                         "position_error": tf.metrics.mean(w_position_loss),
                         "size_error": tf.metrics.mean(w_size_loss),
                         "plane_confidence_error": tf.metrics.mean(w_obj_loss),
                         "no_plane_confidence_error": tf.metrics.mean(w_noobj_loss),
                         "mistakes": tf.metrics.mean(nb_mistakes)}
         #debug
-        tf.summary.scalar("counting_error", w_count_loss)
         tf.summary.scalar("position_error", w_position_loss)
         tf.summary.scalar("size_error", w_size_loss)
         tf.summary.scalar("plane_confidence_error", w_obj_loss)
@@ -311,11 +295,9 @@ def model_fn_squeeze(features, labels, mode, params):
 
     return tf.estimator.EstimatorSpec(
         mode=mode,
-        predictions={"predictions": predict, "classes": classes, "rois":rsrois, "rois_confidence": rsroiC},  # name these fields as you like
-        #predictions={"rois":rsrois, "rois_confidence": rsroiC},  # name these fields as you like
+        predictions={"rois":rsrois, "rois_confidence": rsroiC},  # name these fields as you like
         loss=loss,
         train_op=train_op,
         eval_metric_ops=eval_metrics,
-        export_outputs={'classes': tf.estimator.export.PredictOutput({"predictions": predict, "classes": classes, "rois":rsrois, "rois_confidence": rsroiC})}
-        #export_outputs={'classes': tf.estimator.export.PredictOutput({"rois":rsrois, "rois_confidence": rsroiC})}
+        export_outputs={'classes': tf.estimator.export.PredictOutput({"rois":rsrois, "rois_confidence": rsroiC})}
     )

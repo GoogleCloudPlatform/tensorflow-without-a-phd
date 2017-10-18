@@ -33,8 +33,3 @@ trainingInput:
         minValue: 1
         maxValue: 100
         scaleType: UNIT_LINEAR_SCALE
-      - parameterName: hp-lw4
-        type: INTEGER
-        minValue: 1
-        maxValue: 100
-        scaleType: UNIT_LINEAR_SCALE

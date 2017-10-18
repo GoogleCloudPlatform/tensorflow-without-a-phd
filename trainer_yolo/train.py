@@ -272,10 +272,9 @@ def main(argv):
     parser.add_argument('--hp-lr1', default=0.0001, type=float, help='Hyperparameter: target (min) learning rate')
     parser.add_argument('--hp-lr2', default=3000, type=float, help='Hyperparameter: learning rate decay speed in steps. Learning rate decays by exp(-1) every N steps.')
     parser.add_argument('--hp-bnexp', default=0.993, type=float, help='Hyperparameter: exponential decay for batch norm moving averages.')
-    parser.add_argument('--hp-lw1', default=50, type=float, help='Hyperparameter: loss weight LW1')
-    parser.add_argument('--hp-lw2', default=50, type=float, help='Hyperparameter: loss weight LW2')
+    parser.add_argument('--hp-lw1', default=10, type=float, help='Hyperparameter: loss weight LW1')
+    parser.add_argument('--hp-lw2', default=10, type=float, help='Hyperparameter: loss weight LW2')
     parser.add_argument('--hp-lw3', default=10, type=float, help='Hyperparameter: loss weight LW3')
-    parser.add_argument('--hp-lw4', default=5, type=float, help='Hyperparameter: loss weight Lw4')
     args = parser.parse_args()
     arguments = args.__dict__
 

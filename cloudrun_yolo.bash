@@ -26,8 +26,4 @@ gcloud ml-engine jobs submit training plane$N \
     --runtime-version 1.2 \
     -- \
     --data "${DATA}" \
-    --hp-iterations 50000 \
-    --hp-lw1 10 \
-    --hp-lw2 10 \
-    --hp-lw3 10 \
-    --hp-lw4 10 \
+    --hp-iterations 50000
