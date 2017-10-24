@@ -23,8 +23,10 @@ var payload_tiles = []  // extracted images. format {image_bytes: ,pos:{x: ,y: ,
 
 var zone_width = 660
 var zone_height = 460
-var tile_size = 256  // zone is always tiled with one tile more than necessary in each direction to force overlap
-// acceptable tile sizes depend on ML Engine model used. Currently plane_jpeg_scan_100_200_300_400_600_900.
+var tile_size = 256
+// acceptable tile sizes depend on ML Engine model used. Currently:
+// plane_jpeg_scan_100_200_300_400_600_900 supports square tiles of 100, 200, 300, 400, 600, 900 and 256 pixels
+// jpeg_yolo_256x256 supports square tiles of 256 pixels only
 var tile_delay = 20 // delay in ms between consecutive calls to ML Engine online predictions API (can be 0)
 
 var reload_once = false
@@ -44,3 +46,4 @@ airports.LBG = [48.961900, 2.439519]
 airports.SEA = [47.443495, -122.307206]
 airports.NRT = [35.764783, 140.390962]
 airports.ICN = [37.461626, 126.443786]
+airports.DMA = [32.160020, -110.836055]

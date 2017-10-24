@@ -49,6 +49,12 @@
                 <div class="title">ML Engine REST call</div>
                 <button id="analyze-button" onclick="analyze()" style="display:none;">Analyze</button>
                 <div class="console" id="sap"></div>
+                <form name="modsel">
+                    <select name="model">
+                        <option value="plane_jpeg_scan_100_200_300_400_600_900">20x20 tile classifier</option>
+                        <option value="jpeg_yolo_256x256" selected>YOLO detection</option>
+                    </select>
+                </form>
             </div>
             <div class="uiblock">
                 <div class="title">Map capture</div>
@@ -63,6 +69,7 @@
                         <option value="SEA">SEA Seattle Tacoma</option>
                         <option value="NRT">NRT Tokyo Narita</option>
                         <option value="ICN">ICN Seoul Incheon</option>
+                        <option value="DMA">DMA Davis Mothan Boneyard</option>
                     </select>
                 </form>
                 <canvas width=600 height=600 id="cap"></canvas>

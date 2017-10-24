@@ -48,12 +48,11 @@ function analyze() {
             processingResults(tile)
             displayProcessingMarker(tile)
             var body = mlengineJSONify(tile)
-            //var body = mlengineJSONify([tile])  // TODO: fix the online prediction serving_input_fn and remove the []
             // magic formula: the body of the request goes into the "resource" parameter
             mlengine.projects.predict({
-                name: "projects/cloudml-demo-martin/models/jpeg_yolo_256x256/versions/v4",
-                //name: "projects/cloudml-demo-martin/models/plane_jpeg_scan_100_200_300_400_600_900/versions/v7",
-                //name: "projects/cloudml-demo-martin/models/plane_jpeg_scan_100_200_300_400_600_900_logged2/versions/v7MININST10",
+                name: "projects/cloudml-demo-martin/models/" + document.modsel.model.value,
+                //name: "projects/cloudml-demo-martin/models/plane_jpeg_scan_100_200_300_400_600_900/versions/v7_256x256",
+                //name: "projects/cloudml-demo-martin/models/jpeg_yolo_256x256",
                 resource: body
             })
                 .then(function (res) {
@@ -66,19 +65,24 @@ function analyze() {
                         var nb_results = 0
                         var result_markers = []
                         res.result.predictions.map(function(prediction) {
-                            for (var i=0; i<prediction.rois.length; i++) {
-                                var roi = prediction.rois[i]
-                                var confidence = prediction.rois_confidence[i]
-                                if (confidence > 0.5) {
-                                    nb_planes++
-                                    result_markers.push(roi)
+                            //code for endpoint jpeg_yolo_256x256
+                            if (prediction.rois !== undefined) {
+                                for (var i = 0; i < prediction.rois.length; i++) {
+                                    var roi = prediction.rois[i]
+                                    var confidence = prediction.rois_confidence[i]
+                                    if (confidence > 0.5) {
+                                        nb_planes++
+                                        result_markers.push(roi)
+                                    }
                                 }
                             }
                             // code for endpoint plane_jpeg_scan_100_200_300_400_600_900
-                            //if (prediction.classes) {
-                            //    nb_planes++
-                            //    result_markers.push(prediction.boxes)
-                            //}
+                            else if (prediction.classes !== undefined) {
+                                if (prediction.classes) {  // if this is a plane classes=1
+                                    nb_planes++
+                                    result_markers.push(prediction.boxes)
+                                }
+                            }
                         })
                         undisplayProcessingMarker(tile)
                         displayResultMarkers(tile, result_markers)
@@ -186,31 +190,17 @@ function displayResults(tile, nb) {
     }
 }
 
-function displayErrorResults(err) {
-    var sap = document.getElementById("sap")
-    if (sap)
-        sap.innerText = err
+function displayErrorResults(tile, err) {
+    var reqInfoMsg = document.getElementById(posIdentifier(tile, "reqid_"))
+    if (reqInfoMsg) {
+        reqInfoMsg.innerText = err
+    }
 }
 
 function displayPayload(tiles) {
     var jap = document.getElementById("jap")
     if (jap)
-        jap.innerText = mlengineJSONify(tiles)
-}
-
-// Deprecated: remove as soon ad endoint is updated
-function mlengineJSONifyMulti(tiles) {
-    var payload = new Object()
-    payload.instances = [new Object()]  // single instance
-    payload.instances[0].square_size = tile_size
-    payload.instances[0].image_bytes = []
-    tiles.map(function(tile) {
-        var container = new Object()
-        container.b64 = tile.image_bytes
-        payload.instances[0].image_bytes.push(container)
-    })
-    json_payload = JSON.stringify(payload)
-    return json_payload
+        jap.innerText = mlengineJSONify(tiles[0])
 }
 
 function mlengineJSONify(tile) {

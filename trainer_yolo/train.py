@@ -155,13 +155,18 @@ def generate_slice(pixels, rois, idx):
     # Tile divided in GRID_N x GRID_N grid
     GRID_N = 16
     # Recognizing CELL_B boxes per grid cell
-    CELL_B = 1
+    CELL_B = 2
 
     # For each tile, for each grid cell, determine the CELL_B largest ROIs centered in that cell
     # Output shape [tiles_n, GRID_N, GRID_N, CELL_B, 3]
     targets = tf.map_fn(lambda tile:
-                        boxutils.n_largest_rois_in_cell_relative(tile, rois, rois_n, GRID_N, CELL_B),
+                        boxutils.n_experimental_roi_selection_strategy(tile, rois, rois_n, GRID_N, CELL_B),
+                        #boxutils.n_largest_rois_in_cell_relative(tile, rois, rois_n, GRID_N, CELL_B),
                         tiles)
+
+    #### experimental
+
+    #### experimental
 
     # resize rois to units used by crop_and_resize
     tile_x1, tile_y1, tile_x2, tile_y2 = tf.unstack(tiles, axis=1)

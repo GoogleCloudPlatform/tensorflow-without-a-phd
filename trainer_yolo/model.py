@@ -17,7 +17,7 @@ from trainer_yolo import boxutils
 
 N_CLASSES = 2
 GRID_N = 16  # must be the same as in train.py
-CELL_B = 1   # must be the same as in train.py
+CELL_B = 2   # must be the same as in train.py
 TILE_SIZE = 256  # must be the same as in train.py
 
 def get_bottom_left_digits(classes):
@@ -72,6 +72,9 @@ def model_fn_squeeze(features, labels, mode, params):
     def layer_conv2d_batch_norm_relu(x, filters, kernel_size, strides=1):
         y = tf.layers.conv2d(x, filters=filters, kernel_size=kernel_size, strides=strides, padding="same", activation=None, use_bias=False)
         return tf.nn.relu(batch_normalization(y))
+
+    def layer_conv2d_relu(x, filters, kernel_size, strides=1):
+        return tf.layers.conv2d(x, filters=filters, kernel_size=kernel_size, strides=strides, padding="same", activation=tf.nn.relu)
 
     def layer_conv1x1_batch_norm(x, depth):
         y = tf.layers.conv2d(x, filters=depth, kernel_size=1, strides=1, padding="same", activation=None, use_bias=False)
@@ -136,6 +139,10 @@ def model_fn_squeeze(features, labels, mode, params):
     TY = tf.nn.tanh(layer_conv1x1_batch_norm(TY0, depth=CELL_B))  # shape [batch, 4,4,CELL_B]
     TW = tf.nn.sigmoid(layer_conv1x1_batch_norm(TW0, depth=CELL_B))  # shape [batch, 4,4,CELL_B]
     TC = tf.nn.sigmoid(layer_conv1x1_batch_norm(TC0, depth=CELL_B))  # shape [batch, 4,4,CELL_B]
+
+    # leave some breathing room to the roi sizes so that rois from adjacent cells can reach into this one
+    TX = TX
+    TY = TY
 
     # testing different options for W
     # Woption0
@@ -261,6 +268,8 @@ def model_fn_squeeze(features, labels, mode, params):
         # TODO: improve randomness in training tile selection. Currently, only one batch of random displacements, applied
         # during entire training
         # TODO: idea, try using TC instead of TC_ in position loss and size loss
+        # TODO: dropout
+        # TODO: one run without batch norm for comparison
 
         # YOLO trick: weights the different losses differently
         LW0 = 10.0

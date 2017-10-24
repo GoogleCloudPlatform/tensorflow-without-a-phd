@@ -121,14 +121,13 @@ def dataset_eval_input_fn(dataset, n):
 def serving_input_fn():
     # input expects a list of jpeg images
 
-    input_bytes = {'image_bytes': tf.placeholder(tf.string, [None, None]),
-                   'square_size': tf.placeholder(tf.int32)
-                   }
+    input_bytes = {'image_bytes': tf.placeholder(tf.string),
+                   'square_size': tf.placeholder(tf.int32)}
 
     # TODO: get inage instances from instances. Currently getting multiple images in each
     # instance (input_bytes['image_bytes'][0]) because misunderstanding on format.
 
-    input_images = input_bytes['image_bytes'][0]
+    input_images = input_bytes['image_bytes']
     input_tilesz = input_bytes['square_size'][0]
 
     trained_tile_size = 20
@@ -136,6 +135,7 @@ def serving_input_fn():
     zoom_step = 1.3
     boxes100x100 = np.stack(list(boxscan.genBox(100, 100, trained_tile_size, tile_step, zoom_step)), axis=0)/100.0  # 479 tiles
     boxes200x200 = np.stack(list(boxscan.genBox(200, 200, trained_tile_size, tile_step, zoom_step)), axis=0)/200.0  # 2473 tiles (x5)
+    boxes256x256 = np.stack(list(boxscan.genBox(256, 256, trained_tile_size, tile_step, zoom_step)), axis=0)/256.0
     boxes300x300 = np.stack(list(boxscan.genBox(300, 300, trained_tile_size, tile_step, zoom_step)), axis=0)/300.0  # 6052 tiles
     boxes400x400 = np.stack(list(boxscan.genBox(400, 400, trained_tile_size, tile_step, zoom_step)), axis=0)/400.0  # 11369 tiles (x5)
     boxes600x600 = np.stack(list(boxscan.genBox(600, 600, trained_tile_size, tile_step, zoom_step)), axis=0)/600.0  # 26760 tiles
@@ -143,6 +143,7 @@ def serving_input_fn():
 
     def tile100x100(): return tf.constant(boxes100x100, dtype=tf.float32), tf.constant(np.zeros(len(boxes100x100)), dtype=tf.int32)
     def tile200x200(): return tf.constant(boxes200x200, dtype=tf.float32), tf.constant(np.zeros(len(boxes200x200)), dtype=tf.int32)
+    def tile256x256(): return tf.constant(boxes256x256, dtype=tf.float32), tf.constant(np.zeros(len(boxes256x256)), dtype=tf.int32)
     def tile300x300(): return tf.constant(boxes300x300, dtype=tf.float32), tf.constant(np.zeros(len(boxes300x300)), dtype=tf.int32)
     def tile400x400(): return tf.constant(boxes400x400, dtype=tf.float32), tf.constant(np.zeros(len(boxes400x400)), dtype=tf.int32)
     def tile600x600(): return tf.constant(boxes600x600, dtype=tf.float32), tf.constant(np.zeros(len(boxes600x600)), dtype=tf.int32)
@@ -150,6 +151,7 @@ def serving_input_fn():
 
     boxes, box_ind = tf.case([(tf.equal(input_tilesz, 100), tile100x100),
                               (tf.equal(input_tilesz, 200), tile200x200),
+                              (tf.equal(input_tilesz, 256), tile256x256),
                               (tf.equal(input_tilesz, 300), tile300x300),
                               (tf.equal(input_tilesz, 400), tile400x400),
                               (tf.equal(input_tilesz, 600), tile600x600),
@@ -233,17 +235,17 @@ def main(argv):
     # The Experiment is an Estimator with data loading functions and other parameters
     def experiment_fn_with_params(output_dir, hparams, data, **kwargs):
         # load data
-        #test_images, test_labels, train_images, train_labels = load_data(data)
-        dataset, nb = load_dataset(data)
-        dataset_eval, nb_eval_files = load_dataset(data + "_eval")
+        test_images, test_labels, train_images, train_labels = load_data(data)
+        #dataset, nb = load_dataset(data)
+        #dataset_eval, nb_eval_files = load_dataset(data + "_eval")
         ITERATIONS = hparams["iterations"]
         # Compatibility warning: Experiment will move out of contrib in 1.4
         return tf.contrib.learn.Experiment(
             estimator=tf.estimator.Estimator(model_fn=model.model_fn, model_dir=output_dir, config=training_config, params=hparams),
-            #train_input_fn=lambda: train_data_input_fn(train_images, train_labels),
-            #eval_input_fn=lambda: eval_data_input_fn(test_images, test_labels),
-            train_input_fn=lambda: dataset_input_fn(dataset),
-            eval_input_fn=lambda: dataset_eval_input_fn(dataset_eval, nb_eval_files),
+            train_input_fn=lambda: train_data_input_fn(train_images, train_labels),
+            eval_input_fn=lambda: eval_data_input_fn(test_images, test_labels),
+            #train_input_fn=lambda: dataset_input_fn(dataset),
+            #eval_input_fn=lambda: dataset_eval_input_fn(dataset_eval, nb_eval_files),
             train_steps=ITERATIONS,
             eval_steps=1,
             min_eval_frequency=100,
