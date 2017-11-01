@@ -1,3 +1,3 @@
-description: "same as v7 with proper input format and support for 256x256 tiles"
-deploymentUri: gs://ml1-demo-martin/jobs/plane064/1/export/Servo/1508870182
+description: "batch norm, lr decay 0.008 0.0001 888, dropout 0.11, planesnet32K.pklz2, 5000 it, dense 43, conv1 16, filter_sizes S"
+deploymentUri: gs://ml1-demo-martin/jobs/plane234/export/Servo/1509145962
 runtimeVersion: '1.2'

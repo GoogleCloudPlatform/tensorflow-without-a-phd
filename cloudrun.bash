@@ -4,8 +4,8 @@ CONFIG="config.yaml"
 #CONFIG="config-hptune-2.yaml"
 BUCKET="gs://ml1-demo-martin"
 #BUCKET="gs://ml-eurowest1-martin"
-DATA="gs://ml1-demo-martin/data/planesnet32K.bkg257K.pln88K.ppln88K.pklz2"
-#DATA="gs://ml1-demo-martin/data/datasetx"
+#DATA="gs://ml1-demo-martin/data/planesnet32K.bkg257K.pln88K.ppln88K.pklz2"
+DATA="gs://ml1-demo-martin/data/planesnet32K.pklz2"
 PROJECT="cloudml-demo-martin"
 REGION="us-central1"
 #REGION="euro-west1"
@@ -28,5 +28,13 @@ gcloud ml-engine jobs submit training plane$N \
     --package-path trainer \
     --runtime-version 1.2 \
     -- \
-    --data "${DATA}"
+    --data "${DATA}" \
+    --hp-iterations 5000 \
+    --hp-dense 43 \
+    --hp-conv1 16 \
+    --hp-dropout 0.3 \
+    --hp-lr0 0.0086 \
+    --hp-lr2 888 \
+    --hp-filter-sizes S
+
 

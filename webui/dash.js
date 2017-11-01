@@ -70,7 +70,7 @@ function analyze() {
                                 for (var i = 0; i < prediction.rois.length; i++) {
                                     var roi = prediction.rois[i]
                                     var confidence = prediction.rois_confidence[i]
-                                    if (confidence > 0.5) {
+                                    if (confidence > 0.69) {
                                         nb_planes++
                                         result_markers.push(roi)
                                     }

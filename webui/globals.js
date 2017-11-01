@@ -21,8 +21,8 @@ var googlemapevtlistener = null
 
 var payload_tiles = []  // extracted images. format {image_bytes: ,pos:{x: ,y: ,sz: }}
 
-var zone_width = 660
-var zone_height = 460
+var zone_width = 1600
+var zone_height = 1030
 var tile_size = 256
 // acceptable tile sizes depend on ML Engine model used. Currently:
 // plane_jpeg_scan_100_200_300_400_600_900 supports square tiles of 100, 200, 300, 400, 600, 900 and 256 pixels
