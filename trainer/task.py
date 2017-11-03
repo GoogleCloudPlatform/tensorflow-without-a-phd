@@ -208,6 +208,8 @@ def main(args):
                     save_path = os.path.join(args.output_dir, 'model.ckpt')
                     save_path = saver.save(sess, save_path, global_step=g_step)
                     print('Model checkpoint saved: {}'.format(save_path))
+            if args.render:
+                _ = raw_input('Finished.  Press ENTER to exit.')
         
 
 if __name__ == '__main__':
