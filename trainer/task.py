@@ -6,6 +6,7 @@ import gym
 import json
 
 from helpers import discount_rewards, prepro
+from demo_env import DemoEnv
 
 # Open AI gym Atari env: 0: 'NOOP', 2: 'UP', 3: 'DOWN'
 NOOP_ACTIONS = [0, 2, 3]
@@ -122,7 +123,12 @@ def main(args):
         else:
             sess.run(init)
 
-        env = gym.make("Pong-v0")
+        if args.render:
+            envspec = gym.spec('Pong-v0')
+            env_kwargs = envspec.__dict__.get('_kwargs')
+            env = DemoEnv(**env_kwargs)
+        else:
+            env = gym.make("Pong-v0")
 
         if not args.dry_run:
             summary_path = os.path.join(args.output_dir, 'summary')
