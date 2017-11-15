@@ -71,7 +71,7 @@ update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
 with tf.control_dependencies(update_ops):
     train_op = optimizer.minimize(loss)
 # Note: This code is already present in the
-# tf.contrib.layers.optimize_loss helper function.
+# tf.contrib.training.create_train_op helper function.
 # No need to duplicate if you are using that.
 ```
 
