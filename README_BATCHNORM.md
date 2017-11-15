@@ -11,8 +11,7 @@ Tensorflow has both a low-level and a high-level implementation for batch normal
 - [tf.layers.batch_normalization](https://www.tensorflow.org/api_docs/python/tf/layers/batch_normalization)
 
 #### Low-level Tensorflow
-The low-level tf.nn.batch_normalization function does very little,
-basically just takes your inputs, subtracts the average and divides by the variance
+The low-level tf.nn.batch_normalization function takes your inputs, subtracts the average and divides by the variance
 that you pass in. It is up to you to compute both the batch statistics (average
 and variance of neuron outputs across a batch) and their moving averages across multiple batches and use them apropriately at trainig and
 test time. It is also up to you to compute your batch statistics
@@ -65,7 +64,7 @@ and use them during evaluation and inference.
 
 #### exponential moving averages of batch stats (mean and variance)
 tf.layers.batch_normalization creates variables for the batch norm stats that need to be gathered. These variables are added to tf.GraphKeys.UPDATE_OPS and these UPDATE_OPS are ran automatically
-when you use the tf.contrib.layers.optimize_loss function to compute the training_op that the Estimator API requires.
+when you use the tf.contrib.training.create_train_op function to compute the training_op that the Estimator API requires.
 If you want to use a tf.train.XXXOptimizer directly, add a graph dependency on UPDATE_OPS so that updates happen before your train_op:
 ```Python
 update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
