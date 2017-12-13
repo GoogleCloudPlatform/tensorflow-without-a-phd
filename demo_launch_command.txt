@@ -1,0 +1,1 @@
+python trainer/task.py --render --dry-run --restore --allow-noop --output-dir demo-checkpoint --n-batch 1 --batch-size 1
