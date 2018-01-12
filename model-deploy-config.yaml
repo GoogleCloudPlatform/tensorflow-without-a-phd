@@ -1,3 +1,5 @@
-description: "batch norm, lr decay 0.008 0.0001 888, dropout 0.11, planesnet32K.pklz2, 5000 it, dense 43, conv1 16, filter_sizes S"
-deploymentUri: gs://ml1-demo-martin/jobs/plane234/export/Servo/1509145962
+description: "autoscale minNodes 15"
+#deploymentUri: gs://ml1-demo-martin/jobs/plane222/export/Servo/1508828444/
 runtimeVersion: '1.2'
+autoScaling:
+  minNodes: 15

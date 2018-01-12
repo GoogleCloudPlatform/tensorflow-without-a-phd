@@ -6,6 +6,7 @@ BUCKET="gs://ml1-demo-martin"
 DATA="gs://ml1-demo-martin/data/USGS_public_domain_airports"
 PROJECT="cloudml-demo-martin"
 REGION="us-central1"
+#REGION="europe-west1"
 
 # auto-incrementing run number padded with zeros to 3 digits
 NFILE="cloudrunN.txt"

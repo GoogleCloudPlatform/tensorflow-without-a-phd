@@ -14,6 +14,7 @@ import math
 import tensorflow as tf
 import trainer_yolo.digits as dd
 from trainer_yolo import boxutils
+from trainer_yolo.boxutils import IOUCalculator
 
 N_CLASSES = 2
 GRID_N = 16  # must be the same as in train.py
@@ -135,6 +136,7 @@ def model_fn_squeeze(features, labels, mode, params):
     # TODO: idea: batch norm may be bad on this layer
     # TODO: try with a deeper layer as well
     # TODO: try a filtered convolution instead of pooling2d, maybe info from cell sides should be weighted differently
+    # TODO: try softmax for predicting confidence instead of C
     TX = tf.nn.tanh(layer_conv1x1_batch_norm(TX0, depth=CELL_B))  # shape [batch, 4,4,CELL_B]
     TY = tf.nn.tanh(layer_conv1x1_batch_norm(TY0, depth=CELL_B))  # shape [batch, 4,4,CELL_B]
     TW = tf.nn.sigmoid(layer_conv1x1_batch_norm(TW0, depth=CELL_B))  # shape [batch, 4,4,CELL_B]
@@ -158,10 +160,17 @@ def model_fn_squeeze(features, labels, mode, params):
     # Woption5
     #real_TW = TW*TW
 
-    rois = tf.stack([TX,TY,real_TW], axis=-1)  # shape [batch, GRID_N, GRID_N, CEL_B, 3]
-    rois = boxutils.grid_cell_to_tile_coords(rois, GRID_N, TILE_SIZE)/TILE_SIZE # shape [batch, GRID_N, GRID_N, CELL_B, 4]
-    rsrois = tf.reshape(rois, [-1, GRID_N*GRID_N*CELL_B, 4])
-    rsroiC = tf.reshape(TC, [-1, GRID_N*GRID_N*CELL_B])
+    DETECTION_TRESHOLD = 0.5  # plane "detected" if predicted C>0.5
+    detected_TW = tf.where(tf.greater(TC, DETECTION_TRESHOLD), real_TW, tf.zeros_like(real_TW))
+    # all rois with confidence factors
+    predicted_rois = tf.stack([TX,TY,real_TW], axis=-1)  # shape [batch, GRID_N, GRID_N, CELL_B, 3]
+    predicted_rois = boxutils.grid_cell_to_tile_coords(predicted_rois, GRID_N, TILE_SIZE)/TILE_SIZE
+    predicted_rois = tf.reshape(predicted_rois, [-1, GRID_N*GRID_N*CELL_B, 4])
+    predicted_C = tf.reshape(TC, [-1, GRID_N*GRID_N*CELL_B])
+    # only the rois with confidence > DETECTION_TRESHOLD
+    detected_rois = tf.stack([TX,TY,detected_TW], axis=-1)  # shape [batch, GRID_N, GRID_N, CELL_B, 3]
+    detected_rois = boxutils.grid_cell_to_tile_coords(detected_rois, GRID_N, TILE_SIZE)/TILE_SIZE
+    detected_rois = tf.reshape(detected_rois, [-1, GRID_N*GRID_N*CELL_B, 4])
 
     loss = train_op = eval_metrics = None
     if mode != tf.estimator.ModeKeys.PREDICT:
@@ -172,16 +181,17 @@ def model_fn_squeeze(features, labels, mode, params):
         # target probability is 1 if there is a corresponding target box, 0 otherwise
         TC_ = tf.greater(TW_, ZERO_W)
         fTC_ = tf.cast(tf.greater(TW_, ZERO_W), tf.float32) # shape [batch, 4,4,3] = [batch, GRID_N, GRID_N, CELL_B]
+        target_rois = boxutils.grid_cell_to_tile_coords(T_, GRID_N, TILE_SIZE)/TILE_SIZE
+        target_rois = tf.reshape(target_rois, [-1, GRID_N*GRID_N*CELL_B, 4])
 
         # accuracy
-        DETECTION_TRESHOLD = 0.5  # plane "detected" if predicted C>0.5
         ERROR_TRESHOLD = 0.3  # plane correctly localized if predicted x,y,w within % of ground truth
         detect_correct = tf.logical_not(tf.logical_xor(tf.greater(TC, DETECTION_TRESHOLD), TC_))
         ones = tf.ones(tf.shape(TW_))
         nonzero_TW_ = tf.where(TC_, TW_, ones)
-        # true if correct size where there is a planne, nonsense value where there is no plane
+        # true if correct size where there is a plane, nonsense value where there is no plane
         size_correct = tf.less(tf.abs(real_TW - TW_) / nonzero_TW_, ERROR_TRESHOLD)
-        # true if correct position where there is a planne, nonsense value where there is no plane
+        # true if correct position where there is a plane, nonsense value where there is no plane
         position_correct = tf.less(tf.sqrt(tf.square(TX-TX_) + tf.square(TY-TY_)) / nonzero_TW_ / GRID_N, ERROR_TRESHOLD)
         truth_no_plane = tf.logical_not(TC_)
         size_correct = tf.logical_or(size_correct, truth_no_plane)
@@ -191,18 +201,19 @@ def model_fn_squeeze(features, labels, mode, params):
         all_correct = tf.logical_and(size_correct, position_correct)
         mistakes = tf.reduce_sum(tf.cast(tf.logical_not(all_correct), tf.int32), axis=[1,2,3])  # shape [batch]
 
+        # better: IOU accuracy
+        iou_accuracy = IOUCalculator.batch_intersection_over_union(detected_rois*TILE_SIZE, target_rois*TILE_SIZE, SIZE=TILE_SIZE)
+
         # debug: expected and predicted counts
         debug_img = X
         #debug_img = image_compose(debug_img, get_bottom_left_digits(C_))
         #debug_img = image_compose(debug_img, get_bottom_right_digits(classes))
         debug_img = image_compose(debug_img, get_top_right_red_white_digits(mistakes))
         # debug: ground truth boxes in grey
-        target_rois = boxutils.grid_cell_to_tile_coords(T_, GRID_N, TILE_SIZE)/TILE_SIZE
-        rstarget_rois = tf.reshape(target_rois, [-1, GRID_N*GRID_N*CELL_B, 4])
-        debug_img = draw_color_boxes(debug_img, rstarget_rois, 0.7, 0.7, 0.7)
+        debug_img = draw_color_boxes(debug_img, target_rois, 0.7, 0.7, 0.7)
         # debug: computed ROIs boxes in shades of yellow
-        no_box = tf.zeros(tf.shape(rsrois))
-        select = tf.stack([rsroiC, rsroiC, rsroiC, rsroiC], axis=-1)
+        no_box = tf.zeros(tf.shape(predicted_rois))
+        select = tf.stack([predicted_C, predicted_C, predicted_C, predicted_C], axis=-1)
         select_correct = tf.reshape(all_correct, [-1, GRID_N*GRID_N*CELL_B])
         select_size_correct = tf.reshape(size_correct, [-1, GRID_N*GRID_N*CELL_B])
         select_position_correct = tf.reshape(position_correct, [-1, GRID_N*GRID_N*CELL_B])
@@ -211,8 +222,8 @@ def model_fn_squeeze(features, labels, mode, params):
         select_size_correct = tf.stack([select_size_correct,select_size_correct,select_size_correct,select_size_correct], axis=2)
         select_position_correct = tf.stack([select_position_correct,select_position_correct,select_position_correct,select_position_correct], axis=2)
 
-        correct_rois = tf.where(select_correct, rsrois, no_box)
-        other_rois = tf.where(tf.logical_not(select_correct), rsrois, no_box)
+        correct_rois = tf.where(select_correct, predicted_rois, no_box)
+        other_rois = tf.where(tf.logical_not(select_correct), predicted_rois, no_box)
         correct_size_rois = tf.where(select_size_correct, other_rois, no_box)
         other_rois = tf.where(tf.logical_not(select_size_correct), other_rois, no_box)
         correct_pos_rois = tf.where(select_position_correct, other_rois, no_box)
@@ -286,6 +297,7 @@ def model_fn_squeeze(features, labels, mode, params):
 
         # average number of mistakes per image
         nb_mistakes = tf.reduce_sum(mistakes)
+        iou_accuracy = tf.reduce_mean(iou_accuracy)
 
         train_op = tf.contrib.layers.optimize_loss(loss, tf.train.get_global_step(), learning_rate=params['lr0'], optimizer="Adam", learning_rate_decay_fn=learn_rate)
         eval_metrics = {
@@ -293,7 +305,9 @@ def model_fn_squeeze(features, labels, mode, params):
                         "size_error": tf.metrics.mean(w_size_loss),
                         "plane_confidence_error": tf.metrics.mean(w_obj_loss),
                         "no_plane_confidence_error": tf.metrics.mean(w_noobj_loss),
-                        "mistakes": tf.metrics.mean(nb_mistakes)}
+                        "mistakes": tf.metrics.mean(nb_mistakes),
+                        'IOU': tf.metrics.mean(iou_accuracy)
+                        }
         #debug
         tf.summary.scalar("position_error", w_position_loss)
         tf.summary.scalar("size_error", w_size_loss)
@@ -301,12 +315,13 @@ def model_fn_squeeze(features, labels, mode, params):
         tf.summary.scalar("no_plane_confidence_error", w_noobj_loss)
         tf.summary.scalar("loss", loss)
         tf.summary.scalar("mistakes", nb_mistakes)
+        #tf.summary.scalar("IOU", iou_accuracy) # This would run out of memory
 
     return tf.estimator.EstimatorSpec(
         mode=mode,
-        predictions={"rois":rsrois, "rois_confidence": rsroiC},  # name these fields as you like
+        predictions={"rois":predicted_rois, "rois_confidence": predicted_C},  # name these fields as you like
         loss=loss,
         train_op=train_op,
         eval_metric_ops=eval_metrics,
-        export_outputs={'classes': tf.estimator.export.PredictOutput({"rois":rsrois, "rois_confidence": rsroiC})}
+        export_outputs={'classes': tf.estimator.export.PredictOutput({"rois":predicted_rois, "rois_confidence": predicted_C})}
     )

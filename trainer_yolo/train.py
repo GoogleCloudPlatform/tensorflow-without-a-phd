@@ -137,13 +137,13 @@ def generate_slice(pixels, rois, idx):
     plane_counts = tf.minimum(plane_counts, 1)
 
     # debug
-    plane_counts3 = tf.count_nonzero(tf.floor_div(plane_counts, 3))
-    plane_counts2 = tf.count_nonzero(tf.floor_div(plane_counts, 2)) - plane_counts3
-    plane_counts1 = tf.count_nonzero(tf.floor_div(plane_counts, 1)) - plane_counts3 - plane_counts2
-    plane_counts0 = tf.count_nonzero(tf.add(plane_counts, 1))       - plane_counts1 - plane_counts2 - plane_counts3
+    #plane_counts3 = tf.count_nonzero(tf.floor_div(plane_counts, 3))
+    #plane_counts2 = tf.count_nonzero(tf.floor_div(plane_counts, 2)) - plane_counts3
+    plane_counts1 = tf.count_nonzero(tf.floor_div(plane_counts, 1)) #- plane_counts3 - plane_counts2
+    plane_counts0 = tf.count_nonzero(tf.add(plane_counts, 1))       - plane_counts1 #- plane_counts2 - plane_counts3
     tf_logten("Generating training tiles: ", tiles_n)
     tf_logten("Tiles with 0 planes : ", plane_counts0)
-    tf_logten("Tiles with 1 plane  : ", plane_counts1)
+    tf_logten("Tiles with 1+ planes  : ", plane_counts1)
     #tf_logten("Labels 2: ", plane_counts2)
     #tf_logten("Labels 3: ", plane_counts3)
 
@@ -206,7 +206,7 @@ def dataset_input_fn(img_filelist, roi_filelist):
     dataset = tf.contrib.data.Dataset.from_tensor_slices((tf.constant(img_filelist), tf.constant(roi_filelist)))
     dataset = dataset.map(load_files)
     dataset = dataset.flat_map(generate)
-    #dataset = dataset.shuffle(1000)
+    dataset = dataset.shuffle(10000)
     dataset = dataset.batch(50)
     dataset = dataset.repeat()  # indefinitely
     return features_and_labels(dataset)
@@ -215,7 +215,9 @@ def dataset_eval_input_fn(img_filelist, roi_filelist):
     dataset = tf.contrib.data.Dataset.from_tensor_slices((tf.constant(img_filelist), tf.constant(roi_filelist)))
     dataset = dataset.map(load_files)
     dataset = dataset.flat_map(generate_eval)
-    dataset = dataset.batch(191) # eval dataset 191 markers and will be run 20 times
+    dataset = dataset.batch(8)  # eval dataset is 3820 tiles (477 batches of 8).
+                                # A larger batch size runs out of memory because
+                                # intersect over union metric is very expensive.
     return features_and_labels(dataset)
 
 # file list -> dataset
@@ -245,7 +247,7 @@ def serving_input_fn():
 
 
 def main(argv):
-    training_config = tf.contrib.learn.RunConfig(save_checkpoints_secs=None, save_checkpoints_steps=500)
+    training_config = tf.contrib.learn.RunConfig(save_checkpoints_secs=None, save_checkpoints_steps=1000)
     # Bug, exports_to_keep=None is necessary, otherwise this crashes under Python 3
     export_strategy = tf.contrib.learn.utils.saved_model_export_utils.make_export_strategy(serving_input_fn=serving_input_fn, exports_to_keep=None)
 
@@ -261,7 +263,7 @@ def main(argv):
             train_input_fn=lambda: dataset_input_fn(img_filelist, roi_filelist),
             eval_input_fn=lambda: dataset_eval_input_fn(img_filelist_eval, roi_filelist_eval),
             train_steps=ITERATIONS,
-            eval_steps=20,
+            eval_steps=477,
             min_eval_frequency=100,
             export_strategies=export_strategy
         )

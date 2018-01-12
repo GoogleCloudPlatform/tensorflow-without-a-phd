@@ -304,6 +304,63 @@ def grid_cell_to_tile_coords(rois, grid_n, tile_size):
     return rois
 
 
+class IOUCalculator(object):
+
+    @staticmethod
+    def __iou_tile_coordinate(x, SIZE):
+        xx = tf.cast(tf.round(x), dtype=tf.int16)
+        xx = tf.expand_dims(xx, axis=-1)
+        xx = tf.tile(xx, [1, 1, SIZE])
+        xx = tf.expand_dims(xx, axis=2)
+        xx = tf.tile(xx, [1, 1, SIZE, 1])
+        return xx
+
+    @staticmethod
+    def __iou_gen_linmap(batch, n, SIZE):
+        row = tf.cast(tf.linspace(0.0, (SIZE-1)*1.0, SIZE), dtype=tf.int16)
+        linmap = tf.tile([row], [SIZE, 1])
+        linmap = tf.tile([linmap], [n, 1, 1])
+        linmap = tf.tile([linmap], [batch, 1, 1, 1])  # shape [batch, n, SIZE, SIZE]
+        return linmap
+
+    @classmethod
+    def __iou_gen_rectmap(cls, linmap, rects, SIZE):
+        x1, y1, x2, y2 = tf.unstack(rects, axis=-1)  # shapes [batch, n]
+        x1tile = cls.__iou_tile_coordinate(x1, SIZE)
+        x2tile = cls.__iou_tile_coordinate(x2, SIZE)
+        y1tile = cls.__iou_tile_coordinate(y1, SIZE)
+        y2tile = cls.__iou_tile_coordinate(y2, SIZE)
+        zeros = tf.zeros_like(linmap, dtype=tf.uint8)
+        ones = tf.ones_like(linmap, dtype=tf.uint8)
+        mapx = tf.where(tf.greater_equal(linmap, x1tile), ones, zeros)
+        mapx = tf.where(tf.less(linmap, x2tile), mapx, zeros)
+        mapy = tf.where(tf.greater_equal(linmap, y1tile), ones, zeros)
+        mapy = tf.where(tf.less(linmap, y2tile), mapy, zeros)
+        mapy = tf.matrix_transpose(mapy)
+        map = tf.logical_and(tf.cast(mapx, tf.bool), tf.cast(mapy, tf.bool))
+        return map
+
+    # Computes the intersection over union of two sets of rectangles.
+    # The actual computation is intersection_area(union(rects1), union(rects2)) / union_area(rects1, rects2)
+    # rects1, rects2: detected and ground truth rectangles, shape [batch, n, 4] with coordinates x1, y1, x2, y2
+    # the size of the rectangles is [x2-x1, y2-y1]
+    @classmethod
+    def batch_intersection_over_union(cls, rects1, rects2, SIZE):
+        batch = tf.shape(rects1)[0]
+        n = tf.shape(rects1)[1]
+        linmap = cls.__iou_gen_linmap(batch, n, SIZE)
+        map1 = cls.__iou_gen_rectmap(linmap, rects1, SIZE)  # shape [batch, n, SIZE, SIZE]
+        map2 = cls.__iou_gen_rectmap(linmap, rects2, SIZE)  # shape [batch, n, SIZE, SIZE]
+        union_all = tf.concat([map1, map2], axis=1)
+        union_all = tf.reduce_any(union_all, axis=1)
+        union1 = tf.reduce_any(map1, axis=1)  # shape [batch, SIZE, SIZE]
+        union2 = tf.reduce_any(map2, axis=1)  # shape [batch, SIZE, SIZE]
+        intersect = tf.logical_and(union1, union2)  # shape [batch, SIZE, SIZE]
+        union_area = tf.reduce_sum(tf.cast(union_all, tf.float32), axis=[1, 2])  #  can still be empty because of rectangle cropping
+        safe_union_area = tf.where(tf.equal(union_area, 0.0), tf.ones_like(union_area), union_area)
+        inter_area = tf.reduce_sum(tf.cast(intersect, tf.float32), axis=[1, 2])
+        safe_inter_area = tf.where(tf.equal(union_area, 0.0), tf.ones_like(inter_area), inter_area)
+        return safe_inter_area / safe_union_area
 
 
 

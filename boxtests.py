@@ -42,6 +42,55 @@ class BoxRoiUtilsTest(unittest.TestCase):
              [[[[0],[0],[0]],[[0.1],[0.1],[0.1]]],[[[0],[0],[0]],[[0],[0],[0]]],[[[0.1],[-0.1],[0.1]],[[-0.1],[0],[0.1]]]]]  # batch 2
         ], dtype=tf.float32)
 
+    # def test_ioumap_addrect(self):
+    #     m = IOUMap(5)
+    #     m.add_rect(-2,-1,3,2)
+    #     m.add_rect(3,-1,3,2)
+    #     m.add_rect(-1,3,3,2)
+    #     m.add_rect(4,3,3,4)
+    #     m.add_rect(2,1,1,2)
+    #     r = tf.cast(m.get_bitmap(), tf.uint8)
+    #     correct = np.array([[1,0,0,1,1],
+    #                         [0,0,1,0,0],
+    #                         [0,0,1,0,0],
+    #                         [1,1,0,0,1],
+    #                         [1,1,0,0,1]])
+    #     with tf.Session() as sess:
+    #         res = sess.run(r)
+    #         #print(res)
+    #     d = np.linalg.norm(np.reshape(res, [-1])-np.reshape(correct, [-1]))
+    #     self.assertTrue(d<1e-6, "IOUMap.add_rect test failed")
+
+    def test_batch_iou(self):
+        rois1 = tf.constant([[1, 1, 4, 3],
+                             [2, 3, 7, 5],
+                             [3, 4, 4, 5]], dtype=tf.float32)
+        rois2 = tf.constant([[1, 1, 4, 3],
+                             [2, 3, 7, 5],
+                             [3, 4, 4, 5]], dtype=tf.float32)
+        rois3 = tf.constant([[1, 1, 3, 3],
+                             [2, 3, 7, 5],
+                             [3, 4, 4, 5]], dtype=tf.float32)
+        norois1 = tf.constant([[1, 1, 1, 3],
+                             [2, 3, 7, 3],
+                             [3, 4, 4, 4]], dtype=tf.float32)
+        norois2 = tf.constant([[10, 10, 12, 12],
+                               [2, 3, 2, 3],
+                               [-3, -4, -2, -3]], dtype=tf.float32)
+        partrois = tf.constant([[1, 1, 3, 3],
+                               [2, 3, 2, 3],
+                               [-3, -4, -2, -3]], dtype=tf.float32)
+        batch_roisA = tf.stack([rois1, rois3, rois1, norois1, rois3], axis=0)
+        batch_roisB = tf.stack([rois2, rois2, norois1, norois2, partrois], axis=0)
+        iou2 = IOUCalculator.batch_intersection_over_union(batch_roisA, batch_roisB, SIZE=5)
+        correct = np.array([1.0, 10.0/12.0, 0.0, 1.0, 4.0/10.0])
+        with tf.Session() as sess:
+            res1 = sess.run(iou2)
+            #print(res1)
+        d = np.linalg.norm(res1-correct)
+        self.assertTrue(d<1e-6, "IOUmap.batch_iou test failed")
+
+
     def test_grid_cell_to_tile_coords(self):
         rel_rois = tf.reshape(self.relative_rois, [2, 3, 3, 2, 3]) # mistake in entering test data, adde last dim 1, now removing it
         new_coords = grid_cell_to_tile_coords(rel_rois, grid_n=3, tile_size=6)
