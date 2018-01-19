@@ -13,6 +13,7 @@
 import os
 import sys
 import json
+import tempfile
 import argparse
 import numpy as np
 import tensorflow as tf
@@ -77,13 +78,21 @@ def generate(pixels, json_bytes, eval=False):
     rois = tf.py_func(decode_json_py, [json_bytes], [tf.float32])
     # get a number of slices from the image. This allows us to get an arbitrary number of slices
     # from one image without loading them all in memory.
-    n = 3 if not eval else 1
-    return tf.contrib.data.Dataset.range(n).flat_map(lambda i: generate_slice(pixels, rois, i))
+
+    # usually generating 3 sets of tiles from each image, or only 2 if image augmentation is on half of the images
+    n = 6 if not eval else 1
+    return tf.data.Dataset.range(n).flat_map(lambda i: generate_slice(pixels, rois, eval, i))
 
 def generate_eval(pixels, json_bytes):
     return generate(pixels, json_bytes, eval=True)
 
-def generate_slice(pixels, rois, idx):
+
+# This should no longer be necessary when a batch version of random_hue ships in Tensorflow 1.???
+# Tensorflow 1.4.1 does not yet have this. Tracking: https://github.com/tensorflow/tensorflow/issues/8926
+def batch_random_hue(images):
+    return tf.map_fn(lambda img: tf.image.random_hue(img, 0.5), images)
+
+def generate_slice(pixels, rois, eval, idx):
     # dynamic image shapes
     img_shape = tf.cast(tf.shape(pixels), tf.float32)  # known shape [height, width, 3]
     img_shape = tf.reshape(img_shape, [3])  # tensorflow needs help here
@@ -97,7 +106,9 @@ def generate_slice(pixels, rois, idx):
     TILE_INTERSECT_FRACTION = 0.75
 
     # random displacements around each ROI
-    RANDOM_MAX_DISTANCE = 1.4*TILE_SIZE  # adjusted so that tiles with 0, 1, 2 or many planes happen with roughly equal frequency
+    # most experiments done with 1.4*TILE_SIZE
+    # trying 2*TILE_SIZE
+    RANDOM_MAX_DISTANCE = 2.0*TILE_SIZE  # adjusted so that tiles with 0, 1, 2 or many planes happen with roughly equal frequency
     N_RANDOM_POSITIONS = 20  # 20 * max nb of planes in one input image = nb of tiles generated in RAM (watch out!)
 
     # you can increase sdtev to reach more zones without airplanes
@@ -184,7 +195,12 @@ def generate_slice(pixels, rois, idx):
     images = tf.reshape(images, [-1, TILE_SIZE, TILE_SIZE, 3])
     images = tf.cast(images, tf.uint8)
     targets = tf.reshape(targets, [-1, GRID_N, GRID_N, CELL_B, 3])
-    return tf.contrib.data.Dataset.from_tensor_slices((images, plane_counts, targets))
+
+    if not eval:
+        # random hue shift for all training images
+        images = batch_random_hue(images)
+
+    return tf.data.Dataset.from_tensor_slices((images, plane_counts, targets))
 
 
 def load_files(img_filename, roi_filename):
@@ -203,18 +219,22 @@ def features_and_labels(dataset):
     return features, labels
 
 def dataset_input_fn(img_filelist, roi_filelist):
-    dataset = tf.contrib.data.Dataset.from_tensor_slices((tf.constant(img_filelist), tf.constant(roi_filelist)))
+    dataset = tf.data.Dataset.from_tensor_slices((tf.constant(img_filelist), tf.constant(roi_filelist)))
     dataset = dataset.map(load_files)
     dataset = dataset.flat_map(generate)
-    dataset = dataset.shuffle(10000)
-    dataset = dataset.batch(50)
+
+    dataset = dataset.cache(tempfile.mkdtemp(prefix="datacache") + "/datacache")
     dataset = dataset.repeat()  # indefinitely
+    dataset = dataset.shuffle(20000)
+    dataset = dataset.prefetch(50)
+    dataset = dataset.batch(50)
     return features_and_labels(dataset)
 
 def dataset_eval_input_fn(img_filelist, roi_filelist):
-    dataset = tf.contrib.data.Dataset.from_tensor_slices((tf.constant(img_filelist), tf.constant(roi_filelist)))
+    dataset = tf.data.Dataset.from_tensor_slices((tf.constant(img_filelist), tf.constant(roi_filelist)))
     dataset = dataset.map(load_files)
     dataset = dataset.flat_map(generate_eval)
+    dataset = dataset.cache(tempfile.mkdtemp(prefix="evaldatacache") + "/evaldatacache")
     dataset = dataset.batch(8)  # eval dataset is 3820 tiles (477 batches of 8).
                                 # A larger batch size runs out of memory because
                                 # intersect over union metric is very expensive.
@@ -245,29 +265,37 @@ def serving_input_fn():
     feature_dic = {'image': images}
     return tf.estimator.export.ServingInputReceiver(feature_dic, input_bytes)
 
+def start_training(output_dir, hparams, data, **kwargs):
+    # load data
+    img_filelist, roi_filelist = load_file_list(data)
+    img_filelist_eval, roi_filelist_eval = load_file_list(data + "_eval")
+
+    export_latest = tf.estimator.LatestExporter(name="planesnet",
+                                                serving_input_receiver_fn=serving_input_fn,
+                                                exports_to_keep=1)
+
+    train_spec = tf.estimator.TrainSpec(input_fn= lambda: dataset_input_fn(img_filelist, roi_filelist),
+                                        max_steps= hparams["iterations"])
+
+    eval_spec = tf.estimator.EvalSpec(input_fn=lambda: dataset_eval_input_fn(img_filelist_eval, roi_filelist_eval),
+                                      steps=477,
+                                      exporters=export_latest,
+                                      start_delay_secs=15*60,  # no eval in first 15 min
+                                      throttle_secs = 30*60)  # eval every hour
+
+    training_config = tf.estimator.RunConfig(model_dir=output_dir,
+                                             save_summary_steps=100,
+                                             save_checkpoints_steps=1000,
+                                             keep_checkpoint_max=1)
+
+    estimator=tf.estimator.Estimator(model_fn=model.model_fn_squeeze,
+                                     model_dir=output_dir,
+                                     config=training_config,
+                                     params=hparams)
+
+    tf.estimator.train_and_evaluate(estimator, train_spec, eval_spec)
 
 def main(argv):
-    training_config = tf.contrib.learn.RunConfig(save_checkpoints_secs=None, save_checkpoints_steps=1000)
-    # Bug, exports_to_keep=None is necessary, otherwise this crashes under Python 3
-    export_strategy = tf.contrib.learn.utils.saved_model_export_utils.make_export_strategy(serving_input_fn=serving_input_fn, exports_to_keep=None)
-
-    # The Experiment is an Estimator with data loading functions and other parameters
-    def experiment_fn_with_params(output_dir, hparams, data, **kwargs):
-        # load data
-        img_filelist, roi_filelist = load_file_list(data)
-        img_filelist_eval, roi_filelist_eval = load_file_list(data + "_eval")
-        ITERATIONS = hparams["iterations"]
-        # Compatibility warning: Experiment will move out of conttrib in 1.4
-        return tf.contrib.learn.Experiment(
-            estimator=tf.estimator.Estimator(model_fn=model.model_fn_squeeze, model_dir=output_dir, config=training_config, params=hparams),
-            train_input_fn=lambda: dataset_input_fn(img_filelist, roi_filelist),
-            eval_input_fn=lambda: dataset_eval_input_fn(img_filelist_eval, roi_filelist_eval),
-            train_steps=ITERATIONS,
-            eval_steps=477,
-            min_eval_frequency=100,
-            export_strategies=export_strategy
-        )
-
     parser = argparse.ArgumentParser()
     # mandatory arguments format for ML Engine:
     # gcloud ml-engine jobs submit training jobXXX --job-dir=... --ml-engine-args -- --user-args
@@ -292,8 +320,7 @@ def main(argv):
     logging.log(logging.INFO, "Other parameters:" + str(sorted(otherargs.items())))
 
     output_dir = otherargs.pop('job_dir')
-    experiment_fn = lambda output_dir: experiment_fn_with_params(output_dir, hparams, **otherargs)
-    tf.contrib.learn.learn_runner.run(experiment_fn, output_dir)
+    start_training(output_dir, hparams, **otherargs)
 
 if __name__ == '__main__':
     main(sys.argv)

@@ -54,12 +54,11 @@ def image_compose(img1, img2):
 
 def draw_color_boxes(img, boxes, r, g, b):
     pix_r, _, _ = tf.split(img, 3, axis=3)
-    black = tf.zeros(tf.shape(pix_r))
-    box_r = tf.image.draw_bounding_boxes(black, boxes) * r
-    box_g = tf.image.draw_bounding_boxes(black, boxes) * g
-    box_b = tf.image.draw_bounding_boxes(black, boxes) * b
-    box_img = tf.concat([box_r, box_g, box_b], axis=3)
-    return image_compose(img, box_img)
+    black = tf.zeros_like(pix_r)
+    white_boxes = tf.image.draw_bounding_boxes(black, boxes)
+    box_img = tf.concat([white_boxes * r, white_boxes * g, white_boxes * b], axis=3)
+    white_boxes = tf.concat([white_boxes, white_boxes, white_boxes], axis=3)
+    return tf.where(tf.greater(white_boxes, 0.0), box_img, img)
 
 # Model
 def model_fn_squeeze(features, labels, mode, params):
@@ -143,8 +142,8 @@ def model_fn_squeeze(features, labels, mode, params):
     TC = tf.nn.sigmoid(layer_conv1x1_batch_norm(TC0, depth=CELL_B))  # shape [batch, 4,4,CELL_B]
 
     # leave some breathing room to the roi sizes so that rois from adjacent cells can reach into this one
-    TX = TX
-    TY = TY
+    TX = TX * 1.3
+    TY = TY * 1.3
 
     # testing different options for W
     # Woption0
@@ -232,19 +231,19 @@ def model_fn_squeeze(features, labels, mode, params):
         for i in range(9):
             debug_rois = tf.where(tf.greater(select, 0.1*(i+1)), correct_rois, no_box)
             debug_img = draw_color_boxes(debug_img, debug_rois, 0.1*(i+2), 0.1*(i+2), 0)
-        # size only correct rois in blue
+        # size only correct rois in orange
         for i in range(9):
             debug_rois = tf.where(tf.greater(select, 0.1*(i+1)), correct_size_rois, no_box)
-            debug_img = draw_color_boxes(debug_img, debug_rois, 0, 0, 0.1*(i+2))
-        # position only correct rois in green
+            debug_img = draw_color_boxes(debug_img, debug_rois, 0.1*(i+2), 0.05*(i+2), 0)
+        # position only correct rois in purple
         for i in range(9):
             debug_rois = tf.where(tf.greater(select, 0.1*(i+1)), correct_pos_rois, no_box)
-            debug_img = draw_color_boxes(debug_img, debug_rois, 0, 0.1*(i+2), 0)
+            debug_img = draw_color_boxes(debug_img, debug_rois, 0.05*(i+2), 0, 0.1*(i+2))
         # incorrect rois in red
         for i in range(9):
             debug_rois = tf.where(tf.greater(select, 0.1*(i+1)), other_rois, no_box)
             debug_img = draw_color_boxes(debug_img, debug_rois, 0.1*(i+2), 0, 0)
-        tf.summary.image("input_image", debug_img, max_outputs=10)
+        tf.summary.image("input_image", debug_img, max_outputs=20)
 
         # model outputs
         position_loss = tf.reduce_mean(fTC_ * (tf.square(TX-TX_)+tf.square(TY-TY_)))
@@ -299,7 +298,9 @@ def model_fn_squeeze(features, labels, mode, params):
         nb_mistakes = tf.reduce_sum(mistakes)
         iou_accuracy = tf.reduce_mean(iou_accuracy)
 
-        train_op = tf.contrib.layers.optimize_loss(loss, tf.train.get_global_step(), learning_rate=params['lr0'], optimizer="Adam", learning_rate_decay_fn=learn_rate)
+        lr = learn_rate(params['lr0'], tf.train.get_or_create_global_step())
+        optimizer = tf.train.AdamOptimizer(lr)
+        train_op = tf.contrib.training.create_train_op(loss, optimizer)
         eval_metrics = {
                         "position_error": tf.metrics.mean(w_position_loss),
                         "size_error": tf.metrics.mean(w_size_loss),
@@ -315,6 +316,7 @@ def model_fn_squeeze(features, labels, mode, params):
         tf.summary.scalar("no_plane_confidence_error", w_noobj_loss)
         tf.summary.scalar("loss", loss)
         tf.summary.scalar("mistakes", nb_mistakes)
+        tf.summary.scalar("learning_rate", lr)
         #tf.summary.scalar("IOU", iou_accuracy) # This would run out of memory
 
     return tf.estimator.EstimatorSpec(

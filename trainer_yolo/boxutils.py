@@ -89,7 +89,7 @@ def center_in_grid_cell(grid, grid_n, cell_w, rois, expand=1.0):
     grid_x, grid_y = tf.unstack(grid, axis=-1)
     has_center_x = tf.logical_and(tf.greater_equal(cross_rois_cx, tf.expand_dims(grid_x-(expand-1.0)*cell_w, -1)),  # broadcast !
                                   tf.less(cross_rois_cx, tf.expand_dims(grid_x+expand*cell_w, -1)))    # broadcast ! and broadcast !
-    has_center_y = tf.logical_and(tf.greater_equal(cross_rois_cy, tf.expand_dims(grid_y-(expand-1)*cell_w, -1)),  # broadcast !
+    has_center_y = tf.logical_and(tf.greater_equal(cross_rois_cy, tf.expand_dims(grid_y-(expand-1.0)*cell_w, -1)),  # broadcast !
                                   tf.less(cross_rois_cy, tf.expand_dims(grid_y+expand*cell_w, -1)))    # broadcast ! and broadcast !
     has_center = tf.logical_and(has_center_x, has_center_y) # shape [grid_n, grid_n, rois_n]
     return has_center

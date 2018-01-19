@@ -24,7 +24,7 @@ gcloud ml-engine jobs submit training plane$N \
     --region ${REGION} \
     --module-name trainer_yolo.train \
     --package-path trainer_yolo \
-    --runtime-version 1.2 \
+    --runtime-version 1.4 \
     -- \
     --data "${DATA}" \
     --hp-iterations 50000
