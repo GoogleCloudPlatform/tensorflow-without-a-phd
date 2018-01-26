@@ -16,7 +16,6 @@ import trainer_yolo.digits as dd
 from trainer_yolo import boxutils
 from trainer_yolo.boxutils import IOUCalculator
 
-N_CLASSES = 2
 GRID_N = 16  # must be the same as in train.py
 CELL_B = 2   # must be the same as in train.py
 TILE_SIZE = 256  # must be the same as in train.py
@@ -62,6 +61,11 @@ def draw_color_boxes(img, boxes, r, g, b):
 
 # Model
 def model_fn_squeeze(features, labels, mode, params):
+
+    # YOLO parameters: each tile is divided into a grid_nn x grid_nn grid,
+    # each grid cell predicts cell_n ROIs.
+    grid_nn = params["grid_nn"]
+    cell_n = params["cell_n"]
 
     def learn_rate(lr, step):
         return params['lr1'] + tf.train.exponential_decay(lr, step, params['lr2'], 1/math.e)
@@ -113,7 +117,7 @@ def model_fn_squeeze(features, labels, mode, params):
     Y17 = layer_conv2d_batch_norm_relu(Y16, filters=16*g*f, kernel_size=1, strides=1) #squeeze
     Y17l = layer_conv2d_batch_norm_relu(Y17, filters=16*g*f, kernel_size=1, strides=1) #expand 1x1
     Y17t = layer_conv2d_batch_norm_relu(Y17, filters=16*g*f, kernel_size=3, strides=1) #expand 3x3
-    Y18 = tf.concat([Y17l, Y17t], 3)                                              # output 16x16x32
+    Y18 = tf.concat([Y17l, Y17t], 3)                                              # output 16x16x128
 
     # old bounding box head
     #T19 = layer_conv2d_batch_norm_relu(Y18, filters=CELL_B*4, kernel_size=1, strides=1) # output 16*16*12
@@ -123,27 +127,38 @@ def model_fn_squeeze(features, labels, mode, params):
     #TX, TY, TW, TC = tf.split(T20, 4, axis=3)  # shape 4 x [batch, 4,4,3] = 4 x [batch, GRID_N, GRID_N, CELL_B]
 
     # bounding box head
-    T19 = layer_conv2d_batch_norm_relu(Y18, filters=CELL_B*8*f*g, kernel_size=1, strides=1) # output 16*16*24 if CELL_B=3
-    T20=T19
+    T19 = layer_conv2d_batch_norm_relu(Y18, filters=cell_n*8*f*g, kernel_size=1, strides=1) # output 16*16*(cell_n*32)
     # not needed at GRID_N=16
+    # for GRID_N=16, need pool_size=1, strides=1
     # for GRID_N=8, need pool_size=2, strides=2
     # for GRID_N=4, need pool_size=4, strides=4
-    #T20 = tf.layers.average_pooling2d(T19, pool_size=2, strides=2, padding="valid") # 4x4x12 shape [batch, 4,4,12] = [batch, GRID_N, GRID_N, CELL_B*8]
+    pool_size = 16/grid_nn
+    T20 = tf.layers.average_pooling2d(T19, pool_size=pool_size, strides=pool_size, padding="valid") # [batch, grid_nn, grid_nn, cell_n*32]
     # for each cell, this has CELL_B predictions of bounding box (x,y,w,c)
     # apply tanh for x, y and sigmoid for w, c
-    TX0, TY0, TW0, TC0 = tf.split(T20, 4, axis=3)  # shape 4 x [batch, GRID_N, GRID_N, CELL_B*2]
+    TX0, TY0, TW0, TC0 = tf.split(T20, 4, axis=3)  # shape 4 x [batch, grid_nn, grid_nn, cell_n*8]
     # TODO: idea: batch norm may be bad on this layer
     # TODO: try with a deeper layer as well
     # TODO: try a filtered convolution instead of pooling2d, maybe info from cell sides should be weighted differently
     # TODO: try softmax for predicting confidence instead of C
-    TX = tf.nn.tanh(layer_conv1x1_batch_norm(TX0, depth=CELL_B))  # shape [batch, 4,4,CELL_B]
-    TY = tf.nn.tanh(layer_conv1x1_batch_norm(TY0, depth=CELL_B))  # shape [batch, 4,4,CELL_B]
-    TW = tf.nn.sigmoid(layer_conv1x1_batch_norm(TW0, depth=CELL_B))  # shape [batch, 4,4,CELL_B]
-    TC = tf.nn.sigmoid(layer_conv1x1_batch_norm(TC0, depth=CELL_B))  # shape [batch, 4,4,CELL_B]
+    TX = tf.nn.tanh(layer_conv1x1_batch_norm(TX0, depth=cell_n))  # shape [batch, grid_nn, grid_nn, cell_n]
+    TY = tf.nn.tanh(layer_conv1x1_batch_norm(TY0, depth=cell_n))  # shape [batch, grid_nn, grid_nn, cell_n]
+    TW = tf.nn.sigmoid(layer_conv1x1_batch_norm(TW0, depth=cell_n))  # shape [batch, grid_nn, grid_nn, cell_n]
+    #TC = tf.nn.sigmoid(layer_conv1x1_batch_norm(TC0, depth=CELL_B))  # shape [batch, GRID_N,GRID_N,CELL_B]
+    #  2 is the number of classes: planes, or no planes
+    TClogits = layer_conv1x1_batch_norm(TC0, depth=cell_n*2)   # shape [batch, grid_nn, grid_nn, cell_n*2]
+    TClogits = tf.reshape(TClogits, [-1, grid_nn, grid_nn, cell_n, 2])
+    TC = tf.nn.softmax(TClogits)                               # shape [batch, GRID_N,GRID_N,CELL_B,2]
+    TC_noplane, TC_plane = tf.unstack(TC, axis=-1)
+    TCsim = tf.cast(tf.argmax(TC, axis=-1), dtype=tf.float32)  # shape [batch, GRID_N,GRID_N,CELL_B]
 
     # leave some breathing room to the roi sizes so that rois from adjacent cells can reach into this one
-    TX = TX * 1.3
-    TY = TY * 1.3
+    # only do this at training time to account for slightly misplaced ground truth ROIs. No need at prediction time.
+    TX = TX * 1.0 * params["cell_grow"]
+    TY = TY * 1.0 * params["cell_grow"]
+    if mode == tf.estimator.ModeKeys.PREDICT:
+        TX = tf.clip_by_value(TX, -1.0, 1.0)
+        TY = tf.clip_by_value(TY, -1.0, 1.0)
 
     # testing different options for W
     # Woption0
@@ -160,16 +175,16 @@ def model_fn_squeeze(features, labels, mode, params):
     #real_TW = TW*TW
 
     DETECTION_TRESHOLD = 0.5  # plane "detected" if predicted C>0.5
-    detected_TW = tf.where(tf.greater(TC, DETECTION_TRESHOLD), real_TW, tf.zeros_like(real_TW))
+    detected_TW = tf.where(tf.greater(TCsim, DETECTION_TRESHOLD), real_TW, tf.zeros_like(real_TW))
     # all rois with confidence factors
     predicted_rois = tf.stack([TX,TY,real_TW], axis=-1)  # shape [batch, GRID_N, GRID_N, CELL_B, 3]
-    predicted_rois = boxutils.grid_cell_to_tile_coords(predicted_rois, GRID_N, TILE_SIZE)/TILE_SIZE
-    predicted_rois = tf.reshape(predicted_rois, [-1, GRID_N*GRID_N*CELL_B, 4])
-    predicted_C = tf.reshape(TC, [-1, GRID_N*GRID_N*CELL_B])
+    predicted_rois = boxutils.grid_cell_to_tile_coords(predicted_rois, grid_nn, TILE_SIZE)/TILE_SIZE
+    predicted_rois = tf.reshape(predicted_rois, [-1, grid_nn*grid_nn*cell_n, 4])
+    predicted_C = tf.reshape(TCsim, [-1, grid_nn*grid_nn*cell_n])
     # only the rois with confidence > DETECTION_TRESHOLD
     detected_rois = tf.stack([TX,TY,detected_TW], axis=-1)  # shape [batch, GRID_N, GRID_N, CELL_B, 3]
-    detected_rois = boxutils.grid_cell_to_tile_coords(detected_rois, GRID_N, TILE_SIZE)/TILE_SIZE
-    detected_rois = tf.reshape(detected_rois, [-1, GRID_N*GRID_N*CELL_B, 4])
+    detected_rois = boxutils.grid_cell_to_tile_coords(detected_rois, grid_nn, TILE_SIZE)/TILE_SIZE
+    detected_rois = tf.reshape(detected_rois, [-1, grid_nn*grid_nn*cell_n, 4])
 
     loss = train_op = eval_metrics = None
     if mode != tf.estimator.ModeKeys.PREDICT:
@@ -178,21 +193,22 @@ def model_fn_squeeze(features, labels, mode, params):
         T_ = labels["target"]  # shape [4,4,3,3] = [batch, GRID_N, GRID_N, CEL_B, xyw]
         TX_, TY_, TW_ = tf.unstack(T_, 3, axis=-1) # shape 3 x [batch, 4,4,3] = [batch, GRID_N, GRID_N, CELL_B]
         # target probability is 1 if there is a corresponding target box, 0 otherwise
-        TC_ = tf.greater(TW_, ZERO_W)
-        fTC_ = tf.cast(tf.greater(TW_, ZERO_W), tf.float32) # shape [batch, 4,4,3] = [batch, GRID_N, GRID_N, CELL_B]
-        target_rois = boxutils.grid_cell_to_tile_coords(T_, GRID_N, TILE_SIZE)/TILE_SIZE
-        target_rois = tf.reshape(target_rois, [-1, GRID_N*GRID_N*CELL_B, 4])
+        bTC_ = tf.greater(TW_, ZERO_W)
+        onehotTC_ = tf.one_hot(tf.cast(bTC_, tf.int32), 2, dtype=tf.float32)
+        fTC_ = tf.cast(bTC_, tf.float32) # shape [batch, 4,4,3] = [batch, GRID_N, GRID_N, CELL_B]
+        target_rois = boxutils.grid_cell_to_tile_coords(T_, grid_nn, TILE_SIZE)/TILE_SIZE
+        target_rois = tf.reshape(target_rois, [-1, grid_nn*grid_nn*cell_n, 4])
 
         # accuracy
         ERROR_TRESHOLD = 0.3  # plane correctly localized if predicted x,y,w within % of ground truth
-        detect_correct = tf.logical_not(tf.logical_xor(tf.greater(TC, DETECTION_TRESHOLD), TC_))
+        detect_correct = tf.logical_not(tf.logical_xor(tf.greater(TCsim, DETECTION_TRESHOLD), bTC_))
         ones = tf.ones(tf.shape(TW_))
-        nonzero_TW_ = tf.where(TC_, TW_, ones)
+        nonzero_TW_ = tf.where(bTC_, TW_, ones)
         # true if correct size where there is a plane, nonsense value where there is no plane
         size_correct = tf.less(tf.abs(real_TW - TW_) / nonzero_TW_, ERROR_TRESHOLD)
         # true if correct position where there is a plane, nonsense value where there is no plane
-        position_correct = tf.less(tf.sqrt(tf.square(TX-TX_) + tf.square(TY-TY_)) / nonzero_TW_ / GRID_N, ERROR_TRESHOLD)
-        truth_no_plane = tf.logical_not(TC_)
+        position_correct = tf.less(tf.sqrt(tf.square(TX-TX_) + tf.square(TY-TY_)) / nonzero_TW_ / grid_nn, ERROR_TRESHOLD)
+        truth_no_plane = tf.logical_not(bTC_)
         size_correct = tf.logical_or(size_correct, truth_no_plane)
         position_correct = tf.logical_or(position_correct, truth_no_plane)
         size_correct = tf.logical_and(detect_correct, size_correct)
@@ -213,9 +229,9 @@ def model_fn_squeeze(features, labels, mode, params):
         # debug: computed ROIs boxes in shades of yellow
         no_box = tf.zeros(tf.shape(predicted_rois))
         select = tf.stack([predicted_C, predicted_C, predicted_C, predicted_C], axis=-1)
-        select_correct = tf.reshape(all_correct, [-1, GRID_N*GRID_N*CELL_B])
-        select_size_correct = tf.reshape(size_correct, [-1, GRID_N*GRID_N*CELL_B])
-        select_position_correct = tf.reshape(position_correct, [-1, GRID_N*GRID_N*CELL_B])
+        select_correct = tf.reshape(all_correct, [-1, grid_nn*grid_nn*cell_n])
+        select_size_correct = tf.reshape(size_correct, [-1, grid_nn*grid_nn*cell_n])
+        select_position_correct = tf.reshape(position_correct, [-1, grid_nn*grid_nn*cell_n])
 
         select_correct = tf.stack([select_correct,select_correct,select_correct,select_correct], axis=2)
         select_size_correct = tf.stack([select_size_correct,select_size_correct,select_size_correct,select_size_correct], axis=2)
@@ -243,10 +259,13 @@ def model_fn_squeeze(features, labels, mode, params):
         for i in range(9):
             debug_rois = tf.where(tf.greater(select, 0.1*(i+1)), other_rois, no_box)
             debug_img = draw_color_boxes(debug_img, debug_rois, 0.1*(i+2), 0, 0)
+        # this is apparently not useful
+        #debug_img = tf.cast(debug_img*255, dtype=tf.uint8)
         tf.summary.image("input_image", debug_img, max_outputs=20)
 
         # model outputs
         position_loss = tf.reduce_mean(fTC_ * (tf.square(TX-TX_)+tf.square(TY-TY_)))
+        #position_loss = tf.reduce_mean(TC_plane * (tf.square(TX-TX_)+tf.square(TY-TY_)))
         # YOLO trick: take square root of predicted size for loss so as not to drown errors on small boxes
 
         # testing different options for W
@@ -255,7 +274,10 @@ def model_fn_squeeze(features, labels, mode, params):
         # Woption1
         #size_loss = tf.reduce_mean(fTC_ * tf.square(TW-tf.sqrt(TW_)) * 2)
         # Woption2
+
         size_loss = tf.reduce_mean(fTC_ * tf.square(TW-TW_) * 2)
+        #size_loss = tf.reduce_mean(TC_plane * tf.square(TW-TW_) * 2)
+
         # Woption3
         #size_loss = tf.reduce_mean(fTC_ * tf.square(tf.sqrt(TW)-TW_) * 2)
         # Woption4
@@ -263,12 +285,16 @@ def model_fn_squeeze(features, labels, mode, params):
         # Woption5
         #size_loss = tf.reduce_mean(fTC_ * tf.square(TW*TW-TW_) * 2)
 
-        obj_loss = tf.reduce_mean(fTC_ * tf.square(TC - 1))
-        noobj_loss = tf.reduce_mean((1-fTC_) * tf.square(TC - 0))
+        # detection losses with regressed TC
+        #obj_loss = tf.reduce_mean(fTC_ * tf.square(TC - 1))
+        #noobj_loss = tf.reduce_mean((1-fTC_) * tf.square(TC - 0))
+
+        # detection loss with softmax TC
+        obj_loss = tf.losses.softmax_cross_entropy(onehotTC_, TClogits)
 
         # TODO: idea, add a per-cell plane/no plane detection head. Maybe it can force better gradients (?)
         # because current split of detections "per responsible bounding box" might be hard for a neural network
-        # TODO: similar idea: if only one plane in cell, teach all CELL_B detectors to detect it
+        # TODO: similar idea: if only one plane in cell, teach all CELL_B=cell_n detectors to detect it
         # if multiple planes, then each one its own detector. This could avoid detectors on areas with planes to be trained to detect nothing.
         # TODO: try proper softmax loss for plane/no plane prediction
         # TODO: try two or more grids, shifted by 1/2 cell size: This could make it easier to have cells detect planes in their center,
@@ -282,17 +308,17 @@ def model_fn_squeeze(features, labels, mode, params):
         # TODO: one run without batch norm for comparison
 
         # YOLO trick: weights the different losses differently
-        LW0 = 10.0
         LW1 = params['lw1']
         LW2 = params['lw2']
         LW3 = params['lw3']
-        LWT = LW0+LW1+LW2+LW3
+        LWT = (LW1 + LW2 + LW3)*1.0 # 1.0 needed here to convert to float
         # TODO: hyperparam tune the hell out of these loss weights
-        w_obj_loss = obj_loss*(LW0/LWT)
-        w_position_loss = position_loss*(LW1/LWT)
-        w_size_loss = size_loss*(LW2/LWT)
-        w_noobj_loss = noobj_loss*(LW3/LWT)
-        loss = w_position_loss + w_size_loss + w_obj_loss + w_noobj_loss
+        w_obj_loss = obj_loss*(LW1/LWT)
+        w_position_loss = position_loss*(LW2/LWT)
+        w_size_loss = size_loss*(LW3/LWT)
+        #w_noobj_loss = noobj_loss*(LW3/LWT)
+        #loss = w_position_loss + w_size_loss + w_obj_loss + w_noobj_loss
+        loss = w_position_loss + w_size_loss + w_obj_loss
 
         # average number of mistakes per image
         nb_mistakes = tf.reduce_sum(mistakes)
@@ -304,16 +330,18 @@ def model_fn_squeeze(features, labels, mode, params):
         eval_metrics = {
                         "position_error": tf.metrics.mean(w_position_loss),
                         "size_error": tf.metrics.mean(w_size_loss),
-                        "plane_confidence_error": tf.metrics.mean(w_obj_loss),
-                        "no_plane_confidence_error": tf.metrics.mean(w_noobj_loss),
+                        "plane_cross_entropy_error": tf.metrics.mean(w_obj_loss),
+                        #"plane_confidence_error": tf.metrics.mean(w_obj_loss),
+                        #"no_plane_confidence_error": tf.metrics.mean(w_noobj_loss),
                         "mistakes": tf.metrics.mean(nb_mistakes),
                         'IOU': tf.metrics.mean(iou_accuracy)
                         }
         #debug
         tf.summary.scalar("position_error", w_position_loss)
         tf.summary.scalar("size_error", w_size_loss)
-        tf.summary.scalar("plane_confidence_error", w_obj_loss)
-        tf.summary.scalar("no_plane_confidence_error", w_noobj_loss)
+        tf.summary.scalar("plane_cross_entropy_error", w_obj_loss)
+        #tf.summary.scalar("plane_confidence_error", w_obj_loss)
+        #tf.summary.scalar("no_plane_confidence_error", w_noobj_loss)
         tf.summary.scalar("loss", loss)
         tf.summary.scalar("mistakes", nb_mistakes)
         tf.summary.scalar("learning_rate", lr)

@@ -1,5 +1,3 @@
-description: "autoscale minNodes 15"
-#deploymentUri: gs://ml1-demo-martin/jobs/plane222/export/Servo/1508828444/
-runtimeVersion: '1.2'
-autoScaling:
-  minNodes: 15
+description: "squeezenet arch, 16x16x2 grid, f=g=2 r_periph=1.3 r_predict=1.3, shuffle 50K, slice*5, rnd_maxdist=2*TILESZ, softmax_cross_entropy_C, predicted TC in pos ans size loss"
+deploymentUri: gs://ml1-demo-martin/jobs/plane316/export/planesnet/1516794330
+runtimeVersion: '1.4'

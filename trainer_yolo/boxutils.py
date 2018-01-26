@@ -201,10 +201,10 @@ def n_largest_rois_in_cell_relative(tile, rois, rois_n, grid_n, n, comparator="l
     return rois
 
 
-def n_experimental_roi_selection_strategy(tile, rois, rois_n, grid_n, n):
+def n_experimental_roi_selection_strategy(tile, rois, rois_n, grid_n, n, cell_grow):
     assert n == 2  # only implemented for CELL_B=2
     normal_rois = n_largest_rois_in_cell_relative(tile, rois, rois_n, grid_n, n, comparator="closest_to_center", expand=1.0)
-    periph_rois = n_largest_rois_in_cell_relative(tile, rois, rois_n, grid_n, n, comparator="closest_to_center", expand=1.3)
+    periph_rois = n_largest_rois_in_cell_relative(tile, rois, rois_n, grid_n, n, comparator="closest_to_center", expand=1.0*cell_grow)
 
     # TODO: count number of non-zero rois in both, then use decision table
     # normal_rois   periph_rois   result

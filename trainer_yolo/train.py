@@ -73,26 +73,13 @@ def tf_log(msg):
 def tf_logten(msg, ten):
     tf.py_func(tf_logten_, [tf.constant(msg), ten], [])
 
-def generate(pixels, json_bytes, eval=False):
-    # parse json
-    rois = tf.py_func(decode_json_py, [json_bytes], [tf.float32])
-    # get a number of slices from the image. This allows us to get an arbitrary number of slices
-    # from one image without loading them all in memory.
-
-    # usually generating 3 sets of tiles from each image, or only 2 if image augmentation is on half of the images
-    n = 6 if not eval else 1
-    return tf.data.Dataset.range(n).flat_map(lambda i: generate_slice(pixels, rois, eval, i))
-
-def generate_eval(pixels, json_bytes):
-    return generate(pixels, json_bytes, eval=True)
-
-
-# This should no longer be necessary when a batch version of random_hue ships in Tensorflow 1.???
+# This should no longer be necessary when a batch version of random_hue ships in Tensorflow 1.5
 # Tensorflow 1.4.1 does not yet have this. Tracking: https://github.com/tensorflow/tensorflow/issues/8926
 def batch_random_hue(images):
     return tf.map_fn(lambda img: tf.image.random_hue(img, 0.5), images)
 
-def generate_slice(pixels, rois, eval, idx):
+
+def generate_slice(pixels, rois, grid_nn, cell_n, cell_grow, rnd_hue, rnd_distmax, idx):
     # dynamic image shapes
     img_shape = tf.cast(tf.shape(pixels), tf.float32)  # known shape [height, width, 3]
     img_shape = tf.reshape(img_shape, [3])  # tensorflow needs help here
@@ -105,12 +92,10 @@ def generate_slice(pixels, rois, eval, idx):
     TILE_SIZE = 256
     TILE_INTERSECT_FRACTION = 0.75
 
-    # random displacements around each ROI
-    # most experiments done with 1.4*TILE_SIZE
-    # trying 2*TILE_SIZE
-    RANDOM_MAX_DISTANCE = 2.0*TILE_SIZE  # adjusted so that tiles with 0, 1, 2 or many planes happen with roughly equal frequency
+    # random displacements around each ROI (typically 1.4 to 3.0. Fixed at 2.0 for all evals)
+    # adjusted so that tiles with planes and no planes happen with roughly equal frequency
+    RANDOM_MAX_DISTANCE = rnd_distmax*TILE_SIZE
     N_RANDOM_POSITIONS = 20  # 20 * max nb of planes in one input image = nb of tiles generated in RAM (watch out!)
-
     # you can increase sdtev to reach more zones without airplanes
     rnd_x = tf.truncated_normal([N_RANDOM_POSITIONS], mean=0.0, stddev=RANDOM_MAX_DISTANCE/2.0)
     rnd_y = tf.truncated_normal([N_RANDOM_POSITIONS], mean=0.0, stddev=RANDOM_MAX_DISTANCE/2.0)
@@ -163,21 +148,14 @@ def generate_slice(pixels, rois, eval, idx):
     # "cell": tiles are evenly divided into 4 x 4 = 16 cells
     # "roi": a plane bounding box (gorund thruth)
 
-    # Tile divided in GRID_N x GRID_N grid
-    GRID_N = 16
-    # Recognizing CELL_B boxes per grid cell
-    CELL_B = 2
-
+    # Tile divided in grid_nn x grid_nn grid
+    # Recognizing CELL_B=cell_n boxes per grid cell
     # For each tile, for each grid cell, determine the CELL_B largest ROIs centered in that cell
     # Output shape [tiles_n, GRID_N, GRID_N, CELL_B, 3]
     targets = tf.map_fn(lambda tile:
-                        boxutils.n_experimental_roi_selection_strategy(tile, rois, rois_n, GRID_N, CELL_B),
-                        #boxutils.n_largest_rois_in_cell_relative(tile, rois, rois_n, GRID_N, CELL_B),
+                        boxutils.n_experimental_roi_selection_strategy(tile, rois, rois_n, grid_nn, cell_n, cell_grow),
+                        #boxutils.n_largest_rois_in_cell_relative(tile, rois, rois_n, grid_nn, cell_n),
                         tiles)
-
-    #### experimental
-
-    #### experimental
 
     # resize rois to units used by crop_and_resize
     tile_x1, tile_y1, tile_x2, tile_y2 = tf.unstack(tiles, axis=1)
@@ -194,10 +172,9 @@ def generate_slice(pixels, rois, eval, idx):
     # crop_and_resize does not output a defined pixel depth but the convolutional layers need it
     images = tf.reshape(images, [-1, TILE_SIZE, TILE_SIZE, 3])
     images = tf.cast(images, tf.uint8)
-    targets = tf.reshape(targets, [-1, GRID_N, GRID_N, CELL_B, 3])
+    targets = tf.reshape(targets, [-1, grid_nn, grid_nn, cell_n, 3])
 
-    if not eval:
-        # random hue shift for all training images
+    if rnd_hue:  # random hue shift for all training images
         images = batch_random_hue(images)
 
     return tf.data.Dataset.from_tensor_slices((images, plane_counts, targets))
@@ -211,6 +188,7 @@ def load_files(img_filename, roi_filename):
     json_bytes = tf.read_file(roi_filename)
     return pixels, json_bytes
 
+
 def features_and_labels(dataset):
     it = dataset.make_one_shot_iterator()
     tiles, counts, targets = it.get_next()
@@ -218,32 +196,52 @@ def features_and_labels(dataset):
     labels = {'count': counts, 'target': targets}
     return features, labels
 
-def dataset_input_fn(img_filelist, roi_filelist):
-    dataset = tf.data.Dataset.from_tensor_slices((tf.constant(img_filelist), tf.constant(roi_filelist)))
-    dataset = dataset.map(load_files)
-    dataset = dataset.flat_map(generate)
+
+def generate(pixels, json_bytes, repeat_slice, grid_nn, cell_n, cell_grow, rnd_hue, rnd_distmax):
+    # parse json
+    rois = tf.py_func(decode_json_py, [json_bytes], [tf.float32])
+    # generate_slice generates random image tiles in memory from a large aerial shot
+    # we call it multiple tiles to get more random tiles from the same image, without exceeding available memory.
+    return tf.data.Dataset.range(repeat_slice).flat_map(lambda i: generate_slice(pixels, rois, grid_nn, cell_n, cell_grow, rnd_hue, rnd_distmax, i))
+
+
+def dataset_input_fn(img_filelist, roi_filelist, grid_nn, cell_n, cell_grow, shuffle_buf, rnd_hue, rnd_distmax):
+    fileset = tf.data.Dataset.from_tensor_slices((tf.constant(img_filelist), tf.constant(roi_filelist)))
+    #fileset.repeat(6)
+    dataset = fileset.map(load_files)
+    dataset = dataset.flat_map(lambda pix,json: generate(pix, json,
+                                                         repeat_slice=5,
+                                                         grid_nn=grid_nn,
+                                                         cell_n=cell_n,
+                                                         cell_grow=cell_grow,
+                                                         rnd_hue=rnd_hue,
+                                                         rnd_distmax=rnd_distmax))
 
     dataset = dataset.cache(tempfile.mkdtemp(prefix="datacache") + "/datacache")
     dataset = dataset.repeat()  # indefinitely
-    dataset = dataset.shuffle(20000)
+    dataset = dataset.shuffle(shuffle_buf)
     dataset = dataset.prefetch(50)
     dataset = dataset.batch(50)
     return features_and_labels(dataset)
 
-def dataset_eval_input_fn(img_filelist, roi_filelist):
+
+def dataset_eval_input_fn(img_filelist, roi_filelist, grid_nn, cell_n):
     dataset = tf.data.Dataset.from_tensor_slices((tf.constant(img_filelist), tf.constant(roi_filelist)))
     dataset = dataset.map(load_files)
-    dataset = dataset.flat_map(generate_eval)
+    dataset = dataset.flat_map(lambda pix,json: generate(pix, json,
+                                                         repeat_slice=1,
+                                                         grid_nn=grid_nn,
+                                                         cell_n=cell_n,
+                                                         cell_grow=1.0,
+                                                         rnd_hue=False,
+                                                         rnd_distmax=2.0))
+
     dataset = dataset.cache(tempfile.mkdtemp(prefix="evaldatacache") + "/evaldatacache")
     dataset = dataset.batch(8)  # eval dataset is 3820 tiles (477 batches of 8).
                                 # A larger batch size runs out of memory because
                                 # intersect over union metric is very expensive.
     return features_and_labels(dataset)
 
-# file list -> dataset
-# dataset.map load files -> dataset of files
-# dataset.flat_map generate(image)
-# in generate: dataset range(10).map(generate_one_slice(image))
 
 # input function for base64 encoded JPEG in JSON, with automatic scanning
 # Called when the model is deployed for online predictions on Cloud ML Engine.
@@ -274,14 +272,22 @@ def start_training(output_dir, hparams, data, **kwargs):
                                                 serving_input_receiver_fn=serving_input_fn,
                                                 exports_to_keep=1)
 
-    train_spec = tf.estimator.TrainSpec(input_fn= lambda: dataset_input_fn(img_filelist, roi_filelist),
-                                        max_steps= hparams["iterations"])
+    train_spec = tf.estimator.TrainSpec(input_fn=lambda:dataset_input_fn(img_filelist, roi_filelist,
+                                                                         hparams["grid_nn"],
+                                                                         hparams["cell_n"],
+                                                                         hparams["cell_grow"],
+                                                                         hparams["shuffle_buf"],
+                                                                         hparams["rnd_hue"],
+                                                                         hparams["rnd_distmax"]),
+                                        max_steps=hparams["iterations"])
 
-    eval_spec = tf.estimator.EvalSpec(input_fn=lambda: dataset_eval_input_fn(img_filelist_eval, roi_filelist_eval),
+    eval_spec = tf.estimator.EvalSpec(input_fn=lambda: dataset_eval_input_fn(img_filelist_eval, roi_filelist_eval,
+                                                                             hparams["grid_nn"],
+                                                                             hparams["cell_n"]),
                                       steps=477,
                                       exporters=export_latest,
-                                      start_delay_secs=15*60,  # no eval in first 15 min
-                                      throttle_secs = 30*60)  # eval every hour
+                                      start_delay_secs=30,  # ??
+                                      throttle_secs=10*60)  # eval every 10 min in non distributed mode, 5 min in distributed
 
     training_config = tf.estimator.RunConfig(model_dir=output_dir,
                                              save_summary_steps=100,
@@ -307,9 +313,15 @@ def main(argv):
     parser.add_argument('--hp-lr1', default=0.0001, type=float, help='Hyperparameter: target (min) learning rate')
     parser.add_argument('--hp-lr2', default=3000, type=float, help='Hyperparameter: learning rate decay speed in steps. Learning rate decays by exp(-1) every N steps.')
     parser.add_argument('--hp-bnexp', default=0.993, type=float, help='Hyperparameter: exponential decay for batch norm moving averages.')
-    parser.add_argument('--hp-lw1', default=10, type=float, help='Hyperparameter: loss weight LW1')
-    parser.add_argument('--hp-lw2', default=10, type=float, help='Hyperparameter: loss weight LW2')
-    parser.add_argument('--hp-lw3', default=10, type=float, help='Hyperparameter: loss weight LW3')
+    parser.add_argument('--hp-lw1', default=1, type=float, help='Hyperparameter: loss weight LW1')
+    parser.add_argument('--hp-lw2', default=1, type=float, help='Hyperparameter: loss weight LW2')
+    parser.add_argument('--hp-lw3', default=1, type=float, help='Hyperparameter: loss weight LW3')
+    parser.add_argument('--hp-grid-nn', default=16, type=int, help='Hyperparameter: size of YOLO grid: grid-nn x grid-nn')
+    parser.add_argument('--hp-cell-n', default=2, type=int, help='Hyperparameter: number of ROIs detected per YOLO grid cell')
+    parser.add_argument('--hp-cell-grow', default=1.3, type=float, help='Hyperparameter: ROIs allowed to be cetered beyond grid cell by this factor')
+    parser.add_argument('--hp-shuffle-buf', default=50000, type=int, help='Hyperparameter: data shuffle buffer size')
+    parser.add_argument('--hp-rnd-hue', default=True, type=bool, help='Hyperparameter: data augmentation with random hue on training images')
+    parser.add_argument('--hp-rnd-distmax', default=2.0, type=float, help='Hyperparameter: training tiles selection max random distance from ground truth ROI (always 2.0 for eval tiles)')
     args = parser.parse_args()
     arguments = args.__dict__
 

@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+#CONFIG="config-distributed.yaml"
+#CONFIG="config-master-worker.yaml"
 CONFIG="config.yaml"
 #CONFIG="config-hptune-yolo1.yaml"
 BUCKET="gs://ml1-demo-martin"
@@ -27,4 +29,9 @@ gcloud ml-engine jobs submit training plane$N \
     --runtime-version 1.4 \
     -- \
     --data "${DATA}" \
-    --hp-iterations 50000
+    --hp-iterations 50000 \
+    --hp-lw1 1 \
+    --hp-lw2 1 \
+    --hp-lw3 1 \
+    --hp-rnd-distmax 2.0 \
+    --hp-cell-grow 1.3
