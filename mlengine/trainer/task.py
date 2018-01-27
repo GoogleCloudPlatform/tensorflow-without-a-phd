@@ -10,7 +10,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import numpy as np
 import tensorflow as tf
 from tensorflow.python.platform import tf_logging as logging
 from tensorflow.examples.tutorials.mnist import input_data as mnist_data
@@ -48,26 +47,42 @@ def eval_data_input_fn(mnist):
     return features, labels
 
 
+# Learning rate with exponential decay and min value
+def learn_rate(params, step):
+    return params['lr1'] + tf.train.exponential_decay(params['lr0'], step, params['lr2'], 1/math.e)
+
+
 # Model loss (not needed in INFER mode)
 def conv_model_loss(Ylogits, Y_, mode):
-    return tf.reduce_mean(tf.losses.softmax_cross_entropy(tf.one_hot(Y_,10), Ylogits)) * 100 \
-        if mode == tf.estimator.ModeKeys.TRAIN or mode == tf.estimator.ModeKeys.EVAL else None
+    if mode == tf.estimator.ModeKeys.TRAIN or mode == tf.estimator.ModeKeys.EVAL:
+        loss = tf.reduce_mean(tf.losses.softmax_cross_entropy(tf.one_hot(Y_,10), Ylogits)) * 100
+        # Tensorboard training curves
+        tf.summary.scalar("loss", loss)
+        return loss
+    else:
+        return None
 
 
 # Model optimiser (only needed in TRAIN mode)
 def conv_model_train_op(loss, mode, params):
-    # Compatibility warning: optimize_loss is still in contrib. This will change in Tensorflow 1.4
-    return tf.contrib.layers.optimize_loss(loss, tf.train.get_global_step(), learning_rate=params['lr0'], optimizer="Adam",
-        # to remove learning rate decay, comment the next line
-        learning_rate_decay_fn=lambda lr, step: params['lr1'] + tf.train.exponential_decay(lr, step, -params['lr2'], math.e)
-        ) if mode == tf.estimator.ModeKeys.TRAIN else None
+    if mode == tf.estimator.ModeKeys.TRAIN:
+        lr = learn_rate(params, tf.train.get_or_create_global_step())
+        tf.summary.scalar("learn_rate", lr)
+        optimizer = tf.train.AdamOptimizer(lr)
+        return tf.contrib.training.create_train_op(loss, optimizer)
+    else:
+        return None
 
 
 # Model evaluation metric (not needed in INFER mode)
 def conv_model_eval_metrics(classes, Y_, mode):
-    # You can name the fields of your metrics dictionary as you like.
-    return {'accuracy': tf.metrics.accuracy(classes, Y_)} \
-        if mode == tf.estimator.ModeKeys.TRAIN or mode == tf.estimator.ModeKeys.EVAL else None
+    if mode == tf.estimator.ModeKeys.TRAIN or mode == tf.estimator.ModeKeys.EVAL:
+        accuracy = tf.metrics.accuracy(classes, Y_)
+        tf.summary.scalar("accuracy", tf.reduce_mean(accuracy))
+        # You can name the fields of your metrics dictionary as you like.
+        return {'accuracy': accuracy}
+    else:
+        return None
 
 
 # Model
@@ -116,31 +131,6 @@ def conv_model(features, labels, mode, params):
         export_outputs={'classes': tf.estimator.export.PredictOutput({"predictions": predict, "classes": classes})}
     )
 
-# Compatibility warning: this will move to tf.estimator.run_config.RunConfing in TF 1.4
-training_config = tf.contrib.learn.RunConfig(save_checkpoints_secs=None, save_checkpoints_steps=1000)
-
-# This will export a model at every checkpoint, including the transformations needed for online predictions.
-# Bug: exports_to_keep=None is mandatory otherwise training crashes.
-# Compatibility warning: make_export_strategy is currently in contrib. It will move in TF 1.4
-export_strategy = tf.contrib.learn.utils.saved_model_export_utils.make_export_strategy(serving_input_fn=serving_input_fn)
-
-
-# The Experiment is an Estimator with data loading functions and other parameters
-def experiment_fn_with_params(output_dir, hparams, data_dir, **kwargs):
-    ITERATIONS = hparams["iterations"]
-    mnist = mnist_data.read_data_sets(data_dir, reshape=True, one_hot=False, validation_size=0) # loads training and eval data in memory
-    # Compatibility warning: Experiment will move out of contrib in 1.4
-    return tf.contrib.learn.Experiment(
-    estimator=tf.estimator.Estimator(model_fn=conv_model, model_dir=output_dir, config=training_config, params=hparams),
-    train_input_fn=lambda: train_data_input_fn(mnist),
-    eval_input_fn=lambda: eval_data_input_fn(mnist),
-    train_steps=ITERATIONS,
-    eval_steps=1,
-    min_eval_frequency=100,
-    export_strategies=export_strategy
-)
-
-
 def main(argv):
     parser = argparse.ArgumentParser()
     # You must accept a --job-dir argument when running on Cloud ML Engine. It specifies where checkpoints
@@ -169,14 +159,17 @@ def main(argv):
 
     logging.log(logging.INFO, "Hyperparameters:" + str(sorted(hparams.items())))
 
-    output_dir = otherargs.pop('job_dir')
+    data_dir = otherargs['data_dir']
+    job_dir = otherargs.pop('job_dir')
 
-    # learn_runner needs an experiment function with a single parameter: the output directory.
-    # Here we pass additional command line arguments through a closure.
-    experiment_fn = lambda output_dir: experiment_fn_with_params(output_dir, hparams, **otherargs)
-    # Compatibility warning: learn_runner is currently in contrib. It will move in TF 1.2
-    tf.contrib.learn.learn_runner.run(experiment_fn, output_dir)
+    mnist = mnist_data.read_data_sets(data_dir, reshape=True, one_hot=False, validation_size=0) # loads training and eval data in memory
 
+    training_config = tf.estimator.RunConfig(model_dir=job_dir, save_summary_steps=100, save_checkpoints_steps=1000)
+    estimator = tf.estimator.Estimator(model_fn=conv_model, model_dir=job_dir, params=hparams, config=training_config)
+    train_spec = tf.estimator.TrainSpec(input_fn=lambda: train_data_input_fn(mnist), max_steps=hparams['iterations'])
+    export_latest = tf.estimator.LatestExporter("mnist-model",serving_input_receiver_fn=serving_input_fn)
+    eval_spec = tf.estimator.EvalSpec(input_fn=lambda: eval_data_input_fn(mnist), steps=1, throttle_secs=0, exporters=export_latest)
+    tf.estimator.train_and_evaluate(estimator, train_spec, eval_spec)
 
 if __name__ == '__main__':
     main(sys.argv)

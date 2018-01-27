@@ -11,8 +11,8 @@
 # limitations under the License.
 
 trainingInput:
-  #scaleTier: BASIC
   scaleTier: BASIC_GPU
+  #scaleTier: BASIC_GPU
   #scaleTier: STANDARD_1
   #scaleTier: PREMIUM_1
 
