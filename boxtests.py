@@ -42,59 +42,104 @@ class BoxRoiUtilsTest(unittest.TestCase):
              [[[[0],[0],[0]],[[0.1],[0.1],[0.1]]],[[[0],[0],[0]],[[0],[0],[0]]],[[[0.1],[-0.1],[0.1]],[[-0.1],[0],[0.1]]]]]  # batch 2
         ], dtype=tf.float32)
 
-    # def test_ioumap_addrect(self):
-    #     m = IOUMap(5)
-    #     m.add_rect(-2,-1,3,2)
-    #     m.add_rect(3,-1,3,2)
-    #     m.add_rect(-1,3,3,2)
-    #     m.add_rect(4,3,3,4)
-    #     m.add_rect(2,1,1,2)
-    #     r = tf.cast(m.get_bitmap(), tf.uint8)
-    #     correct = np.array([[1,0,0,1,1],
-    #                         [0,0,1,0,0],
-    #                         [0,0,1,0,0],
-    #                         [1,1,0,0,1],
-    #                         [1,1,0,0,1]])
-    #     with tf.Session() as sess:
-    #         res = sess.run(r)
-    #         #print(res)
-    #     d = np.linalg.norm(np.reshape(res, [-1])-np.reshape(correct, [-1]))
-    #     self.assertTrue(d<1e-6, "IOUMap.add_rect test failed")
+
+    def test_remove_non_intersecting_rois(self):
+        tiles = tf.constant([[0.0, 0.0, 3.0, 3.0],  # tile0
+                 [1, -1, 3, 1],         # tile1
+                 [4, 3, 7, 8]])          # tile2
+        rois = tf.constant([[0.0, 0.0, 1.0, 1.0],   # intersects tile0
+                [-1, -1, 5, 5],         # intersects tile0, tile1, tile2
+                [-1, -5, 0, 0],         # intersect nothing
+                [2, 2, 5, 8]])           # intersects tile0, tile2
+        correct = np.array([[[0.0, 0.0, 1.0, 1.0], [-1, -1, 5, 5], [2, 2, 5, 8]],  # tile0 rois
+                   [[-1, -1, 5, 5], [0, 0, 0, 0], [0, 0, 0, 0]],           # tile1 rois
+                   [[-1, -1, 5, 5], [2, 2, 5, 8], [0, 0, 0, 0]]])          # tile2 rois
+        filtered_rois = remove_non_intersecting_rois(tiles, rois, max_per_tile=3)
+        with tf.Session() as sess:
+            res1, overflow = sess.run(filtered_rois)
+            #print(overflow)
+        d = np.linalg.norm(res1-correct)
+        ovf = np.sum(overflow)
+        self.assertTrue(d<1e-6, "remove_non_intersecting_rois test failed")
+        self.assertTrue(ovf==0, "remove_non_intersecting_rois overflow test failed")
+
+
+    def test_rois_in_tile_relative(self):
+        tiles = tf.constant([[0.0, 0.0, 3.0, 3.0],  # tile0
+                             [1, -1, 4, 2],         # tile1
+                             [4, 3, 7, 6]])         # tile2
+        rois = tf.constant([[0.0, 0.0, 1.0, 1.0],   # intersects tile0
+                            [-1, -1, 5, 5],         # intersects tile0, tile1, tile2
+                            [-1, -5, 0, 0],         # intersect nothing
+                            [2, 2, 5, 8],           # intersects tile0, tile2
+                            [5, 5, 6, 6]])          # intersects tile2
+        correct = np.array([[[0.0, 0.0, 1.0, 1.0], [-1, -1, 5, 5], [2, 2, 5, 8]],  # tile0 rois
+                            [[-2, 0, 4, 6], [0, 0, 0, 0], [0, 0, 0, 0]],           # tile1 rois
+                            [[-5, -4, 1, 2], [-2, -1, 1, 5], [1, 2, 2, 3]]])   / 3.0       # tile2 rois
+        correct2 = np.array([[[0.0, 0.0, 1.0, 1.0], [-1, -1, 5, 5]],  # tile0 rois
+                            [[-2, 0, 4, 6], [0, 0, 0, 0]],           # tile1 rois
+                            [[-5, -4, 1, 2], [-2, -1, 1, 5]]])   / 3.0       # tile2 rois
+        filtered_rois = rois_in_tile_relative(tiles, rois, tile_size=3.0, max_per_tile=3)
+        filtered_rois2 = rois_in_tile_relative(tiles, rois, tile_size=3.0, max_per_tile=2, assert_on_overflow=False)  # this overflows max_per_tile
+        with tf.Session() as sess:
+            res1 = sess.run(filtered_rois)
+            res2 = sess.run(filtered_rois2)
+            #print(res1)
+            #print(correct)
+        d = np.linalg.norm(res1-correct) + np.linalg.norm(res2-correct2)
+        self.assertTrue(d<1e-6, "rois_in_tile_relative test failed")
 
     def test_batch_iou(self):
         rois1 = tf.constant([[1, 1, 4, 3],
                              [2, 3, 7, 5],
                              [3, 4, 4, 5]], dtype=tf.float32)
+        rois1b = tf.constant([[1, 1, 4, 3],
+                             [2, 3, 7, 5]], dtype=tf.float32)
         rois2 = tf.constant([[1, 1, 4, 3],
                              [2, 3, 7, 5],
                              [3, 4, 4, 5]], dtype=tf.float32)
+        rois2b = tf.constant([[1, 1, 4, 3],
+                             [2, 3, 7, 5]], dtype=tf.float32)
         rois3 = tf.constant([[1, 1, 3, 3],
                              [2, 3, 7, 5],
                              [3, 4, 4, 5]], dtype=tf.float32)
+        rois3b = tf.constant([[1, 1, 3, 3],
+                             [2, 3, 7, 5]], dtype=tf.float32)
         norois1 = tf.constant([[1, 1, 1, 3],
                              [2, 3, 7, 3],
                              [3, 4, 4, 4]], dtype=tf.float32)
+        norois1b = tf.constant([[1, 1, 1, 3],
+                               [2, 3, 7, 3]], dtype=tf.float32)
         norois2 = tf.constant([[10, 10, 12, 12],
                                [2, 3, 2, 3],
                                [-3, -4, -2, -3]], dtype=tf.float32)
+        norois2b = tf.constant([[10, 10, 12, 12],
+                               [2, 3, 2, 3]], dtype=tf.float32)
         partrois = tf.constant([[1, 1, 3, 3],
                                [2, 3, 2, 3],
                                [-3, -4, -2, -3]], dtype=tf.float32)
+        partroisb = tf.constant([[1, 1, 3, 3],
+                                [2, 3, 2, 3]], dtype=tf.float32)
         batch_roisA = tf.stack([rois1, rois3, rois1, norois1, rois3], axis=0)
         batch_roisB = tf.stack([rois2, rois2, norois1, norois2, partrois], axis=0)
-        iou2 = IOUCalculator.batch_intersection_over_union(batch_roisA, batch_roisB, SIZE=5)
-        correct = np.array([1.0, 10.0/12.0, 0.0, 1.0, 4.0/10.0])
+        batch_roisBb = tf.stack([rois2b, rois2b, norois1b, norois2b, partroisb], axis=0)
+        iou1 = IOUCalculator.batch_intersection_over_union(batch_roisA, batch_roisB, SIZE=5)
+        iou2 = IOUCalculator.batch_intersection_over_union(batch_roisA, batch_roisBb, SIZE=5)
+        correct1 = np.array([1.0, 10.0/12.0, 0.0, 1.0, 4.0/10.0])
+        correct2 = np.array([1.0, 10.0/12.0, 0.0, 1.0, 4.0/10.0])
         with tf.Session() as sess:
-            res1 = sess.run(iou2)
-            #print(res1)
-        d = np.linalg.norm(res1-correct)
-        self.assertTrue(d<1e-6, "IOUmap.batch_iou test failed")
+            res1 = sess.run(iou1)
+            res2 = sess.run(iou2)
+            #print(res2)
+        d1 = np.linalg.norm(res1-correct1)
+        d2 = np.linalg.norm(res2-correct2)
+        self.assertTrue((d1+d2)<1e-6, "IOUmap.batch_iou test failed")
 
 
     def test_grid_cell_to_tile_coords(self):
-        rel_rois = tf.reshape(self.relative_rois, [2, 3, 3, 2, 3]) # mistake in entering test data, adde last dim 1, now removing it
+        rel_rois = tf.reshape(self.relative_rois, [2, 3, 3, 2, 3]) # mistake in entering test data, added last dim 1, now removing it
         new_coords = grid_cell_to_tile_coords(rel_rois, grid_n=3, tile_size=6)
-        correct = np.array([[[[[0.7, 0.7, 1.3, 1.3], [-1., -1., 5., 5.]],
+        correct = tf.constant([[[[[0.7, 0.7, 1.3, 1.3], [-1., -1., 5., 5.]],
                               [[-1.5, 0.5, 1.5, 3.5], [0.7, 2.7, 1.3, 3.3]],
                               [[0.8, 4.8, 1.4, 5.4], [1., 5., 1., 5.]]],
                              [[[2.8, 0.6, 3.4, 1.2], [2.6, 0.8, 3.2, 1.4]],
@@ -112,10 +157,13 @@ class BoxRoiUtilsTest(unittest.TestCase):
                              [[[5., 1., 5., 1.], [4.8, 0.8, 5.4, 1.4]],
                               [[5., 3., 5., 3.], [5., 3., 5., 3.]],
                               [[4.6, 4.8, 5.2, 5.4], [4.7, 4.6, 5.3, 5.2]]]]])
+        correct = swap_xy(correct)  # the API for grid_cell_to_tile_coords has changed, now producing coordinates in the x1y1x2y2 format. Previously, it was y1x1y2x2.
         with tf.Session() as sess:
-            res = sess.run(new_coords)
-        d = np.linalg.norm(np.reshape(res, [-1])-np.reshape(correct, [-1]))
-        self.assertTrue(d<1e-6, "grid_cell_to_tile_coords test failed")
+            res, cor = sess.run([new_coords, correct])
+            #print(res)
+            #print(cor)
+        d = np.linalg.norm(np.reshape(res, [-1])-np.reshape(cor, [-1]))
+        self.assertTrue(d<1e-5, "grid_cell_to_tile_coords test failed")
 
     def test_make_rois_tile_cell_relative(self):
         rois_n = tf.shape(self.rois)[0]
@@ -196,7 +244,7 @@ class BoxRoiUtilsTest(unittest.TestCase):
     def test_center_in_grid_cell(self):
         grid = gen_grid(grid_n=4)
         grid = size_and_move_grid(grid, cell_w=1, origin=self.tile0[0:2])
-        res = center_in_grid_cell(grid, grid_n=4, cell_w=1, rois=cxyw_rois(self.rois))
+        res = center_in_grid_cell(grid, grid_n=4, cell_w=1, rois=x1y1x2y2_to_cxcyw(self.rois))
         with tf.Session() as sess:
             res, grid = sess.run([res, grid])
             grid2 = np.array([[[3.0, 2.0], [4.0, 2.0], [5.0, 2.0], [6.0, 2.0]],

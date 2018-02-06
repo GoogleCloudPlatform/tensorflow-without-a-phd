@@ -99,11 +99,56 @@ function centerMap(lat, lng) {
     googlemap.setCenter({lat:lat, lng:lng})
 }
 
+function onScroll() {
+    clearTimeout(scrollTimer)
+    scrollTimer = setTimeout(onScrollDone, 500)
+}
+
+function onScrollDone() {
+    grabPixels()
+}
+
+function centerImage(filename) {
+    var img = new Image();
+    img.src = filename;
+    var imgnod  = document.getElementById('imgmap');
+    imgnod.innerHTML = "";
+    imgnod.appendChild(img);
+    imgnod.addEventListener("scroll", onScroll)
+    function onLoaded() {
+        if (img.complete)
+            grabPixels()
+        else
+            setTimeout(onLoaded, 500)
+    }
+    setTimeout(onLoaded, 500)
+}
+
+function switchToMap() {
+    document.getElementById('map').style.display = "block"
+    document.getElementById('imgmap') .style.display = "none"
+}
+
+function switchToImage() {
+    document.getElementById('map').style.display = "none"
+    document.getElementById('imgmap') .style.display = "block"
+}
+
 function centerMapOnCode(airportCode) {
-    coords = airports[airportCode]
-    if (coords === undefined)
-        coords = airports.TLS
-    centerMap(coords[0], coords[1])
+    if (airportCode.startsWith("train_") || airportCode.startsWith("test_")) {
+        filename = sampleImages[airportCode]
+        if (filename === undefined)
+            filename = sampleImages.ATL
+        centerImage(filename)
+        switchToImage()
+    }
+    else {
+        coords = airports[airportCode]
+        if (coords === undefined)
+            coords = airports.TLS
+        switchToMap()
+        centerMap(coords[0], coords[1])
+    }
 }
 
 

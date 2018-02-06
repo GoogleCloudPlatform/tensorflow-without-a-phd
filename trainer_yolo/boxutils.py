@@ -12,6 +12,26 @@
 
 from builtins import zip
 import tensorflow as tf
+from tensorflow.python.platform import tf_logging as logging
+
+
+def __tf_log(msg):
+    logging.info(msg.decode("utf-8"))
+
+
+def __tf_logten(msg, ten):
+    logging.info(msg.decode("utf-8") + str(ten))
+
+
+# log a string message from tensorflow code
+def tf_log(msg):
+    tf.py_func(__tf_log, [tf.constant(msg)], [])
+
+
+# long a message with a tensor value from tnesorflow code
+def tf_logten(msg, ten):
+    tf.py_func(__tf_logten, [tf.constant(msg), ten], [])
+
 
 def one_d_intersect(px1, px2, qx1, qx2):
     # this assumes px2>=px1 and qx2>=qx1
@@ -66,13 +86,20 @@ def gen_grid(grid_n):
 def size_and_move_grid(grid, cell_w, origin):
     return grid * cell_w + origin
 
-def cxyw_rois(rois):
+def x1y1x2y2_to_cxcyw(rois):
     rois_x1, rois_y1, rois_x2, rois_y2 = tf.unstack(rois, axis=1)  # rois shape [n, 4]
     # center coordinates of the roi
     rois_x = (rois_x1 + rois_x2) / 2.0
     rois_y = (rois_y1 + rois_y2) / 2.0
     rois_w = (rois_x2 - rois_x1)
     rois = tf.stack([rois_x, rois_y, rois_w], axis=1) # rois shape [rois_n, 3]
+    return rois
+
+def xyw_to_x1y1x2y2(rois):
+    rois_x1, rois_y1, rois_w = tf.unstack(rois, axis=1)  # rois shape [n, 3]
+    rois_x2 = rois_x1 + rois_w
+    rois_y2 = rois_y1 + rois_w
+    rois = tf.stack([rois_x1, rois_y1, rois_x2, rois_y2], axis=1) # rois shape [n, 3]
     return rois
 
 def reshape_rois(rois, grid_n):
@@ -126,7 +153,7 @@ def n_largest_rois_in_cell(tile, rois, rois_n, grid_n, n, comparator="largest_w"
     # grid shape [grid_n, grid_n, 2]
     # rois shape [rois_n, 3]
 
-    rois = cxyw_rois(rois)
+    rois = x1y1x2y2_to_cxcyw(rois)
     cross_rois = reshape_rois(rois, grid_n)  # shape [grid_n, grid_n, rois_n, 3]]
     cross_rois_cx, cross_rois_cy, cross_rois_w = tf.unstack(cross_rois, axis=-1) # shape [grid_n, grid_n, rois_n]]
     has_center = center_in_grid_cell(grid, grid_n, cell_w, rois, expand=expand)
@@ -172,7 +199,7 @@ def make_rois_tile_cell_relative(tile, tiled_rois, grid_n):
     grid, cell_w = gen_grid_for_tile(tile, grid_n)
     tile_w = cell_w * grid_n
 
-    # tiled_rois shape [grid_n, grid_n, n, 3] n = CELL_B
+    # tiled_rois shape [grid_n, grid_n, cell_n, 3]
 
     # compute grid cell centers
     grid_centers = (grid + grid + cell_w) / 2.0  # shape [grid_n, grid_n, 2]
@@ -181,7 +208,7 @@ def make_rois_tile_cell_relative(tile, tiled_rois, grid_n):
     # force broadcasting on correct axis
     gc_x = tf.expand_dims(gc_x, axis=-1)
     gc_y = tf.expand_dims(gc_y, axis=-1)
-    tr_x, tr_y, tr_w = tf.unstack(tiled_rois, axis=-1) # shape [grid_n, grid_n, n] n = CELL_B
+    tr_x, tr_y, tr_w = tf.unstack(tiled_rois, axis=-1) # shape [grid_n, grid_n, cell_n]
 
     ctr_x = (tr_x - gc_x) / (cell_w/2.0)  # constrain x within [-1, 1] in cell center relative coordinates
     ctr_y = (tr_y - gc_y) / (cell_w/2.0)  # constrain y within [-1, 1] in cell center relative coordinates
@@ -264,6 +291,10 @@ def n_experimental_roi_selection_strategy(tile, rois, rois_n, grid_n, n, cell_gr
     combined_rois = tf.reshape(rscombined_rois, [grid_n, grid_n, n, 3])
     return combined_rois
 
+# input coordinates x1, y1, x2, y2
+def swap_xy(rois):
+    x1, y1, x2, y2 = tf.unstack(rois, axis=-1)
+    return tf.stack([y1, x1, y2, x2], axis=-1)
 
 def grid_cell_to_tile_coords(rois, grid_n, tile_size):
     # converts between coordinates used internally by the model
@@ -300,8 +331,95 @@ def grid_cell_to_tile_coords(rois, grid_n, tile_size):
     roi_x2 = roi_cx + roi_w/2
     roi_y1 = roi_cy - roi_w/2
     roi_y2 = roi_cy + roi_w/2
-    rois = tf.stack([roi_y1, roi_x1, roi_y2, roi_x2], axis=4)  # shape [batch, grid_n, grid_n, n, 4]
+    rois = tf.stack([roi_x1, roi_y1, roi_x2, roi_y2], axis=4)  # shape [batch, grid_n, grid_n, n, 4]
     return rois
+
+# rois shape [n_rois, 4] coordinates (x1, y1, x2, y2) in aerial image coordinates
+def find_empty_rois(rois):
+    roi_x1, roi_y1, roi_x2, roi_y2 = tf.unstack(rois, axis=-1)
+    empty = tf.logical_or(tf.equal(roi_x1, roi_x2), tf.equal(roi_y1, roi_y2))
+    return empty
+
+
+# Selects items from rois acccording to boolean mask. Pads the result to max_n items.
+# rois: shape [n, 4]
+# mask: shape [n]
+# output: shape [max_n, 4]
+def filter_by_bool(rois, mask, max_n):
+    rois = tf.boolean_mask(rois, mask)
+    n = tf.shape(rois)[0]
+    # make sure we have enough space in the tensor for all ROIs.
+    # If not, pad to max_n and return a boolean to signal the overflow.
+    pad_n = tf.maximum(max_n-n, 0)
+
+    #def log_overflow():
+    #    tf.logging.info("ROI per tile overflow.")
+    #    tf.Print(rois, [n-max_n], "ROI per tile overflow. The result will be incorrect as some ROIs have been discarded: ")
+    #    #tf_logten("ROI per tile overflow. The result will be incorrect as some ROIs have been discarded: ", n-max_n )
+    #    return 0
+    #tf.cond(tf.greater(n, max_n), log_overflow, lambda: 0)
+
+    rois = tf.pad(rois, [[0, pad_n], [0, 0]])  # pad to max_n elements
+    rois = tf.slice(rois, [0,0], [max_n, 4])  # truncate to max_n elements
+    return rois
+
+
+# Selects items from rois acccording to boolean mask. Pads the result to max_n items.
+# rois: shape [batch, n, 4]
+# mask: shape [batch, n]
+# output: shape [batch, max_n, 4]
+def batch_filter_by_bool(rois, mask, max_n):
+    rois_n = tf.count_nonzero(mask, axis=1)
+    overflow = tf.maximum(rois_n - max_n, 0)
+    rois = tf.map_fn(lambda rois__mask: filter_by_bool(*rois__mask, max_n=max_n), (rois, mask), dtype=tf.float32)  # shape [batch, max_n, 4]
+    rois = tf.reshape(rois, [-1, max_n, 4])  # Tensorflow needs a hint about the shape
+    return rois, overflow
+
+
+# tiles shape [n_tiles, 4] coordinates (x1, y1, x2, y2) in aerial image coordinates
+# rois shape [n_rois, 4] coordinates (x1, y1, x2, y2) in aerial image coordinates
+# output: shape [n_tiles, max_per_tile, 4] in aerial image coordinates. Roi list padded with empty ROIs.
+def remove_non_intersecting_rois(tiles, rois, max_per_tile):
+    n_tiles = tf.shape(tiles)[0]
+    # compute which rois are contained in which tiles
+    rois = tf.expand_dims(rois, axis=0)  # shape [1, n_rois, 4]
+    rois = tf.tile(rois, [n_tiles, 1, 1])  # shape [n_tiles, n_rois, 4]
+    is_roi_in_tile = tf.map_fn(lambda tiles_rois: boxintersect(*tiles_rois), (tiles, rois), dtype=bool)  # shape [n_tiles, n_rois]
+    rois, overflow = batch_filter_by_bool(rois, is_roi_in_tile, max_per_tile)
+    return rois, overflow
+
+
+# rois shape [batch, n_rois, 4] coordinates (x1, y1, x2, y2) in aerial image coordinates
+# output: shape [batch, max_per_tile, 4] in aerial image coordinates. Roi list padded with empty ROIs.
+def remove_empty_rois(rois, max_per_tile):
+    is_non_empty_roi = tf.logical_not(find_empty_rois(rois))
+    rois, overflow = batch_filter_by_bool(rois, is_non_empty_roi, max_per_tile)
+    return rois, overflow
+
+
+# tiles shape [n_tiles, 4] coordinates (x1, y1, x2, y2) in aerial image coordinates
+# rois shape [n_rois, 4] coordinates (x1, y1, x2, y2) in aerial image coordinates
+# max_per_tile: max number of possible rois in one tile
+# output: shape [max_per_tile, 4] coordinates (x1, y1, x2, y2) in tile relative coordinates in which tile width = 1.0
+# Assumes all tiles have the same size tile_size
+def rois_in_tile_relative(tiles, rois, tile_size, max_per_tile, assert_on_overflow=True):
+    rois, overflow = remove_non_intersecting_rois(tiles, rois, max_per_tile)  # [n_tiles, max_per_tile, 4]
+    if assert_on_overflow:
+        with tf.control_dependencies([tf.assert_non_positive(overflow,
+                                     message="ROI per tile overflow. Set MAX_TARGET_ROIS_PER_TILE to a larger value.")]):
+            rois = tf.identity(rois)
+    is_roi_empty = find_empty_rois(rois)
+    is_roi_empty = tf.stack([is_roi_empty, is_roi_empty, is_roi_empty, is_roi_empty], axis=-1)
+    tiles = tf.expand_dims(tiles, axis=1)  # force broadcasting on correct axis
+    tile_x1, tile_y1, tile_x2, tile_y2 = tf.unstack(tiles, axis=2)  # shape [n_tiles, 1]
+    roi_x1, roi_y1, roi_x2, roi_y2 = tf.unstack(rois, axis=2)  # shape [n_tiles, max_per_tile]
+    roi_x1 = (roi_x1 - tile_x1) / tile_size  # shapes [n_tiles, max_per_tile] x [n_tiles] broadcast
+    roi_x2 = (roi_x2 - tile_x1) / tile_size
+    roi_y1 = (roi_y1 - tile_y1) / tile_size
+    roi_y2 = (roi_y2 - tile_y1) / tile_size
+    rois = tf.stack([roi_x1, roi_y1, roi_x2, roi_y2], axis=-1)  # shape [n_tiles, max_per_tile, 4]
+    # replace empty ROIs by (0,0,0,0) for clarity
+    return tf.where(is_roi_empty, tf.zeros_like(rois), rois)
 
 
 class IOUCalculator(object):
@@ -347,10 +465,12 @@ class IOUCalculator(object):
     @classmethod
     def batch_intersection_over_union(cls, rects1, rects2, SIZE):
         batch = tf.shape(rects1)[0]
-        n = tf.shape(rects1)[1]
-        linmap = cls.__iou_gen_linmap(batch, n, SIZE)
-        map1 = cls.__iou_gen_rectmap(linmap, rects1, SIZE)  # shape [batch, n, SIZE, SIZE]
-        map2 = cls.__iou_gen_rectmap(linmap, rects2, SIZE)  # shape [batch, n, SIZE, SIZE]
+        n1 = tf.shape(rects1)[1]  # number of rectangles per batch element in rect1
+        n2 = tf.shape(rects2)[1]  # number of rectangles per batch element in rect2
+        linmap1 = cls.__iou_gen_linmap(batch, n1, SIZE)
+        linmap2 = cls.__iou_gen_linmap(batch, n2, SIZE)
+        map1 = cls.__iou_gen_rectmap(linmap1, rects1, SIZE)  # shape [batch, n, SIZE, SIZE]
+        map2 = cls.__iou_gen_rectmap(linmap2, rects2, SIZE)  # shape [batch, n, SIZE, SIZE]
         union_all = tf.concat([map1, map2], axis=1)
         union_all = tf.reduce_any(union_all, axis=1)
         union1 = tf.reduce_any(map1, axis=1)  # shape [batch, SIZE, SIZE]
@@ -360,7 +480,8 @@ class IOUCalculator(object):
         safe_union_area = tf.where(tf.equal(union_area, 0.0), tf.ones_like(union_area), union_area)
         inter_area = tf.reduce_sum(tf.cast(intersect, tf.float32), axis=[1, 2])
         safe_inter_area = tf.where(tf.equal(union_area, 0.0), tf.ones_like(inter_area), inter_area)
-        return safe_inter_area / safe_union_area
+        iou = safe_inter_area / safe_union_area  # returns 0 even if the union is null
+        return iou
 
 
 

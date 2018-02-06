@@ -16,16 +16,21 @@
 
 function grabPixels() {
     var map = document.getElementById('map')
+    var imgmap = document.getElementById('imgmap')
     var zone = document.getElementById('zone')
     var visu = document.getElementById('cap')
+
+    var node_to_grab = map
+    if (map.style.display == "none")
+        node_to_grab = imgmap
 
     resetResults()
     disableMapScroll()
 
-    html2canvas(map, {
+    html2canvas(node_to_grab, {
         onrendered: function(canvas) {processPixels(canvas, zone.offsetLeft, zone.offsetTop, zone.clientWidth, zone.clientHeight, visu)},
-        width: map.clientWidth,
-        height: map.clientHeight,
+        width: node_to_grab.clientWidth,
+        height: node_to_grab.clientHeight,
         useCORS: true
     })
 }

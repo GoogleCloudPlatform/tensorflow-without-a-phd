@@ -22,10 +22,10 @@ from tensorflow.python.platform import tf_logging as logging
 
 from trainer_yolo import model
 from trainer_yolo import boxutils
+from trainer_yolo.boxutils import tf_logten
 
 logging.set_verbosity(logging.INFO)
 logging.log(logging.INFO, "Tensorflow version " + tf.__version__)
-
 
 def extract_filename_without_extension(filename):
     basename = os.path.basename(filename)
@@ -59,27 +59,13 @@ def gcsload(filename):
     logging.info("loaded: {}".format(filename))
     return gcsfile.read_file_to_string(filename, binary_mode=True)
 
-def tf_log_(msg):
-    logging.info(msg.decode("utf-8"))
-
-def tf_logten_(msg, ten):
-    logging.info(msg.decode("utf-8") + str(ten))
-
-# log a string message from tensorflow code
-def tf_log(msg):
-    tf.py_func(tf_log_, [tf.constant(msg)], [])
-
-# long a message with a tensor value from tnesorflow code
-def tf_logten(msg, ten):
-    tf.py_func(tf_logten_, [tf.constant(msg), ten], [])
-
 # This should no longer be necessary when a batch version of random_hue ships in Tensorflow 1.5
 # Tensorflow 1.4.1 does not yet have this. Tracking: https://github.com/tensorflow/tensorflow/issues/8926
 def batch_random_hue(images):
     return tf.map_fn(lambda img: tf.image.random_hue(img, 0.5), images)
 
 
-def generate_slice(pixels, rois, grid_nn, cell_n, cell_grow, rnd_hue, rnd_distmax, idx):
+def generate_slice(pixels, rois, grid_nn, cell_n, cell_swarm, cell_grow, rnd_hue, rnd_distmax, idx):
     # dynamic image shapes
     img_shape = tf.cast(tf.shape(pixels), tf.float32)  # known shape [height, width, 3]
     img_shape = tf.reshape(img_shape, [3])  # tensorflow needs help here
@@ -91,6 +77,7 @@ def generate_slice(pixels, rois, grid_nn, cell_n, cell_grow, rnd_hue, rnd_distma
 
     TILE_SIZE = 256
     TILE_INTERSECT_FRACTION = 0.75
+    MAX_TARGET_ROIS_PER_TILE = 50  # max number of rois in training or test images
 
     # random displacements around each ROI (typically 1.4 to 3.0. Fixed at 2.0 for all evals)
     # adjusted so that tiles with planes and no planes happen with roughly equal frequency
@@ -149,13 +136,18 @@ def generate_slice(pixels, rois, grid_nn, cell_n, cell_grow, rnd_hue, rnd_distma
     # "roi": a plane bounding box (gorund thruth)
 
     # Tile divided in grid_nn x grid_nn grid
-    # Recognizing CELL_B=cell_n boxes per grid cell
-    # For each tile, for each grid cell, determine the CELL_B largest ROIs centered in that cell
-    # Output shape [tiles_n, GRID_N, GRID_N, CELL_B, 3]
-    targets = tf.map_fn(lambda tile:
-                        boxutils.n_experimental_roi_selection_strategy(tile, rois, rois_n, grid_nn, cell_n, cell_grow),
-                        #boxutils.n_largest_rois_in_cell_relative(tile, rois, rois_n, grid_nn, cell_n),
-                        tiles)
+    # Recognizing cell_n boxes per grid cell
+    # For each tile, for each grid cell, determine the cell_n largest ROIs centered in that cell
+    # Output shape [tiles_n, grid_nn, grid_nn, cell_n, 3]
+    if cell_n == 2 and cell_swarm:
+        yolo_target_rois = tf.map_fn(lambda tile: boxutils.n_experimental_roi_selection_strategy(tile, rois, rois_n, grid_nn, cell_n, cell_grow), tiles)
+    elif not cell_swarm:
+        yolo_target_rois = tf.map_fn(lambda tile: boxutils.n_largest_rois_in_cell_relative(tile, rois, rois_n, grid_nn, cell_n), tiles)
+    else:
+        raise ValueError('Ground truth ROI selection strategy cell_swarm is only implemented for cell_n=2')
+
+    # Compute ground truth ROIs (required coordinate format)
+    target_rois = boxutils.rois_in_tile_relative(tiles, rois, TILE_SIZE, MAX_TARGET_ROIS_PER_TILE)  # shape [n_tiles, MAX_TARGET_ROIS_PER_TILE, 4]
 
     # resize rois to units used by crop_and_resize
     tile_x1, tile_y1, tile_x2, tile_y2 = tf.unstack(tiles, axis=1)
@@ -168,16 +160,16 @@ def generate_slice(pixels, rois, grid_nn, cell_n, cell_grow, rnd_hue, rnd_distma
 
     indices = tf.zeros([tiles_n], dtype=tf.int32) # all the rois refer to image #0 (there is only one)
     # expand_dims needed because crop_and_resize expects a batch of images
-    images = tf.image.crop_and_resize(tf.expand_dims(pixels, 0), tiles, indices, [TILE_SIZE, TILE_SIZE])
+    image_tiles = tf.image.crop_and_resize(tf.expand_dims(pixels, 0), tiles, indices, [TILE_SIZE, TILE_SIZE])
     # crop_and_resize does not output a defined pixel depth but the convolutional layers need it
-    images = tf.reshape(images, [-1, TILE_SIZE, TILE_SIZE, 3])
-    images = tf.cast(images, tf.uint8)
-    targets = tf.reshape(targets, [-1, grid_nn, grid_nn, cell_n, 3])
+    image_tiles = tf.reshape(image_tiles, [-1, TILE_SIZE, TILE_SIZE, 3])
+    image_tiles = tf.cast(image_tiles, tf.uint8)
+    yolo_target_rois = tf.reshape(yolo_target_rois, [-1, grid_nn, grid_nn, cell_n, 3])
 
     if rnd_hue:  # random hue shift for all training images
-        images = batch_random_hue(images)
+        image_tiles = batch_random_hue(image_tiles)
 
-    return tf.data.Dataset.from_tensor_slices((images, plane_counts, targets))
+    return tf.data.Dataset.from_tensor_slices((image_tiles, plane_counts, yolo_target_rois, target_rois))
 
 
 def load_files(img_filename, roi_filename):
@@ -191,21 +183,21 @@ def load_files(img_filename, roi_filename):
 
 def features_and_labels(dataset):
     it = dataset.make_one_shot_iterator()
-    tiles, counts, targets = it.get_next()
-    features = {'image': tiles}
-    labels = {'count': counts, 'target': targets}
+    image_tiles, counts, yolo_target_rois, target_rois = it.get_next()
+    features = {'image': image_tiles}
+    labels = {'count': counts, 'yolo_target_rois': yolo_target_rois, 'target_rois': target_rois}
     return features, labels
 
 
-def generate(pixels, json_bytes, repeat_slice, grid_nn, cell_n, cell_grow, rnd_hue, rnd_distmax):
+def generate(pixels, json_bytes, repeat_slice, grid_nn, cell_n, cell_swarm, cell_grow, rnd_hue, rnd_distmax):
     # parse json
     rois = tf.py_func(decode_json_py, [json_bytes], [tf.float32])
     # generate_slice generates random image tiles in memory from a large aerial shot
     # we call it multiple tiles to get more random tiles from the same image, without exceeding available memory.
-    return tf.data.Dataset.range(repeat_slice).flat_map(lambda i: generate_slice(pixels, rois, grid_nn, cell_n, cell_grow, rnd_hue, rnd_distmax, i))
+    return tf.data.Dataset.range(repeat_slice).flat_map(lambda i: generate_slice(pixels, rois, grid_nn, cell_n, cell_swarm, cell_grow, rnd_hue, rnd_distmax, i))
 
 
-def dataset_input_fn(img_filelist, roi_filelist, grid_nn, cell_n, cell_grow, shuffle_buf, rnd_hue, rnd_distmax):
+def dataset_input_fn(img_filelist, roi_filelist, grid_nn, cell_n, cell_swarm, cell_grow, shuffle_buf, rnd_hue, rnd_distmax):
     fileset = tf.data.Dataset.from_tensor_slices((tf.constant(img_filelist), tf.constant(roi_filelist)))
     #fileset.repeat(6)
     dataset = fileset.map(load_files)
@@ -213,6 +205,7 @@ def dataset_input_fn(img_filelist, roi_filelist, grid_nn, cell_n, cell_grow, shu
                                                          repeat_slice=5,
                                                          grid_nn=grid_nn,
                                                          cell_n=cell_n,
+                                                         cell_swarm=cell_swarm,
                                                          cell_grow=cell_grow,
                                                          rnd_hue=rnd_hue,
                                                          rnd_distmax=rnd_distmax))
@@ -225,21 +218,22 @@ def dataset_input_fn(img_filelist, roi_filelist, grid_nn, cell_n, cell_grow, shu
     return features_and_labels(dataset)
 
 
-def dataset_eval_input_fn(img_filelist, roi_filelist, grid_nn, cell_n):
+def dataset_eval_input_fn(img_filelist, roi_filelist, grid_nn, cell_n, cell_swarm):
     dataset = tf.data.Dataset.from_tensor_slices((tf.constant(img_filelist), tf.constant(roi_filelist)))
     dataset = dataset.map(load_files)
     dataset = dataset.flat_map(lambda pix,json: generate(pix, json,
                                                          repeat_slice=1,
                                                          grid_nn=grid_nn,
                                                          cell_n=cell_n,
+                                                         cell_swarm=cell_swarm,
                                                          cell_grow=1.0,
                                                          rnd_hue=False,
                                                          rnd_distmax=2.0))
 
     dataset = dataset.cache(tempfile.mkdtemp(prefix="evaldatacache") + "/evaldatacache")
-    dataset = dataset.batch(8)  # eval dataset is 3820 tiles (477 batches of 8).
-                                # A larger batch size runs out of memory because
-                                # intersect over union metric is very expensive.
+    # eval dataset was 3820 tiles (60 batches of 64). A larger batch will OOM.
+    # eval dataset is 8380 tiles (131 batches of 64). A larger batch will OOM.
+    dataset = dataset.batch(64)
     return features_and_labels(dataset)
 
 
@@ -275,6 +269,7 @@ def start_training(output_dir, hparams, data, **kwargs):
     train_spec = tf.estimator.TrainSpec(input_fn=lambda:dataset_input_fn(img_filelist, roi_filelist,
                                                                          hparams["grid_nn"],
                                                                          hparams["cell_n"],
+                                                                         hparams["cell_swarm"],
                                                                          hparams["cell_grow"],
                                                                          hparams["shuffle_buf"],
                                                                          hparams["rnd_hue"],
@@ -283,11 +278,12 @@ def start_training(output_dir, hparams, data, **kwargs):
 
     eval_spec = tf.estimator.EvalSpec(input_fn=lambda: dataset_eval_input_fn(img_filelist_eval, roi_filelist_eval,
                                                                              hparams["grid_nn"],
-                                                                             hparams["cell_n"]),
-                                      steps=477,
+                                                                             hparams["cell_n"],
+                                                                             hparams["cell_swarm"]),
+                                      steps=hparams["evalsteps"], # 477 to exhaust all eval data with eval batch size 8
                                       exporters=export_latest,
-                                      start_delay_secs=30,  # ??
-                                      throttle_secs=10*60)  # eval every 10 min in non distributed mode, 5 min in distributed
+                                      start_delay_secs=1,  # ??
+                                      throttle_secs=1)  # eval every 10 min in non distributed mode, 5 min in distributed
 
     training_config = tf.estimator.RunConfig(model_dir=output_dir,
                                              save_summary_steps=100,
@@ -305,10 +301,12 @@ def main(argv):
     parser = argparse.ArgumentParser()
     # mandatory arguments format for ML Engine:
     # gcloud ml-engine jobs submit training jobXXX --job-dir=... --ml-engine-args -- --user-args
-
+    def str2bool(v): return v=='True'
     parser.add_argument('--job-dir', default="checkpoints", help='GCS or local path where to store training checkpoints')
     parser.add_argument('--data', default="sample_data/USGS_public_domain_airports", help='Path to data file (can be on Google cloud storage gs://...)')
     parser.add_argument('--hp-iterations', default=50000, type=int, help='Hyperparameter: number of training iterations')
+    parser.add_argument('--hp-evalsteps', default=131, type=int, help='Hyperparameter: number of training iterations')
+    parser.add_argument('--hp-shuffle-buf', default=50000, type=int, help='Hyperparameter: data shuffle buffer size')
     parser.add_argument('--hp-lr0', default=0.01, type=float, help='Hyperparameter: initial (max) learning rate')
     parser.add_argument('--hp-lr1', default=0.0001, type=float, help='Hyperparameter: target (min) learning rate')
     parser.add_argument('--hp-lr2', default=3000, type=float, help='Hyperparameter: learning rate decay speed in steps. Learning rate decays by exp(-1) every N steps.')
@@ -318,9 +316,9 @@ def main(argv):
     parser.add_argument('--hp-lw3', default=1, type=float, help='Hyperparameter: loss weight LW3')
     parser.add_argument('--hp-grid-nn', default=16, type=int, help='Hyperparameter: size of YOLO grid: grid-nn x grid-nn')
     parser.add_argument('--hp-cell-n', default=2, type=int, help='Hyperparameter: number of ROIs detected per YOLO grid cell')
+    parser.add_argument('--hp-cell-swarm', default=True, type=str2bool, help='Hyperparameter: ground truth ROIs selection algorithm. The better swarm algorithm is only implemented for cell_n=2')
     parser.add_argument('--hp-cell-grow', default=1.3, type=float, help='Hyperparameter: ROIs allowed to be cetered beyond grid cell by this factor')
-    parser.add_argument('--hp-shuffle-buf', default=50000, type=int, help='Hyperparameter: data shuffle buffer size')
-    parser.add_argument('--hp-rnd-hue', default=True, type=bool, help='Hyperparameter: data augmentation with random hue on training images')
+    parser.add_argument('--hp-rnd-hue', default=True, type=str2bool, help='Hyperparameter: data augmentation with random hue on training images')
     parser.add_argument('--hp-rnd-distmax', default=2.0, type=float, help='Hyperparameter: training tiles selection max random distance from ground truth ROI (always 2.0 for eval tiles)')
     args = parser.parse_args()
     arguments = args.__dict__

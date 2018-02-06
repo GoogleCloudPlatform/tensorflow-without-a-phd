@@ -29,9 +29,14 @@ gcloud ml-engine jobs submit training plane$N \
     --runtime-version 1.4 \
     -- \
     --data "${DATA}" \
-    --hp-iterations 50000 \
+    --hp-iterations 30000 \
     --hp-lw1 1 \
-    --hp-lw2 1 \
-    --hp-lw3 1 \
-    --hp-rnd-distmax 2.0 \
-    --hp-cell-grow 1.3
+    --hp-lw2 3 \
+    --hp-lw3 30 \
+    --hp-rnd-distmax 3.0 \
+    --hp-grid-nn 16 \
+    --hp-cell-n 2 \
+    --hp-cell-swarm True \
+    --hp-cell-grow 1.3 \
+    --hp-rnd-hue True \
+    --hp-shuffle-buf 50000

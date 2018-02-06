@@ -16,9 +16,8 @@ import trainer_yolo.digits as dd
 from trainer_yolo import boxutils
 from trainer_yolo.boxutils import IOUCalculator
 
-GRID_N = 16  # must be the same as in train.py
-CELL_B = 2   # must be the same as in train.py
 TILE_SIZE = 256  # must be the same as in train.py
+MAX_DETECTED_ROIS_PER_TILE = 100  # can be different from MAX_TARGET_ROIS_PER_TILE in train.py. The max possible is GRID_N * GRID_N * CELL_B.
 
 def get_bottom_left_digits(classes):
     digits = tf.image.grayscale_to_rgb(dd.digits_bottom_left(TILE_SIZE//8, TILE_SIZE//8))
@@ -54,7 +53,8 @@ def image_compose(img1, img2):
 def draw_color_boxes(img, boxes, r, g, b):
     pix_r, _, _ = tf.split(img, 3, axis=3)
     black = tf.zeros_like(pix_r)
-    white_boxes = tf.image.draw_bounding_boxes(black, boxes)
+    # the Tensorflow function draw_bounding_boxes expects coordinates in the y1, x1, y2, x2 format
+    white_boxes = tf.image.draw_bounding_boxes(black, boxutils.swap_xy(boxes))
     box_img = tf.concat([white_boxes * r, white_boxes * g, white_boxes * b], axis=3)
     white_boxes = tf.concat([white_boxes, white_boxes, white_boxes], axis=3)
     return tf.where(tf.greater(white_boxes, 0.0), box_img, img)
@@ -127,16 +127,17 @@ def model_fn_squeeze(features, labels, mode, params):
     #TX, TY, TW, TC = tf.split(T20, 4, axis=3)  # shape 4 x [batch, 4,4,3] = 4 x [batch, GRID_N, GRID_N, CELL_B]
 
     # bounding box head
-    T19 = layer_conv2d_batch_norm_relu(Y18, filters=cell_n*8*f*g, kernel_size=1, strides=1) # output 16*16*(cell_n*32)
+    T19 = layer_conv2d_batch_norm_relu(Y18, filters=20*f*g, kernel_size=1, strides=1) # output 16*16*(cell_n*32)
     # not needed at GRID_N=16
     # for GRID_N=16, need pool_size=1, strides=1
     # for GRID_N=8, need pool_size=2, strides=2
     # for GRID_N=4, need pool_size=4, strides=4
-    pool_size = 16/grid_nn
+    pool_size = 16//grid_nn
     T20 = tf.layers.average_pooling2d(T19, pool_size=pool_size, strides=pool_size, padding="valid") # [batch, grid_nn, grid_nn, cell_n*32]
     # for each cell, this has CELL_B predictions of bounding box (x,y,w,c)
     # apply tanh for x, y and sigmoid for w, c
-    TX0, TY0, TW0, TC0 = tf.split(T20, 4, axis=3)  # shape 4 x [batch, grid_nn, grid_nn, cell_n*8]
+    TX0, TY0, TW0, TC00, TC01 = tf.split(T20, 5, axis=-1)  # shape 4 x [batch, grid_nn, grid_nn, 16]
+    TC0 = tf.concat([TC00, TC01], axis=-1)
     # TODO: idea: batch norm may be bad on this layer
     # TODO: try with a deeper layer as well
     # TODO: try a filtered convolution instead of pooling2d, maybe info from cell sides should be weighted differently
@@ -185,19 +186,21 @@ def model_fn_squeeze(features, labels, mode, params):
     detected_rois = tf.stack([TX,TY,detected_TW], axis=-1)  # shape [batch, GRID_N, GRID_N, CELL_B, 3]
     detected_rois = boxutils.grid_cell_to_tile_coords(detected_rois, grid_nn, TILE_SIZE)/TILE_SIZE
     detected_rois = tf.reshape(detected_rois, [-1, grid_nn*grid_nn*cell_n, 4])
+    detected_rois, detected_rois_overflow = boxutils.remove_empty_rois(detected_rois, MAX_DETECTED_ROIS_PER_TILE)
 
     loss = train_op = eval_metrics = None
     if mode != tf.estimator.ModeKeys.PREDICT:
         ZERO_W = 0.0001
         C_ = labels["count"]
-        T_ = labels["target"]  # shape [4,4,3,3] = [batch, GRID_N, GRID_N, CEL_B, xyw]
+        T_ = labels["yolo_target_rois"]  # shape [4,4,3,3] = [batch, GRID_N, GRID_N, CEL_B, xyw]
+        target_rois = labels["target_rois"] # shape [batch, MAX_TARGET_ROIS_PER_TILE, x1y1x2y2]
         TX_, TY_, TW_ = tf.unstack(T_, 3, axis=-1) # shape 3 x [batch, 4,4,3] = [batch, GRID_N, GRID_N, CELL_B]
         # target probability is 1 if there is a corresponding target box, 0 otherwise
         bTC_ = tf.greater(TW_, ZERO_W)
         onehotTC_ = tf.one_hot(tf.cast(bTC_, tf.int32), 2, dtype=tf.float32)
         fTC_ = tf.cast(bTC_, tf.float32) # shape [batch, 4,4,3] = [batch, GRID_N, GRID_N, CELL_B]
-        target_rois = boxutils.grid_cell_to_tile_coords(T_, grid_nn, TILE_SIZE)/TILE_SIZE
-        target_rois = tf.reshape(target_rois, [-1, grid_nn*grid_nn*cell_n, 4])
+        #yolo_target_rois = boxutils.grid_cell_to_tile_coords(T_, grid_nn, TILE_SIZE)/TILE_SIZE
+        #yolo_target_rois = tf.reshape(target_rois, [-1, grid_nn*grid_nn*cell_n, 4])
 
         # accuracy
         ERROR_TRESHOLD = 0.3  # plane correctly localized if predicted x,y,w within % of ground truth
@@ -216,8 +219,17 @@ def model_fn_squeeze(features, labels, mode, params):
         all_correct = tf.logical_and(size_correct, position_correct)
         mistakes = tf.reduce_sum(tf.cast(tf.logical_not(all_correct), tf.int32), axis=[1,2,3])  # shape [batch]
 
-        # better: IOU accuracy
+        # IOU (Intersection Over Union) accuracy
         iou_accuracy = IOUCalculator.batch_intersection_over_union(detected_rois*TILE_SIZE, target_rois*TILE_SIZE, SIZE=TILE_SIZE)
+        iou_accuracy_overflow = tf.greater(tf.reduce_sum(detected_rois_overflow), 0)
+        # check that we are not overflowing the tensor size. Issue a warning if we are. This should only happen at
+        # the begining of the training with a completely uninitialized network.
+        iou_accuracy = tf.cond(iou_accuracy_overflow, lambda: tf.Print(iou_accuracy, [detected_rois_overflow],
+            summarize=250, message="ROI tensor overflow in IOU computation. The computed IOU is not correct and will"
+            "be reported as 0. Increase MAX_DETECTED_ROIS_PER_TILE to avoid."), lambda: tf.identity(iou_accuracy))
+        iou_accuracy = tf.reduce_mean(iou_accuracy)
+        # set iou_accuracy to 0 if there has been any overflow in its computation
+        iou_accuracy = tf.where(iou_accuracy_overflow, tf.zeros_like(iou_accuracy), iou_accuracy)
 
         # debug: expected and predicted counts
         debug_img = X
@@ -322,7 +334,6 @@ def model_fn_squeeze(features, labels, mode, params):
 
         # average number of mistakes per image
         nb_mistakes = tf.reduce_sum(mistakes)
-        iou_accuracy = tf.reduce_mean(iou_accuracy)
 
         lr = learn_rate(params['lr0'], tf.train.get_or_create_global_step())
         optimizer = tf.train.AdamOptimizer(lr)
@@ -345,6 +356,7 @@ def model_fn_squeeze(features, labels, mode, params):
         tf.summary.scalar("loss", loss)
         tf.summary.scalar("mistakes", nb_mistakes)
         tf.summary.scalar("learning_rate", lr)
+        #tf.summary.histogram("detected_rois_overflow", detected_rois_overflow)
         #tf.summary.scalar("IOU", iou_accuracy) # This would run out of memory
 
     return tf.estimator.EstimatorSpec(

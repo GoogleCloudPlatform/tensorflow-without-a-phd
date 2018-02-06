@@ -45,6 +45,11 @@ var markersOnDisk = [
     'USGS_CVG',
     'USGS_AUS',
     'USGS_SEA',
+    'USGS_TUC1l',
+    'USGS_TUC1s',
+    'USGS_TUC2s',
+    'USGS_TUC3s',
+    'USGS_TUC4s',
     'USGS_VCV',
     'USGS_VCV2']
 

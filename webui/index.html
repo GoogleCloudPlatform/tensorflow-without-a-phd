@@ -55,19 +55,8 @@
                         <option value="plane_jpeg_scan_100_200_300_400_600_900/versions/v02">20x20 tile regularized acc. 99.6%</option>
                         <option value="plane_jpeg_scan_100_200_300_400_600_900/versions/v7_256x256">20x20 tile classifier (best - more data)</option>
                         <option value="jpeg_yolo_256x256/versions/v1">YOLO detection 8x8x1</option>
-                        <option value="jpeg_yolo_256x256/versions/v4">YOLO detection 16x16x1</option>
-
-
-                        <option value="jpeg_yolo_256x256/versions/v5">YOLO detection 5 (previous best - 16x16x2 swarm optimized)</option>
-                        <option value="jpeg_yolo_256x256/versions/v8">YOLO detection 8</option>
-                        <option value="jpeg_yolo_256x256/versions/v9">YOLO detection 9</option>
-                        <option value="jpeg_yolo_256x256/versions/v10">YOLO detection 10</option>
-                        <option value="jpeg_yolo_256x256/versions/v11">YOLO detection 11</option>
-                        <option value="jpeg_yolo_256x256/versions/v12">YOLO detection 12</option>
-                        <option value="jpeg_yolo_256x256/versions/v13">YOLO detection 13</option>
-                        <option value="jpeg_yolo_256x256/versions/v14" selected>YOLO detection 14</option>
-                        <option value="jpeg_yolo_256x256/versions/v15">YOLO detection 15</option>
-                        <option value="jpeg_yolo_256x256/versions/v16">YOLO detection 16</option>
+                        <option value="jpeg_yolo_256x256/versions/v5">YOLO detection 16x16x2, swarm optimized</option>
+                        <option value="jpeg_yolo_256x256/versions/v18" selected>YOLO detection 16x16x2, data augment, swarm</option>
                     </select>
                 </form>
             </div>
@@ -75,7 +64,7 @@
                 <div class="title">Map capture</div>
                 <form name="airsel">
                     <select name="sel" onchange="centerMapOnCode(document.airsel.sel.value)">
-                        <option value="">--> to airport</option>
+                        <option value="">--> to airport on Google Maps</option>
                         <option value="TLS">TLS Toulouse-Blagnac</option>
                         <option value="LAX">LAX Los Angeles</option>
                         <option value="SFO">SFO San Francisco</option>
@@ -85,6 +74,47 @@
                         <option value="NRT">NRT Tokyo Narita</option>
                         <option value="ICN">ICN Seoul Incheon</option>
                         <option value="DMA">DMA Davis Mothan Boneyard</option>
+
+                        <option value="">--> training pictures</option>
+                        <option value="train_ATL">ATL Atlanta</option>
+                        <option value="train_AUS">AUS Austin</option>
+                        <option value="train_BHM">BHM Birmingham, Alabama</option>
+                        <option value="train_BOS">BOS Boston</option>
+                        <option value="train_BWI">BWI Baltimore</option>
+                        <option value="train_CLT">CLT Charlotte</option>
+                        <option value="train_CVG">CVG Cincinnati</option>
+                        <option value="train_DSM">DSM Des Moines</option>
+                        <option value="train_EYW">EYW Key West, Florida</option>
+                        <option value="train_FAT">FAT Fresno</option>
+                        <option value="train_FLG">FLG Flagstaff</option>
+                        <option value="train_FLL">FLL Fort Lauderdale</option>
+                        <option value="train_FWA">FWA Fort Wayne</option>
+                        <option value="train_IAD">IAD Dulles</option>
+                        <option value="train_IAH">IAH Houston</option>
+                        <option value="train_IND">IND Indianapolis</option>
+                        <option value="train_MDW">MDW Chicago Midway</option>
+                        <option value="train_MIA">MIA Miami</option>
+                        <option value="train_OAK">OAK Oakland</option>
+                        <option value="train_OHR">OHR Chicago O'Hare</option>
+                        <option value="train_PHX">PHX Phoenix</option>
+                        <option value="train_SAN">SAN San Antonio</option>
+                        <option value="train_SEA">SEA Seattle</option>
+                        <option value="train_SFO">SFO San Francisco</option>
+                        <option value="train_SJC">SJC San Jose</option>
+
+                        <option value="">--> test pictures</option>
+                        <option value="test_DEN">DEN Denver</option>
+                        <option value="test_LAX">LAX Los Angeles</option>
+                        <option value="test_MSY">MSY New Orleans</option>
+                        <option value="test_TUC1l">TUC Tucson 1l</option>
+                        <option value="test_TUC1s">TUC Tucson 1s</option>
+                        <option value="test_TUC2s">TUC Tucson 2s</option>
+                        <option value="test_TUC3s">TUC Tucson 3s</option>
+                        <option value="test_TUC4s">TUC Tucson 4s</option>
+
+                        <option value="">--> boneyard pictures</option>
+                        <option value="train_DMA">DMA Davis Mothan Boneyard</option>
+                        <option value="train_DMA2">DMA Davis Mothan Boneyard 2</option>
                     </select>
                 </form>
                 <canvas width=600 height=600 id="cap"></canvas>
@@ -95,6 +125,7 @@
             </div>
         </div>
         <div id="map"></div>
+        <div id="imgmap"></div>
         <div id="zone-container"><div id="zone"></div></div></div>
     </div>
 </body>
