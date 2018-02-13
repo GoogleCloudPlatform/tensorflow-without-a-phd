@@ -213,8 +213,8 @@ def dataset_input_fn(img_filelist, roi_filelist, grid_nn, cell_n, cell_swarm, ce
     dataset = dataset.cache(tempfile.mkdtemp(prefix="datacache") + "/datacache")
     dataset = dataset.repeat()  # indefinitely
     dataset = dataset.shuffle(shuffle_buf)
-    dataset = dataset.prefetch(50)
-    dataset = dataset.batch(50)
+    dataset = dataset.prefetch(10)
+    dataset = dataset.batch(10)
     return features_and_labels(dataset)
 
 
@@ -233,7 +233,8 @@ def dataset_eval_input_fn(img_filelist, roi_filelist, grid_nn, cell_n, cell_swar
     dataset = dataset.cache(tempfile.mkdtemp(prefix="evaldatacache") + "/evaldatacache")
     # eval dataset was 3820 tiles (60 batches of 64). A larger batch will OOM.
     # eval dataset is 8380 tiles (131 batches of 64). A larger batch will OOM.
-    dataset = dataset.batch(64)
+    # eval dataset is 8380 tiles (262 batches of 32). A larger batch will OOM.
+    dataset = dataset.batch(32)
     return features_and_labels(dataset)
 
 
@@ -282,15 +283,15 @@ def start_training(output_dir, hparams, data, **kwargs):
                                                                              hparams["cell_swarm"]),
                                       steps=hparams["evalsteps"], # 477 to exhaust all eval data with eval batch size 8
                                       exporters=export_latest,
-                                      start_delay_secs=1,  # ??
-                                      throttle_secs=1)  # eval every 10 min in non distributed mode, 5 min in distributed
+                                      start_delay_secs=1,  # Confirmed: this does not work (plane533 for ex.)
+                                      throttle_secs=1)
 
     training_config = tf.estimator.RunConfig(model_dir=output_dir,
                                              save_summary_steps=100,
                                              save_checkpoints_steps=1000,
                                              keep_checkpoint_max=1)
 
-    estimator=tf.estimator.Estimator(model_fn=model.model_fn_squeeze,
+    estimator=tf.estimator.Estimator(model_fn=model.model_fn_squeeze3,
                                      model_dir=output_dir,
                                      config=training_config,
                                      params=hparams)
@@ -305,7 +306,7 @@ def main(argv):
     parser.add_argument('--job-dir', default="checkpoints", help='GCS or local path where to store training checkpoints')
     parser.add_argument('--data', default="sample_data/USGS_public_domain_airports", help='Path to data file (can be on Google cloud storage gs://...)')
     parser.add_argument('--hp-iterations', default=50000, type=int, help='Hyperparameter: number of training iterations')
-    parser.add_argument('--hp-evalsteps', default=131, type=int, help='Hyperparameter: number of training iterations')
+    parser.add_argument('--hp-evalsteps', default=262, type=int, help='Hyperparameter: number of training iterations')
     parser.add_argument('--hp-shuffle-buf', default=50000, type=int, help='Hyperparameter: data shuffle buffer size')
     parser.add_argument('--hp-lr0', default=0.01, type=float, help='Hyperparameter: initial (max) learning rate')
     parser.add_argument('--hp-lr1', default=0.0001, type=float, help='Hyperparameter: target (min) learning rate')
@@ -320,6 +321,10 @@ def main(argv):
     parser.add_argument('--hp-cell-grow', default=1.3, type=float, help='Hyperparameter: ROIs allowed to be cetered beyond grid cell by this factor')
     parser.add_argument('--hp-rnd-hue', default=True, type=str2bool, help='Hyperparameter: data augmentation with random hue on training images')
     parser.add_argument('--hp-rnd-distmax', default=2.0, type=float, help='Hyperparameter: training tiles selection max random distance from ground truth ROI (always 2.0 for eval tiles)')
+    parser.add_argument('--hp-dropout', default=0.0, type=float, help='Hyperparameter: dropout rate')
+    parser.add_argument('--hp-base-depth5', default=10, type=int, help='Hyperparameter: number of filters in the first and last squeeze layers divided by 5')
+    parser.add_argument('--hp-depth-increment', default=5, type=int, help='Hyperparameter: increment the decrement filter depth by this amount between first and last layer')
+    parser.add_argument('--hp-layers21', default=5, type=int, help='Hyperparameter: number of layers = layers21 * 2 + 1')
     args = parser.parse_args()
     arguments = args.__dict__
 

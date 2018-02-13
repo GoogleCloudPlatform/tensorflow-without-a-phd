@@ -6,6 +6,7 @@ CONFIG="config.yaml"
 #CONFIG="config-hptune-yolo1.yaml"
 BUCKET="gs://ml1-demo-martin"
 DATA="gs://ml1-demo-martin/data/USGS_public_domain_airports"
+#DATA="gs://ml1-demo-martin/data/USGS_public_domainTINY_airports"
 PROJECT="cloudml-demo-martin"
 REGION="us-central1"
 #REGION="europe-west1"
@@ -29,14 +30,18 @@ gcloud ml-engine jobs submit training plane$N \
     --runtime-version 1.4 \
     -- \
     --data "${DATA}" \
-    --hp-iterations 30000 \
+    --hp-iterations 25000 \
     --hp-lw1 1 \
-    --hp-lw2 3 \
-    --hp-lw3 30 \
-    --hp-rnd-distmax 3.0 \
+    --hp-lw2 1 \
+    --hp-lw3 1 \
+    --hp-lr2 5000 \
+    --hp-rnd-distmax 2.0 \
     --hp-grid-nn 16 \
     --hp-cell-n 2 \
     --hp-cell-swarm True \
-    --hp-cell-grow 1.3 \
+    --hp-cell-grow 1.0 \
     --hp-rnd-hue True \
-    --hp-shuffle-buf 50000
+    --hp-dropout 0.5 \
+    --hp-shuffle-buf 50000 \
+    --hp-layers21 10 \
+    --hp-base-depth5 15

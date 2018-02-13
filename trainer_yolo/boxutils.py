@@ -461,7 +461,10 @@ class IOUCalculator(object):
     # Computes the intersection over union of two sets of rectangles.
     # The actual computation is intersection_area(union(rects1), union(rects2)) / union_area(rects1, rects2)
     # rects1, rects2: detected and ground truth rectangles, shape [batch, n, 4] with coordinates x1, y1, x2, y2
-    # the size of the rectangles is [x2-x1, y2-y1]
+    # the size of the rectangles is [x2-x1, y2-y1].
+    # Returns an array of shape [batch]. Use batch_mean() to correctly average it.
+    # Returns 1 in cases in the batch where both rects1 and rects2 contain
+    # no rectangles(correctly detected nothing when there was nothing to detect).
     @classmethod
     def batch_intersection_over_union(cls, rects1, rects2, SIZE):
         batch = tf.shape(rects1)[0]
@@ -482,6 +485,24 @@ class IOUCalculator(object):
         safe_inter_area = tf.where(tf.equal(union_area, 0.0), tf.ones_like(inter_area), inter_area)
         iou = safe_inter_area / safe_union_area  # returns 0 even if the union is null
         return iou
+
+    # Computes the average IOU across a batch of IOUs
+    # IOUs of value 1 mean that the network correctly detected nothing when there was nothing to detect.
+    # To compute the average IOU, 1 values are eliminated. The result is the average IOU acroos all
+    # instances where either something was detected or there was something to detect.
+    # In the rare case where the result would be 0/0, the return value is 1 which is not really correct
+    # but should be rare and only offset a further average of batch_mean() results only a little.
+    # ious: shape[batch]
+    @staticmethod
+    def batch_mean(ious):
+        correct_non_detections = tf.equal(ious, 1.0)
+        other_detections = tf.logical_not(correct_non_detections)
+        n = tf.reduce_sum(tf.cast(other_detections, tf.float32))
+        m = tf.reduce_sum(tf.where(correct_non_detections, tf.zeros_like(ious), ious))
+        safe_n = tf.where(tf.equal(n, 0.0), tf.ones_like(n), n)
+        safe_m = tf.where(tf.equal(n, 0.0), tf.ones_like(m), m)
+        return safe_m/safe_n
+
 
 
 

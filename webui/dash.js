@@ -151,16 +151,27 @@ function displayErrorMarker(tile) {
         marker.style.backgroundColor = "red"
 }
 
+function invertCoords(box) {
+    var bbox = []
+    bbox[0] = box[1]
+    bbox[1] = box[0]
+    bbox[2] = box[3]
+    bbox[3] = box[2]
+    return bbox
+}
+
 function displayResultMarkers(tile, markers) {
     var zone = document.getElementById("zone")
     if (zone) {
         markers.map(function(box) {
             var marker = document.createElement("div")
             marker.classList = "zone-marker"
-            marker.style.top = box[0] * tile.pos.sz + tile.pos.y + 'px'
-            marker.style.left = box[1] * tile.pos.sz + tile.pos.x + 'px'
-            marker.style.width = (box[2] - box[0]) * tile.pos.sz + 'px'
-            marker.style.height = (box[3] - box[1]) * tile.pos.sz + 'px'
+            var invert_coords = true
+            var bbox = invert_coords ? invertCoords(box) : box
+            marker.style.left = bbox[0] * tile.pos.sz + tile.pos.x + 'px'
+            marker.style.top = bbox[1] * tile.pos.sz + tile.pos.y + 'px'
+            marker.style.width = (bbox[2] - bbox[0]) * tile.pos.sz + 'px'
+            marker.style.height = (bbox[3] - bbox[1]) * tile.pos.sz + 'px'
             zone.appendChild(marker)
         })
     }

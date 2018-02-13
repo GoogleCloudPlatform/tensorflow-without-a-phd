@@ -10,14 +10,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import print_function
+import re
 import math
 import tensorflow as tf
 import trainer_yolo.digits as dd
 from trainer_yolo import boxutils
 from trainer_yolo.boxutils import IOUCalculator
+from tensorflow.python.platform import tf_logging as logging
 
 TILE_SIZE = 256  # must be the same as in train.py
-MAX_DETECTED_ROIS_PER_TILE = 100  # can be different from MAX_TARGET_ROIS_PER_TILE in train.py. The max possible is GRID_N * GRID_N * CELL_B.
+MAX_DETECTED_ROIS_PER_TILE = 60  # can be different from MAX_TARGET_ROIS_PER_TILE in train.py. The max possible is GRID_N * GRID_N * CELL_B.
 
 def get_bottom_left_digits(classes):
     digits = tf.image.grayscale_to_rgb(dd.digits_bottom_left(TILE_SIZE//8, TILE_SIZE//8))
@@ -108,7 +111,7 @@ def model_fn_squeeze(features, labels, mode, params):
     Y11l = layer_conv2d_batch_norm_relu(Y10, filters=32*f, kernel_size=1, strides=1) #expand 1x1
     Y11t = layer_conv2d_batch_norm_relu(Y10, filters=32*f, kernel_size=3, strides=1) #expand 3x3
     Y11 = tf.concat([Y11l, Y11t], 3)                                              # output 32x32x64
-    Y12 = layer_conv2d_batch_norm_relu(Y11, filters=16*2*g*f, kernel_size=1, strides=1) #squeeze
+    Y12 = layer_conv2d_batch_norm_relu(Y11, filters=16*2*g*f, kernel_size=1, strides=1) #squeeze   111 the *2 factor here is nonsense
     Y12l = layer_conv2d_batch_norm_relu(Y12, filters=16*2*g*f, kernel_size=1, strides=1) #expand 1x1
     Y12t = layer_conv2d_batch_norm_relu(Y12, filters=16*2*g*f, kernel_size=3, strides=1) #expand 3x3
     Y13 = tf.concat([Y12l, Y12t], 3)                                              # output 32x32x32
@@ -227,7 +230,7 @@ def model_fn_squeeze(features, labels, mode, params):
         iou_accuracy = tf.cond(iou_accuracy_overflow, lambda: tf.Print(iou_accuracy, [detected_rois_overflow],
             summarize=250, message="ROI tensor overflow in IOU computation. The computed IOU is not correct and will"
             "be reported as 0. Increase MAX_DETECTED_ROIS_PER_TILE to avoid."), lambda: tf.identity(iou_accuracy))
-        iou_accuracy = tf.reduce_mean(iou_accuracy)
+        iou_accuracy = IOUCalculator.batch_mean(iou_accuracy)
         # set iou_accuracy to 0 if there has been any overflow in its computation
         iou_accuracy = tf.where(iou_accuracy_overflow, tf.zeros_like(iou_accuracy), iou_accuracy)
 
@@ -365,5 +368,552 @@ def model_fn_squeeze(features, labels, mode, params):
         loss=loss,
         train_op=train_op,
         eval_metric_ops=eval_metrics,
-        export_outputs={'classes': tf.estimator.export.PredictOutput({"rois":predicted_rois, "rois_confidence": predicted_C})}
+        # the visualisation GUI was coded for swapped coordinates y1x1y2x2
+        export_outputs={'classes': tf.estimator.export.PredictOutput({"rois":boxutils.swap_xy(predicted_rois), "rois_confidence": predicted_C})}
+    )
+
+# Model
+def model_fn_squeeze2(features, labels, mode, params):
+
+    # YOLO parameters: each tile is divided into a grid_nn x grid_nn grid,
+    # each grid cell predicts cell_n ROIs.
+    grid_nn = params["grid_nn"]
+    cell_n = params["cell_n"]
+    base_depth = params["base_depth5"] * 5
+
+    def learn_rate(lr, step):
+        return params['lr1'] + tf.train.exponential_decay(lr, step, params['lr2'], 1/math.e)
+
+    def batch_normalization(x):  # axis=-1 will work for both dense and convolutional layers
+        return tf.layers.batch_normalization(x, axis=-1, momentum=params['bnexp'], epsilon=1e-5, center=True, scale=False, training=(mode == tf.estimator.ModeKeys.TRAIN))
+
+    def dropout(x):
+        # dropout mask stays constant when scanning the image in X and Y with a filter
+        # in the noise_shape parameter, 1 means "keep the droput mask the same when this dimension changes"
+        noiseshape = tf.shape(x)
+        noiseshape = noiseshape * tf.constant([1,0,0,1]) + tf.constant([0,1,1,0])
+        y = tf.layers.dropout(x, params["dropout"], noise_shape=noiseshape)
+        return y
+
+    def layer_conv2d_batch_norm_relu(x, filters, kernel_size, strides=1):
+        y = tf.layers.conv2d(x, filters=filters, kernel_size=kernel_size, strides=strides, padding="same", activation=None, use_bias=False)
+        return dropout(tf.nn.relu(batch_normalization(y)))
+
+    def layer_conv1x1_batch_norm(x, depth):
+        y = tf.layers.conv2d(x, filters=depth, kernel_size=1, strides=1, padding="same", activation=None, use_bias=False)
+        return batch_normalization(y)
+
+    def layer_conv1x1(x, depth):
+        return tf.layers.conv2d(x, filters=depth, kernel_size=1, strides=1, padding="same", activation=None, use_bias=True)
+
+    def layer_squeeze(x, depth):
+        return layer_conv2d_batch_norm_relu(x, filters=depth, kernel_size=1, strides=1)
+
+    def layer_squeeze_pool(x, depth):
+        return layer_conv2d_batch_norm_relu(x, filters=depth, kernel_size=2, strides=2)
+
+    def layer_expand(x, depth):
+        y1x1 = layer_conv2d_batch_norm_relu(x, filters=depth//2, kernel_size=1, strides=1)
+        y3x3 = layer_conv2d_batch_norm_relu(x, filters=depth//2, kernel_size=3, strides=1)
+        return tf.concat([y1x1, y3x3], 3)
+
+    # TODO: test both varieties of maxpool
+    # pool_size=3, strides=2 | pool_size=2, strides=2
+    def layer_maxpool(x):
+        return tf.layers.max_pooling2d(x, pool_size=2, strides=2, padding="same")
+
+    # model inputs
+    X = features["image"]
+    X = tf.to_float(X) / 255.0 # input image format is uint8
+
+    # simplified small squeezenet architecture
+    Y = layer_conv2d_batch_norm_relu(X, filters=35, kernel_size=3, strides=1)
+    Y = layer_expand(Y, 2*35)
+    #   --- maxpool ---
+    #Y = layer_maxpool(Y)
+    Y = layer_squeeze_pool(Y, 40)
+    Y = layer_expand(Y, 2*45)
+    Y = layer_squeeze(Y, 50)
+    Y = layer_expand(Y, 2*55)
+    #   --- maxpool ---
+    #Y = layer_maxpool(Y)
+    Y = layer_squeeze_pool(Y, 60)
+    Y = layer_expand(Y, 2*65)
+    Y = layer_squeeze(Y, 70)
+    Y = layer_expand(Y, 2*75)
+    #   --- maxpool ---
+    #Y = layer_maxpool(Y)
+    Y = layer_squeeze_pool(Y, 70)
+    Y = layer_expand(Y, 2*65)
+    Y = layer_squeeze(Y, 60)
+    Y = layer_expand(Y, 2*55)
+    #   --- maxpool ---
+    #Y = layer_maxpool(Y)
+    Y = layer_squeeze_pool(Y, 50)
+    Y = layer_expand(Y, 2*45)
+    Y = layer_squeeze(Y, 40)
+    Y = layer_expand(Y, 2*35)
+
+    # YOLO bounding box head
+    #
+    # not needed at GRID_N=16
+    # for GRID_N=16, need pool_size=1, strides=1
+    # for GRID_N=8, need pool_size=2, strides=2
+    # for GRID_N=4, need pool_size=4, strides=4
+    pool_size = 16//grid_nn
+    T = tf.layers.average_pooling2d(Y, pool_size=pool_size, strides=pool_size, padding="valid") # [batch, grid_nn, grid_nn, cell_n*32]
+    # for each cell, this has CELL_B predictions of bounding box (x,y,w,c)
+    # apply tanh for x, y and sigmoid for w, c
+    TX0, TY0, TW0, TC00, TC01 = tf.split(T, 5, axis=-1)  # shape 4 x [batch, grid_nn, grid_nn, 16]
+    TC0 = tf.concat([TC00, TC01], axis=-1)
+    TX = tf.nn.tanh(layer_conv1x1(TX0, depth=cell_n))  # shape [batch, grid_nn, grid_nn, cell_n]
+    TY = tf.nn.tanh(layer_conv1x1(TY0, depth=cell_n))  # shape [batch, grid_nn, grid_nn, cell_n]
+    TW = tf.nn.sigmoid(layer_conv1x1(TW0, depth=cell_n))  # shape [batch, grid_nn, grid_nn, cell_n]
+    #  2 is the number of classes: planes, or no planes
+    TClogits = layer_conv1x1(TC0, depth=cell_n*2)   # shape [batch, grid_nn, grid_nn, cell_n*2]
+    TClogits = tf.reshape(TClogits, [-1, grid_nn, grid_nn, cell_n, 2])
+    TC = tf.nn.softmax(TClogits)                               # shape [batch, GRID_N,GRID_N,CELL_B,2]
+    TC_noplane, TC_plane = tf.unstack(TC, axis=-1)
+    TCsim = tf.cast(tf.argmax(TC, axis=-1), dtype=tf.float32)  # shape [batch, GRID_N,GRID_N,CELL_B]
+
+    # leave some breathing room to the roi sizes so that rois from adjacent cells can reach into this one
+    # only do this at training time to account for slightly misplaced ground truth ROIs. No need at prediction time.
+    TX = TX * 1.0 * params["cell_grow"]
+    TY = TY * 1.0 * params["cell_grow"]
+    if mode == tf.estimator.ModeKeys.PREDICT:
+        TX = tf.clip_by_value(TX, -1.0, 1.0)
+        TY = tf.clip_by_value(TY, -1.0, 1.0)
+
+    DETECTION_TRESHOLD = 0.5  # plane "detected" if predicted C>0.5
+    detected_TW = tf.where(tf.greater(TCsim, DETECTION_TRESHOLD), TW, tf.zeros_like(TW))
+    # all rois with confidence factors
+    predicted_rois = tf.stack([TX,TY,TW], axis=-1)  # shape [batch, GRID_N, GRID_N, CELL_B, 3]
+    predicted_rois = boxutils.grid_cell_to_tile_coords(predicted_rois, grid_nn, TILE_SIZE)/TILE_SIZE
+    predicted_rois = tf.reshape(predicted_rois, [-1, grid_nn*grid_nn*cell_n, 4])
+    predicted_C = tf.reshape(TCsim, [-1, grid_nn*grid_nn*cell_n])
+    # only the rois with confidence > DETECTION_TRESHOLD
+    detected_rois = tf.stack([TX,TY,detected_TW], axis=-1)  # shape [batch, GRID_N, GRID_N, CELL_B, 3]
+    detected_rois = boxutils.grid_cell_to_tile_coords(detected_rois, grid_nn, TILE_SIZE)/TILE_SIZE
+    detected_rois = tf.reshape(detected_rois, [-1, grid_nn*grid_nn*cell_n, 4])
+    detected_rois, detected_rois_overflow = boxutils.remove_empty_rois(detected_rois, MAX_DETECTED_ROIS_PER_TILE)
+
+    loss = train_op = eval_metrics = None
+    if mode != tf.estimator.ModeKeys.PREDICT:
+        ZERO_W = 0.0001
+        C_ = labels["count"]
+        T_ = labels["yolo_target_rois"]  # shape [4,4,3,3] = [batch, GRID_N, GRID_N, CEL_B, xyw]
+        target_rois = labels["target_rois"] # shape [batch, MAX_TARGET_ROIS_PER_TILE, x1y1x2y2]
+        TX_, TY_, TW_ = tf.unstack(T_, 3, axis=-1) # shape 3 x [batch, 4,4,3] = [batch, GRID_N, GRID_N, CELL_B]
+        # target probability is 1 if there is a corresponding target box, 0 otherwise
+        bTC_ = tf.greater(TW_, ZERO_W)
+        onehotTC_ = tf.one_hot(tf.cast(bTC_, tf.int32), 2, dtype=tf.float32)
+        fTC_ = tf.cast(bTC_, tf.float32) # shape [batch, 4,4,3] = [batch, GRID_N, GRID_N, CELL_B]
+
+        # accuracy
+        ERROR_TRESHOLD = 0.3  # plane correctly localized if predicted x,y,w within % of ground truth
+        detect_correct = tf.logical_not(tf.logical_xor(tf.greater(TCsim, DETECTION_TRESHOLD), bTC_))
+        ones = tf.ones(tf.shape(TW_))
+        nonzero_TW_ = tf.where(bTC_, TW_, ones)
+        # true if correct size where there is a plane, nonsense value where there is no plane
+        size_correct = tf.less(tf.abs(TW - TW_) / nonzero_TW_, ERROR_TRESHOLD)
+        # true if correct position where there is a plane, nonsense value where there is no plane
+        position_correct = tf.less(tf.sqrt(tf.square(TX-TX_) + tf.square(TY-TY_)) / nonzero_TW_ / grid_nn, ERROR_TRESHOLD)
+        truth_no_plane = tf.logical_not(bTC_)
+        size_correct = tf.logical_or(size_correct, truth_no_plane)
+        position_correct = tf.logical_or(position_correct, truth_no_plane)
+        size_correct = tf.logical_and(detect_correct, size_correct)
+        position_correct = tf.logical_and(detect_correct, position_correct)
+        all_correct = tf.logical_and(size_correct, position_correct)
+        mistakes = tf.reduce_sum(tf.cast(tf.logical_not(all_correct), tf.int32), axis=[1,2,3])  # shape [batch]
+
+        # IOU (Intersection Over Union) accuracy
+        iou_accuracy = IOUCalculator.batch_intersection_over_union(detected_rois*TILE_SIZE, target_rois*TILE_SIZE, SIZE=TILE_SIZE)
+        iou_accuracy_overflow = tf.greater(tf.reduce_sum(detected_rois_overflow), 0)
+        # check that we are not overflowing the tensor size. Issue a warning if we are. This should only happen at
+        # the begining of the training with a completely uninitialized network.
+        iou_accuracy = tf.cond(iou_accuracy_overflow, lambda: tf.Print(iou_accuracy, [detected_rois_overflow],
+                                                                       summarize=250, message="ROI tensor overflow in IOU computation. The computed IOU is not correct and will"
+                                                                                              "be reported as 0. Increase MAX_DETECTED_ROIS_PER_TILE to avoid."), lambda: tf.identity(iou_accuracy))
+        #if mode == tf.estimator.ModeKeys.EVAL:
+        #    iou_accuracy = tf.Print(iou_accuracy, [iou_accuracy], summarize=100, message="Eval IOU: ")
+
+        iou_accuracy = IOUCalculator.batch_mean(iou_accuracy)
+
+        #if mode == tf.estimator.ModeKeys.EVAL:
+        #    iou_accuracy = tf.Print(iou_accuracy, [iou_accuracy], summarize=100, message="Eval batch average IOU: ")
+
+        # set iou_accuracy to 0 if there has been any overflow in its computation
+        iou_accuracy = tf.where(iou_accuracy_overflow, tf.zeros_like(iou_accuracy), iou_accuracy)
+
+        # debug images
+        debug_img = X
+        debug_img = image_compose(debug_img, get_top_right_red_white_digits(mistakes))
+        # debug: ground truth boxes in grey
+        debug_img = draw_color_boxes(debug_img, target_rois, 0.7, 0.7, 0.7)
+        # debug: computed ROIs boxes in shades of yellow
+        no_box = tf.zeros(tf.shape(predicted_rois))
+        select = tf.stack([predicted_C, predicted_C, predicted_C, predicted_C], axis=-1)
+        select_correct = tf.reshape(all_correct, [-1, grid_nn*grid_nn*cell_n])
+        select_size_correct = tf.reshape(size_correct, [-1, grid_nn*grid_nn*cell_n])
+        select_position_correct = tf.reshape(position_correct, [-1, grid_nn*grid_nn*cell_n])
+
+        select_correct = tf.stack([select_correct,select_correct,select_correct,select_correct], axis=2)
+        select_size_correct = tf.stack([select_size_correct,select_size_correct,select_size_correct,select_size_correct], axis=2)
+        select_position_correct = tf.stack([select_position_correct,select_position_correct,select_position_correct,select_position_correct], axis=2)
+
+        correct_rois = tf.where(select_correct, predicted_rois, no_box)
+        other_rois = tf.where(tf.logical_not(select_correct), predicted_rois, no_box)
+        correct_size_rois = tf.where(select_size_correct, other_rois, no_box)
+        other_rois = tf.where(tf.logical_not(select_size_correct), other_rois, no_box)
+        correct_pos_rois = tf.where(select_position_correct, other_rois, no_box)
+        other_rois = tf.where(tf.logical_not(select_position_correct), other_rois, no_box)
+        # correct rois in yellow
+        for i in range(9):
+            debug_rois = tf.where(tf.greater(select, 0.1*(i+1)), correct_rois, no_box)
+            debug_img = draw_color_boxes(debug_img, debug_rois, 0.1*(i+2), 0.1*(i+2), 0)
+        # size only correct rois in orange
+        for i in range(9):
+            debug_rois = tf.where(tf.greater(select, 0.1*(i+1)), correct_size_rois, no_box)
+            debug_img = draw_color_boxes(debug_img, debug_rois, 0.1*(i+2), 0.05*(i+2), 0)
+        # position only correct rois in purple
+        for i in range(9):
+            debug_rois = tf.where(tf.greater(select, 0.1*(i+1)), correct_pos_rois, no_box)
+            debug_img = draw_color_boxes(debug_img, debug_rois, 0.05*(i+2), 0, 0.1*(i+2))
+        # incorrect rois in red
+        for i in range(9):
+            debug_rois = tf.where(tf.greater(select, 0.1*(i+1)), other_rois, no_box)
+            debug_img = draw_color_boxes(debug_img, debug_rois, 0.1*(i+2), 0, 0)
+        tf.summary.image("input_image", debug_img, max_outputs=20)
+
+        # model outputs
+        position_loss = tf.reduce_mean(fTC_ * (tf.square(TX-TX_)+tf.square(TY-TY_)))
+        size_loss = tf.reduce_mean(fTC_ * tf.square(TW-TW_) * 2)
+        obj_loss = tf.losses.softmax_cross_entropy(onehotTC_, TClogits)
+
+        # YOLO trick: weights the different losses differently
+        LW1 = params['lw1']
+        LW2 = params['lw2']
+        LW3 = params['lw3']
+        LWT = (LW1 + LW2 + LW3)*1.0 # 1.0 needed here to convert to float
+        w_obj_loss = obj_loss*(LW1/LWT)
+        w_position_loss = position_loss*(LW2/LWT)
+        w_size_loss = size_loss*(LW3/LWT)
+        loss = w_position_loss + w_size_loss + w_obj_loss
+
+        # average number of mistakes per image
+        nb_mistakes = tf.reduce_sum(mistakes)
+
+        lr = learn_rate(params['lr0'], tf.train.get_or_create_global_step())
+        optimizer = tf.train.AdamOptimizer(lr)
+        train_op = tf.contrib.training.create_train_op(loss, optimizer)
+        eval_metrics = {
+            "position_error": tf.metrics.mean(w_position_loss),
+            "size_error": tf.metrics.mean(w_size_loss),
+            "plane_cross_entropy_error": tf.metrics.mean(w_obj_loss),
+            "mistakes": tf.metrics.mean(nb_mistakes),
+            'IOU': tf.metrics.mean(iou_accuracy)
+        }
+        #debug
+        tf.summary.scalar("position_error", w_position_loss)
+        tf.summary.scalar("size_error", w_size_loss)
+        tf.summary.scalar("plane_cross_entropy_error", w_obj_loss)
+        tf.summary.scalar("loss", loss)
+        tf.summary.scalar("mistakes", nb_mistakes)
+        tf.summary.scalar("learning_rate", lr)
+        #tf.summary.scalar("IOU", iou_accuracy) # This would run out of memory
+
+    return tf.estimator.EstimatorSpec(
+        mode=mode,
+        predictions={"rois":predicted_rois, "rois_confidence": predicted_C},  # name these fields as you like
+        loss=loss,
+        train_op=train_op,
+        eval_metric_ops=eval_metrics,
+        # the visualisation GUI was coded for swapped coordinates y1x1y2x2
+        export_outputs={'classes': tf.estimator.export.PredictOutput({"rois":boxutils.swap_xy(predicted_rois), "rois_confidence": predicted_C})}
+    )
+
+# Model
+def model_fn_squeeze3(features, labels, mode, params):
+
+    # YOLO parameters: each tile is divided into a grid_nn x grid_nn grid,
+    # each grid cell predicts cell_n ROIs.
+    grid_nn = params["grid_nn"]
+    cell_n = params["cell_n"]
+    base_depth = params["base_depth5"] * 5 # to make it continuous for hyperparam tuning
+    layers_n = params["layers21"] * 2 + 1
+    depth_increment = params["depth_increment"]
+
+    def learn_rate(lr, step):
+        return params['lr1'] + tf.train.exponential_decay(lr, step, params['lr2'], 1/math.e)
+
+    def batch_normalization(x):  # axis=-1 will work for both dense and convolutional layers
+        return tf.layers.batch_normalization(x, axis=-1, momentum=params['bnexp'], epsilon=1e-5, center=True, scale=False, training=(mode == tf.estimator.ModeKeys.TRAIN))
+
+    def dropout(x):
+        # dropout mask stays constant when scanning the image in X and Y with a filter
+        # in the noise_shape parameter, 1 means "keep the dropout mask the same when this dimension changes"
+        noiseshape = tf.shape(x)
+        noiseshape = noiseshape * tf.constant([1,0,0,1]) + tf.constant([0,1,1,0])
+        y = tf.layers.dropout(x, params["dropout"], noise_shape=noiseshape)
+        return y
+
+    def layer_conv2d_batch_norm_relu(x, filters, kernel_size, strides=1):
+        y = tf.layers.conv2d(x, filters=filters, kernel_size=kernel_size, strides=strides, padding="same", activation=None, use_bias=False)
+        return dropout(tf.nn.relu(batch_normalization(y)))
+
+    def layer_conv1x1_batch_norm(x, depth):
+        y = tf.layers.conv2d(x, filters=depth, kernel_size=1, strides=1, padding="same", activation=None, use_bias=False)
+        return batch_normalization(y)
+
+    def layer_conv1x1(x, depth):
+        return tf.layers.conv2d(x, filters=depth, kernel_size=1, strides=1, padding="same", activation=None, use_bias=True)
+
+    def log_and_update_layer_stats(info, layer_name, output, layers_incr, weights_incr, log_layer_number=True, depth_multiplier=0):
+        info["layers"] += layers_incr
+        info["weights"] += weights_incr
+        depth = output.get_shape()[3]
+        message_weights = "({:,d} weights)".format(weights_incr).rjust(20)
+        message_depth_multiplier = "" if depth_multiplier==0 else "*{}".format(depth_multiplier)
+        message_shape = "{}x{}x{}{}".format(output.get_shape()[1], output.get_shape()[2], depth, message_depth_multiplier).ljust(14)
+        message1 = "NN layer {:>2}: {:>13} -> {} {}".format(info["layers"], layer_name, message_shape, message_weights)
+        message2 = "NN layer {} -> {}       {}".format(layer_name, message_shape, message_weights)
+        logging.log(logging.INFO, message1 if log_layer_number else message2)
+        return info
+
+    def count_conv_weights(input, output, filters):
+        return int(input.get_shape()[3] * output.get_shape()[3] * filters * filters)
+
+    def layer_squeeze(x, depth, info):
+        y = layer_conv2d_batch_norm_relu(x, filters=depth, kernel_size=1, strides=1)
+        info = log_and_update_layer_stats(info, "squeeze", y, 1, count_conv_weights(x,y,1))
+        return y, info
+
+    def layer_expand(x, depth, info):
+        y1x1 = layer_conv2d_batch_norm_relu(x, filters=depth//2, kernel_size=1, strides=1)
+        y3x3 = layer_conv2d_batch_norm_relu(x, filters=depth//2, kernel_size=3, strides=1)
+        y = tf.concat([y1x1, y3x3], 3)
+        info = log_and_update_layer_stats(info, "expand", y3x3, 1, count_conv_weights(x,y1x1,1) + count_conv_weights(x,y3x3,3), depth_multiplier=2)
+        return y, info
+
+    def layers_squeeze_expand(x, depth_increment, info):
+        depth = int(x.get_shape()[3])//2
+        depth += depth_increment
+        x, info = layer_squeeze(x, depth, info)
+        depth += depth_increment
+        x, info = layer_expand(x, 2*depth, info)
+        return x, info
+
+    # TODO: test both varieties of maxpool: pool_size=3, strides=2 | pool_size=2, strides=2
+    def layer_maxpool(x, info, info_width_depth=""):
+        #logging.log(logging.INFO, "NN layer maxpool -> {}x{}x{}".format(x.get_shape()[1], x.get_shape()[2], x.get_shape()[3]))
+        y = tf.layers.max_pooling2d(x, pool_size=2, strides=2, padding="same")
+        info = log_and_update_layer_stats(info, "maxpool 2x2", y, 0, 0, log_layer_number=False)
+        return y, info
+
+    layers_n = (layers_n - 3) // 2
+    layers_n = [2,
+                (layers_n + 0) // 4 * 2,
+                (layers_n + 2) // 4 * 2,
+                (layers_n + 3) // 4 * 2,
+                (layers_n + 1) // 4 * 2,
+                1]
+    logging.log(logging.INFO, "NN layers: {} + {} + {} + {} + {} + {} = {}".format(layers_n[0], layers_n[1], layers_n[2], layers_n[3], layers_n[4], layers_n[5], sum(layers_n)))
+
+    # model inputs
+    X = features["image"]
+    X = tf.to_float(X) / 255.0 # input image format is uint8
+
+    # simplified small squeezenet architecture
+
+    #logging.log(logging.INFO, "NN layer {1:>2}: conv 3x3x{0} -> 256x256x{0}".format(base_depth*2, 1))
+    info = {"layers": 0, "weights": 0}
+    Y = layer_conv2d_batch_norm_relu(X, filters=base_depth*2, kernel_size=3, strides=1)
+    info = log_and_update_layer_stats(info, "conv 3x3x{}".format(base_depth*2), Y, 1, count_conv_weights(X,Y,3))
+    Y, info = layer_expand(Y, 2*base_depth, info)
+
+    Y, info = layer_maxpool(Y, info)
+    for _ in range(0, layers_n[1], 2):
+        Y, info = layers_squeeze_expand(Y, depth_increment, info)
+    Y, info = layer_maxpool(Y, info)
+    for _ in range(0, layers_n[2], 2):
+        Y, info = layers_squeeze_expand(Y, depth_increment, info)
+    Y, info = layer_maxpool(Y, info)
+    for _ in range(0, layers_n[3], 2):
+        Y, info = layers_squeeze_expand(Y, -depth_increment, info)
+    Y, info = layer_maxpool(Y, info)
+    for _ in range(0, layers_n[4], 2):
+        Y, info = layers_squeeze_expand(Y, -depth_increment, info)
+
+    # YOLO bounding box head
+    #
+
+    # not needed at GRID_N=16
+    # for GRID_N=16, need pool_size=1, strides=1
+    # for GRID_N=8, need pool_size=2, strides=2
+    # for GRID_N=4, need pool_size=4, strides=4
+    pool_size = 16//grid_nn
+    T = tf.layers.average_pooling2d(Y, pool_size=pool_size, strides=pool_size, padding="valid") # [batch, grid_nn, grid_nn, cell_n*32]
+    # for each cell, this has CELL_B predictions of bounding box (x,y,w,c)
+    # apply tanh for x, y and sigmoid for w, c
+    TX0, TY0, TW0, TC00, TC01 = tf.split(T, 5, axis=-1)  # shape 4 x [batch, grid_nn, grid_nn, 16]
+    TC0 = tf.concat([TC00, TC01], axis=-1)
+    TX = tf.nn.tanh(layer_conv1x1_batch_norm(TX0, depth=cell_n))  # shape [batch, grid_nn, grid_nn, cell_n]
+    TY = tf.nn.tanh(layer_conv1x1_batch_norm(TY0, depth=cell_n))  # shape [batch, grid_nn, grid_nn, cell_n]
+    TW = tf.nn.sigmoid(layer_conv1x1_batch_norm(TW0, depth=cell_n))  # shape [batch, grid_nn, grid_nn, cell_n]
+    info = log_and_update_layer_stats(info, "YOLO head - avg pool to {0}x{0} grid cells + conv 1x1x5*{1}".format(grid_nn, cell_n), TW, 1, 5*count_conv_weights(TC00, TW, 1), depth_multiplier=5)
+    logging.log(logging.INFO, "NN layers total weights {:,d}".format(info["weights"]))
+    #  2 is the number of classes: planes, or no planes
+    TClogits = layer_conv1x1(TC0, depth=cell_n*2)   # shape [batch, grid_nn, grid_nn, cell_n*2]
+    TClogits = tf.reshape(TClogits, [-1, grid_nn, grid_nn, cell_n, 2])
+    TC = tf.nn.softmax(TClogits)                               # shape [batch, GRID_N,GRID_N,CELL_B,2]
+    TC_noplane, TC_plane = tf.unstack(TC, axis=-1)
+    TCsim = tf.cast(tf.argmax(TC, axis=-1), dtype=tf.float32)  # shape [batch, GRID_N,GRID_N,CELL_B]
+
+    # leave some breathing room to the roi sizes so that rois from adjacent cells can reach into this one
+    # only do this at training time to account for slightly misplaced ground truth ROIs. No need at prediction time.
+    TX = TX * 1.0 * params["cell_grow"]
+    TY = TY * 1.0 * params["cell_grow"]
+    if mode == tf.estimator.ModeKeys.PREDICT:
+        TX = tf.clip_by_value(TX, -1.0, 1.0)
+        TY = tf.clip_by_value(TY, -1.0, 1.0)
+
+    DETECTION_TRESHOLD = 0.5  # plane "detected" if predicted C>0.5
+    detected_TW = tf.where(tf.greater(TCsim, DETECTION_TRESHOLD), TW, tf.zeros_like(TW))
+    # all rois with confidence factors
+    predicted_rois = tf.stack([TX,TY,TW], axis=-1)  # shape [batch, GRID_N, GRID_N, CELL_B, 3]
+    predicted_rois = boxutils.grid_cell_to_tile_coords(predicted_rois, grid_nn, TILE_SIZE)/TILE_SIZE
+    predicted_rois = tf.reshape(predicted_rois, [-1, grid_nn*grid_nn*cell_n, 4])
+    predicted_C = tf.reshape(TCsim, [-1, grid_nn*grid_nn*cell_n])
+    # only the rois with confidence > DETECTION_TRESHOLD
+    detected_rois = tf.stack([TX,TY,detected_TW], axis=-1)  # shape [batch, GRID_N, GRID_N, CELL_B, 3]
+    detected_rois = boxutils.grid_cell_to_tile_coords(detected_rois, grid_nn, TILE_SIZE)/TILE_SIZE
+    detected_rois = tf.reshape(detected_rois, [-1, grid_nn*grid_nn*cell_n, 4])
+    detected_rois, detected_rois_overflow = boxutils.remove_empty_rois(detected_rois, MAX_DETECTED_ROIS_PER_TILE)
+
+    loss = train_op = eval_metrics = None
+    if mode != tf.estimator.ModeKeys.PREDICT:
+        ZERO_W = 0.0001
+        C_ = labels["count"]
+        T_ = labels["yolo_target_rois"]  # shape [4,4,3,3] = [batch, GRID_N, GRID_N, CEL_B, xyw]
+        target_rois = labels["target_rois"] # shape [batch, MAX_TARGET_ROIS_PER_TILE, x1y1x2y2]
+        TX_, TY_, TW_ = tf.unstack(T_, 3, axis=-1) # shape 3 x [batch, 4,4,3] = [batch, GRID_N, GRID_N, CELL_B]
+        # target probability is 1 if there is a corresponding target box, 0 otherwise
+        bTC_ = tf.greater(TW_, ZERO_W)
+        onehotTC_ = tf.one_hot(tf.cast(bTC_, tf.int32), 2, dtype=tf.float32)
+        fTC_ = tf.cast(bTC_, tf.float32) # shape [batch, 4,4,3] = [batch, GRID_N, GRID_N, CELL_B]
+
+        # accuracy
+        ERROR_TRESHOLD = 0.3  # plane correctly localized if predicted x,y,w within % of ground truth
+        detect_correct = tf.logical_not(tf.logical_xor(tf.greater(TCsim, DETECTION_TRESHOLD), bTC_))
+        ones = tf.ones(tf.shape(TW_))
+        nonzero_TW_ = tf.where(bTC_, TW_, ones)
+        # true if correct size where there is a plane, nonsense value where there is no plane
+        size_correct = tf.less(tf.abs(TW - TW_) / nonzero_TW_, ERROR_TRESHOLD)
+        # true if correct position where there is a plane, nonsense value where there is no plane
+        position_correct = tf.less(tf.sqrt(tf.square(TX-TX_) + tf.square(TY-TY_)) / nonzero_TW_ / grid_nn, ERROR_TRESHOLD)
+        truth_no_plane = tf.logical_not(bTC_)
+        size_correct = tf.logical_or(size_correct, truth_no_plane)
+        position_correct = tf.logical_or(position_correct, truth_no_plane)
+        size_correct = tf.logical_and(detect_correct, size_correct)
+        position_correct = tf.logical_and(detect_correct, position_correct)
+        all_correct = tf.logical_and(size_correct, position_correct)
+        mistakes = tf.reduce_sum(tf.cast(tf.logical_not(all_correct), tf.int32), axis=[1,2,3])  # shape [batch]
+
+        # IOU (Intersection Over Union) accuracy
+        iou_accuracy = IOUCalculator.batch_intersection_over_union(detected_rois*TILE_SIZE, target_rois*TILE_SIZE, SIZE=TILE_SIZE)
+        iou_accuracy_overflow = tf.greater(tf.reduce_sum(detected_rois_overflow), 0)
+        # check that we are not overflowing the tensor size. Issue a warning if we are. This should only happen at
+        # the begining of the training with a completely uninitialized network.
+        iou_accuracy = tf.cond(iou_accuracy_overflow, lambda: tf.Print(iou_accuracy, [detected_rois_overflow],
+                                                                       summarize=250, message="ROI tensor overflow in IOU computation. The computed IOU is not correct and will"
+                                                                                              "be reported as 0. Increase MAX_DETECTED_ROIS_PER_TILE to avoid."), lambda: tf.identity(iou_accuracy))
+        iou_accuracy = IOUCalculator.batch_mean(iou_accuracy)
+        # set iou_accuracy to 0 if there has been any overflow in its computation
+        iou_accuracy = tf.where(iou_accuracy_overflow, tf.zeros_like(iou_accuracy), iou_accuracy)
+
+        # debug images
+        debug_img = X
+        debug_img = image_compose(debug_img, get_top_right_red_white_digits(mistakes))
+        # debug: ground truth boxes in grey
+        debug_img = draw_color_boxes(debug_img, target_rois, 0.7, 0.7, 0.7)
+        # debug: computed ROIs boxes in shades of yellow
+        no_box = tf.zeros(tf.shape(predicted_rois))
+        select = tf.stack([predicted_C, predicted_C, predicted_C, predicted_C], axis=-1)
+        select_correct = tf.reshape(all_correct, [-1, grid_nn*grid_nn*cell_n])
+        select_size_correct = tf.reshape(size_correct, [-1, grid_nn*grid_nn*cell_n])
+        select_position_correct = tf.reshape(position_correct, [-1, grid_nn*grid_nn*cell_n])
+
+        select_correct = tf.stack([select_correct,select_correct,select_correct,select_correct], axis=2)
+        select_size_correct = tf.stack([select_size_correct,select_size_correct,select_size_correct,select_size_correct], axis=2)
+        select_position_correct = tf.stack([select_position_correct,select_position_correct,select_position_correct,select_position_correct], axis=2)
+
+        correct_rois = tf.where(select_correct, predicted_rois, no_box)
+        other_rois = tf.where(tf.logical_not(select_correct), predicted_rois, no_box)
+        correct_size_rois = tf.where(select_size_correct, other_rois, no_box)
+        other_rois = tf.where(tf.logical_not(select_size_correct), other_rois, no_box)
+        correct_pos_rois = tf.where(select_position_correct, other_rois, no_box)
+        other_rois = tf.where(tf.logical_not(select_position_correct), other_rois, no_box)
+        # correct rois in yellow
+        for i in range(9):
+            debug_rois = tf.where(tf.greater(select, 0.1*(i+1)), correct_rois, no_box)
+            debug_img = draw_color_boxes(debug_img, debug_rois, 0.1*(i+2), 0.1*(i+2), 0)
+        # size only correct rois in orange
+        for i in range(9):
+            debug_rois = tf.where(tf.greater(select, 0.1*(i+1)), correct_size_rois, no_box)
+            debug_img = draw_color_boxes(debug_img, debug_rois, 0.1*(i+2), 0.05*(i+2), 0)
+        # position only correct rois in purple
+        for i in range(9):
+            debug_rois = tf.where(tf.greater(select, 0.1*(i+1)), correct_pos_rois, no_box)
+            debug_img = draw_color_boxes(debug_img, debug_rois, 0.05*(i+2), 0, 0.1*(i+2))
+        # incorrect rois in red
+        for i in range(9):
+            debug_rois = tf.where(tf.greater(select, 0.1*(i+1)), other_rois, no_box)
+            debug_img = draw_color_boxes(debug_img, debug_rois, 0.1*(i+2), 0, 0)
+        tf.summary.image("input_image", debug_img, max_outputs=20)
+
+        # model outputs
+        position_loss = tf.reduce_mean(fTC_ * (tf.square(TX-TX_)+tf.square(TY-TY_)))
+        size_loss = tf.reduce_mean(fTC_ * tf.square(TW-TW_) * 2)
+        obj_loss = tf.losses.softmax_cross_entropy(onehotTC_, TClogits)
+
+        # YOLO trick: weights the different losses differently
+        LW1 = params['lw1']
+        LW2 = params['lw2']
+        LW3 = params['lw3']
+        LWT = (LW1 + LW2 + LW3)*1.0 # 1.0 needed here to convert to float
+        w_obj_loss = obj_loss*(LW1/LWT)
+        w_position_loss = position_loss*(LW2/LWT)
+        w_size_loss = size_loss*(LW3/LWT)
+        loss = w_position_loss + w_size_loss + w_obj_loss
+
+        # average number of mistakes per image
+        nb_mistakes = tf.reduce_sum(mistakes)
+
+        lr = learn_rate(params['lr0'], tf.train.get_or_create_global_step())
+        optimizer = tf.train.AdamOptimizer(lr)
+        train_op = tf.contrib.training.create_train_op(loss, optimizer)
+        eval_metrics = {
+            "position_error": tf.metrics.mean(w_position_loss),
+            "size_error": tf.metrics.mean(w_size_loss),
+            "plane_cross_entropy_error": tf.metrics.mean(w_obj_loss),
+            "mistakes": tf.metrics.mean(nb_mistakes),
+            'IOU': tf.metrics.mean(iou_accuracy)
+        }
+        #debug
+        tf.summary.scalar("position_error", w_position_loss)
+        tf.summary.scalar("size_error", w_size_loss)
+        tf.summary.scalar("plane_cross_entropy_error", w_obj_loss)
+        tf.summary.scalar("loss", loss)
+        tf.summary.scalar("mistakes", nb_mistakes)
+        tf.summary.scalar("learning_rate", lr)
+        #tf.summary.scalar("IOU", iou_accuracy) # This would run out of memory
+
+    return tf.estimator.EstimatorSpec(
+        mode=mode,
+        predictions={"rois":predicted_rois, "rois_confidence": predicted_C},  # name these fields as you like
+        loss=loss,
+        train_op=train_op,
+        eval_metric_ops=eval_metrics,
+        # the visualisation GUI was coded for swapped coordinates y1x1y2x2
+        export_outputs={'classes': tf.estimator.export.PredictOutput({"rois":boxutils.swap_xy(predicted_rois), "rois_confidence": predicted_C})}
     )

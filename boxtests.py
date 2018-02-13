@@ -133,7 +133,34 @@ class BoxRoiUtilsTest(unittest.TestCase):
             #print(res2)
         d1 = np.linalg.norm(res1-correct1)
         d2 = np.linalg.norm(res2-correct2)
-        self.assertTrue((d1+d2)<1e-6, "IOUmap.batch_iou test failed")
+        self.assertTrue((d1+d2)<1e-6, "IOUCalculator.batch_iou test failed")
+
+    def test_batch_iou_mean(self):
+        ious1 = tf.constant([0, 1, 0.3, 0.9, 0.8], dtype=tf.float32)  # 1s are ignored in the average
+        ious2 = tf.constant([0, 0, 0, 0, 0], dtype=tf.float32)
+        ious3 = tf.constant([1, 1, 1, 1, 1], dtype=tf.float32) # the average is undefined when 1s are ignored, 1 is returned
+        ious4 = tf.constant([1, 1, 1, 0.99, 1], dtype=tf.float32)
+        mean1 = IOUCalculator.batch_mean(ious1)
+        mean2 = IOUCalculator.batch_mean(ious2)
+        mean3 = IOUCalculator.batch_mean(ious3)
+        mean4 = IOUCalculator.batch_mean(ious4)
+        with tf.Session() as sess:
+            res1 = sess.run(mean1)
+            res2 = sess.run(mean2)
+            res3 = sess.run(mean3)
+            res4 = sess.run(mean4)
+            print(res4)
+        correct1 = 0.5
+        correct2 = 0
+        correct3 = 1.0
+        correct4 = 0.99
+        d1 = res1-correct1
+        d2 = res2-correct2
+        d3 = res3-correct3
+        d4 = np.linalg.norm(res4-correct4)
+        #print(d4)
+        self.assertTrue(d1==0 and d2==0 and d3==0 and d4<1e-6, "IOUCalculator.batch_mean test failed")
+
 
 
     def test_grid_cell_to_tile_coords(self):
