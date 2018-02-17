@@ -31,8 +31,6 @@ var tile_size = 256
 // jpeg_yolo_256x256 supports square tiles of 256 pixels only
 var tile_delay = 50 // delay in ms between consecutive calls to ML Engine online predictions API (can be 0)
 
-var reload_once = false
-
 // all button event handlers
 var analyzeButton = document.getElementById('analyze-button');
 var authorizeButton = document.getElementById('authorize-button');
@@ -44,9 +42,12 @@ var airports = new Object()
 airports.TLS = [43.629450, 1.364613]
 airports.LAX = [33.943560, -118.411534]
 airports.SFO = [37.618887, -122.379771]
+airports.SFO2 = [37.61986428512326, -122.39355755433655]
 airports.CDG = [49.009441, 2.557194]
 airports.LBG = [48.961900, 2.439519]
+airports.LBG2 = [48.963465356635695, 2.4394921779098695]
 airports.SEA = [47.443495, -122.307206]
+airports.SEA2 = [47.43486679675242, -122.30547865739442]
 airports.NRT = [35.764783, 140.390962]
 airports.ICN = [37.461626, 126.443786]
 airports.DMA = [32.160020, -110.836055]

@@ -52,7 +52,8 @@ function processPixels(canvas, sx, sy, sw, sh, visu) {
         var rlonce = query.get("r")
         if (rlonce != "1") {
             setMapLocationInURL(googlemap.getCenter(), googlemap.getZoom(), 1)
-            location.reload()
+            setTimeout(grabPixels, 100)  // it works better to retry the grab
+            //location.reload()         // rather than reload everyting...
             return
         }
     }
@@ -110,5 +111,6 @@ function hasBackgroundInAnyCorner(imgdata) {
     var h = imgdata.height
     var r=229, g=227, b=223
     function is_background_pix(x, y) {return data[(y*w+x)*4]==r && data[(y*w+x)*4+1]==g && data[(y*w+x)*4+2]==b}
+    a = is_background_pix(0,0)
     return is_background_pix(0,0) || is_background_pix(w-1, 0) || is_background_pix(0, h-1) || is_background_pix(w-1, h-1)
 }

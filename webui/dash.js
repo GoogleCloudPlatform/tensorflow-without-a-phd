@@ -43,6 +43,10 @@ function updateSigninStatus(isSignedIn) {
 function analyze() {
     resetResults()
     var delay = 0
+
+    var model_url = "projects/cloudml-demo-martin/models/" + document.modsel.model.value
+    var model_version = /\/v([0-9].*)/.exec(model_url)[1] // can be undefined
+
     payload_tiles.map(function (tile) {
         setTimeout(function() {
             processingResults(tile)
@@ -50,7 +54,7 @@ function analyze() {
             var body = mlengineJSONify(tile)
             // magic formula: the body of the request goes into the "resource" parameter
             mlengine.projects.predict({
-                name: "projects/cloudml-demo-martin/models/" + document.modsel.model.value,
+                name: model_url,
                 //name: "projects/cloudml-demo-martin/models/plane_jpeg_scan_100_200_300_400_600_900/versions/v7_256x256",
                 //name: "projects/cloudml-demo-martin/models/jpeg_yolo_256x256",
                 resource: body
@@ -85,7 +89,7 @@ function analyze() {
                             }
                         })
                         undisplayProcessingMarker(tile)
-                        displayResultMarkers(tile, result_markers)
+                        displayResultMarkers(tile, result_markers, model_version)
                         displayResults(tile, nb_planes)
                         console.info("Found planes:" + nb_planes)
                     }
@@ -160,13 +164,13 @@ function invertCoords(box) {
     return bbox
 }
 
-function displayResultMarkers(tile, markers) {
+function displayResultMarkers(tile, markers, model_version) {
     var zone = document.getElementById("zone")
     if (zone) {
         markers.map(function(box) {
             var marker = document.createElement("div")
             marker.classList = "zone-marker"
-            var invert_coords = true
+            var invert_coords = !(model_version == 19 || model_version == 20 || model_version == 23)
             var bbox = invert_coords ? invertCoords(box) : box
             marker.style.left = bbox[0] * tile.pos.sz + tile.pos.x + 'px'
             marker.style.top = bbox[1] * tile.pos.sz + tile.pos.y + 'px'

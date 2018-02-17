@@ -52,16 +52,27 @@
                 <form name="modsel">
                     <select name="model">
                         <option value="plane_jpeg_scan_100_200_300_400_600_900/versions/v00">20x20 tile classifier v0</option>
-                        <option value="plane_jpeg_scan_100_200_300_400_600_900/versions/v02">20x20 tile regularized acc. 99.6%</option>
-                        <option value="plane_jpeg_scan_100_200_300_400_600_900/versions/v7_256x256">20x20 tile classifier (best - more data)</option>
+                        <option value="plane_jpeg_scan_100_200_300_400_600_900/versions/v02">20x20 tile regularized accuracy 99.6%</option>
+                        <option value="plane_jpeg_scan_100_200_300_400_600_900/versions/v7_256x256">20x20 tile classifier best - more data</option>
+                        <!--
                         <option value="jpeg_yolo_256x256/versions/v1">YOLO detection 8x8x1</option>
+                        -->
                         <option value="jpeg_yolo_256x256/versions/v5">YOLO detection 16x16x2, swarm optimized</option>
-                        <option value="jpeg_yolo_256x256/versions/v18" selected>YOLO detection 16x16x2, data augment, swarm</option>
-                        <option value="jpeg_yolo_256x256/versions/v19">YOLO detection 16x16x2, small batch, data augment, swarm</option>
-                        <option value="jpeg_yolo_256x256/versions/v20">YOLO detection 16x16x2, layers 17, small batch, data augment, swarm</option>
+                        <!--
+                        <option value="jpeg_yolo_256x256/versions/v18">YOLO detection 16x16x2, data augment, swarm</option>
+                        -->
+                        <option value="jpeg_yolo_256x256/versions/v19">YOLO detection 16x16x2, data augment, swarm, small batch, </option>
+                        <option value="jpeg_yolo_256x256/versions/v20" selected>YOLO detection 16x16x2, layers 17, data augment, swarm, small batch</option>
+                        <!--
                         <option value="jpeg_yolo_256x256/versions/v21">YOLO detection 16x16x2, layers 19, small batch, dropout</option>
                         <option value="jpeg_yolo_256x256/versions/v22">YOLO detection 16x16x2, small batch, swarm 1.0</option>
                         <option value="jpeg_yolo_256x256/versions/v23">YOLO detection 16x16x2, small batch, swarm 1.3</option>
+
+                        <option value="jpeg_yolo_256x256/versions/v24">YOLO detection 16x16x2, TINY 12L, no dropout, swarm 1.0</option>
+                        <option value="jpeg_yolo_256x256/versions/v25">YOLO detection 16x16x2, SMALL 12L, dropout, swarm 1.3</option>
+                        <option value="jpeg_yolo_256x256/versions/v26">YOLO detection 16x16x2, BIG 15L, dropout, swarm 1.3</option>
+                        <option value="jpeg_yolo_256x256/versions/v27">YOLO detection 16x16x2, BIG 15L, dropout, swarm 1.0</option>
+                        -->
                     </select>
                 </form>
             </div>
@@ -73,9 +84,12 @@
                         <option value="TLS">TLS Toulouse-Blagnac</option>
                         <option value="LAX">LAX Los Angeles</option>
                         <option value="SFO">SFO San Francisco</option>
+                        <option value="SFO2">SFO San Francisco 2</option>
                         <option value="CDG">CDG Paris Roissy</option>
                         <option value="LBG">LBG Paris Le Bourget</option>
+                        <option value="LBG2">LBG Paris Le Bourget 2</option>
                         <option value="SEA">SEA Seattle Tacoma</option>
+                        <option value="SEA2">SEA Seattle Tacoma 2</option>
                         <option value="NRT">NRT Tokyo Narita</option>
                         <option value="ICN">ICN Seoul Incheon</option>
                         <option value="DMA">DMA Davis Mothan Boneyard</option>
