@@ -1,6 +1,6 @@
 import numpy as np
 from matplotlib import pyplot as plt
-from utils import pretty_matplotlib_style
+import utils_prettystyle
 
 def picture_this_1(data, datalen):
     plt.subplot(211)
