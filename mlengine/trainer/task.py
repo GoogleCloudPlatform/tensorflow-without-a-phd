@@ -32,19 +32,22 @@ def serving_input_fn():
 
 
 # In memory training data for this simple case.
-# When data is too large to fit in memory, use Tensorflow queues.
 def train_data_input_fn(mnist):
-    features, labels = tf.train.shuffle_batch([tf.constant(mnist.train.images), tf.constant(mnist.train.labels)],
-                                            batch_size=100, capacity=5000, min_after_dequeue=2000, enqueue_many=True)
-    features = {'image': features}
-    return features, labels
+    dataset = tf.data.Dataset.from_tensor_slices((mnist.train.images, mnist.train.labels))
+    dataset = dataset.shuffle(5000)
+    dataset = dataset.batch(100)
+    dataset = dataset.repeat()
+    features, labels = dataset.make_one_shot_iterator().get_next()
+    return {'image': features}, labels
 
 
-# Eval data is an in-memory constant here.
+# Eval data
 def eval_data_input_fn(mnist):
-    features, labels = tf.constant(mnist.test.images), tf.constant(mnist.test.labels)
-    features = {'image': features}
-    return features, labels
+    dataset = tf.data.Dataset.from_tensor_slices((mnist.test.images, mnist.test.labels))
+    dataset = dataset.batch(10000)  # a single batch with all the test data
+    dataset = dataset.repeat(1)
+    features, labels = dataset.make_one_shot_iterator().get_next()
+    return {'image': features}, labels
 
 
 # Learning rate with exponential decay and min value
@@ -168,7 +171,7 @@ def main(argv):
     estimator = tf.estimator.Estimator(model_fn=conv_model, model_dir=job_dir, params=hparams, config=training_config)
     train_spec = tf.estimator.TrainSpec(input_fn=lambda: train_data_input_fn(mnist), max_steps=hparams['iterations'])
     export_latest = tf.estimator.LatestExporter("mnist-model",serving_input_receiver_fn=serving_input_fn)
-    eval_spec = tf.estimator.EvalSpec(input_fn=lambda: eval_data_input_fn(mnist), steps=1, throttle_secs=0, exporters=export_latest)
+    eval_spec = tf.estimator.EvalSpec(input_fn=lambda: eval_data_input_fn(mnist), steps=1, exporters=export_latest, throttle_secs=1, start_delay_secs=1)
     tf.estimator.train_and_evaluate(estimator, train_spec, eval_spec)
 
 if __name__ == '__main__':
