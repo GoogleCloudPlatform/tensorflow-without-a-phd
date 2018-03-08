@@ -2,3 +2,4 @@ sample_results
 .ipynb_checkpoints
 utils/__pycache__
 *.pyc
+tutorial/outputdir
