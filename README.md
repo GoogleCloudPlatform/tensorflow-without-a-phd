@@ -4,7 +4,8 @@
 
 ## Requirements
 
-Install Python 3, then pip(3)-install jupyter, matplotlib and tensorflow
+Install Python 3, then pip(3)-install jupyter, matplotlib and tensorflow.
+
 On Windows, Anaconda is recommended.
 
 ## Tutorial
@@ -19,5 +20,6 @@ Notebooks execute locally. You can also run on Google Cloud ML Engine using the 
 
 ## Start here
 
-Part 1: tutorial/00_RNN_predictions_playground.ipynb
-Part 2: tutorial/01_RNN_generator_playground.ipynb 
+Part 1: [tutorial/00_RNN_predictions_playground.ipynb](tutorial/00_RNN_predictions_playground.ipynb)
+
+Part 2: [tutorial/01_RNN_generator_playground.ipynb](tutorial/01_RNN_generator_playground.ipynb) 
