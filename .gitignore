@@ -1,5 +1,11 @@
 sample_results
 .ipynb_checkpoints
-utils/__pycache__
 *.pyc
 tutorial/outputdir
+tutorial/checkpoints
+tutorial/temperatures_all
+datasets_temperature_load_test.ipynb
+datasets_temperature_load_test.py
+task.py
+tutorial/temperatures_32
+load_test_*.py
