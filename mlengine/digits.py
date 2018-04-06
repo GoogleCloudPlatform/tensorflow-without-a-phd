@@ -173,8 +173,14 @@ sdigit5b = scale(digit5b)
 test_digits = [sdigit8, sdigit7a, sdigit7b, sdigit5a, sdigit5b]
 
 if __name__ == '__main__':
-    # for online predictions, use this format
-    print(json.dumps({'image': [sdigit8, sdigit7a, sdigit7b, sdigit5a, sdigit5b]}))
 
-    # this format works for both local and online predictions
+    # for online predictions, ml-engine expects a valid JSON object with a list
+    print(json.dumps({'image': test_digits}))
+
+    # for local predictions, ml-engine expects one valid JSON object per line
     #print(json.dumps({'image': sdigit8}))
+    #print(json.dumps({'image': sdigit7a}))
+    #print(json.dumps({'image': sdigit7b}))
+    #print(json.dumps({'image': sdigit5a}))
+    #print(json.dumps({'image': sdigit5b}))
+

@@ -12,10 +12,13 @@
 
 import tensorflow as tf
 from tensorflow.python.platform import tf_logging as logging
-from tensorflow.examples.tutorials.mnist import input_data as mnist_data
+
+
+import numpy as np
 import argparse
 import math
 import sys
+from trainer.utils import maybe_download_and_ungzip
 logging.set_verbosity(logging.INFO)
 logging.log(logging.INFO, "Tensorflow version " + tf.__version__)
 
@@ -23,31 +26,67 @@ logging.log(logging.INFO, "Tensorflow version " + tf.__version__)
 # To run this: see README.md
 #
 
+def read_label(tf_bytestring):
+    label = tf.decode_raw(tf_bytestring, tf.uint8)
+    return tf.reshape(label, [])
+
+def read_image(tf_bytestring):
+    image = tf.decode_raw(tf_bytestring, tf.uint8)
+    return tf.cast(image, tf.float32)/256.0
+
+def load_mnist_data(data_dir):
+    SOURCE_URL = 'https://storage.googleapis.com/cvdf-datasets/mnist/'
+    train_images_file = 'train-images-idx3-ubyte.gz'
+    local_train_images_file = maybe_download_and_ungzip(train_images_file, data_dir, SOURCE_URL + train_images_file)
+    train_labels_file = 'train-labels-idx1-ubyte.gz'
+    local_train_labels_file = maybe_download_and_ungzip(train_labels_file, data_dir, SOURCE_URL + train_labels_file)
+    test_images_file = 't10k-images-idx3-ubyte.gz'
+    local_test_images_file = maybe_download_and_ungzip(test_images_file, data_dir, SOURCE_URL + test_images_file)
+    test_labels_file = 't10k-labels-idx1-ubyte.gz'
+    local_test_labels_file = maybe_download_and_ungzip(test_labels_file, data_dir, SOURCE_URL + test_labels_file)
+    return local_train_images_file, local_train_labels_file, local_test_images_file, local_test_labels_file
+
 # Called when the model is deployed for online predictions on Cloud ML Engine.
 def serving_input_fn():
+    # TODO: test again with the None param. This is untested!!!
     inputs = {'image': tf.placeholder(tf.float32, [None, 28, 28])}
     # Here, you can transform the data received from the API call
     features = inputs
     return tf.estimator.export.ServingInputReceiver(features, inputs)
 
 
-# In memory training data for this simple case.
-def train_data_input_fn(mnist):
-    dataset = tf.data.Dataset.from_tensor_slices((mnist.train.images, mnist.train.labels))
-    dataset = dataset.shuffle(5000)
-    dataset = dataset.batch(100)
-    dataset = dataset.repeat()
+# Load a tf.data.Dataset made of interleaved images and labels
+# from an image file and a labels file.
+def load_dataset(image_file, label_file):
+    imagedataset = tf.data.FixedLengthRecordDataset(image_file, 28*28,
+                                                    header_bytes=16, buffer_size=1024*16).map(read_image)
+    labelsdataset = tf.data.FixedLengthRecordDataset(label_file, 1,
+                                                     header_bytes=8, buffer_size=1024*16).map(read_label)
+    dataset = tf.data.Dataset.zip((imagedataset, labelsdataset))
+    return dataset
+
+
+# Returns the iterator nodes that will fedd the model with data
+# The outpt format of this function must match the input format of your model_fn
+def nodes_for_model(dataset):
     features, labels = dataset.make_one_shot_iterator().get_next()
     return {'image': features}, labels
+
+
+def train_data_input_fn(image_file, label_file):
+    dataset = load_dataset(image_file, label_file)
+    dataset = dataset.repeat()
+    dataset = dataset.shuffle(60000)
+    dataset = dataset.batch(100)
+    return nodes_for_model(dataset)
 
 
 # Eval data
-def eval_data_input_fn(mnist):
-    dataset = tf.data.Dataset.from_tensor_slices((mnist.test.images, mnist.test.labels))
+def eval_data_input_fn(image_file, label_file):
+    dataset = load_dataset(image_file, label_file)
     dataset = dataset.batch(10000)  # a single batch with all the test data
     dataset = dataset.repeat(1)
-    features, labels = dataset.make_one_shot_iterator().get_next()
-    return {'image': features}, labels
+    return nodes_for_model(dataset)
 
 
 # Learning rate with exponential decay and min value
@@ -60,7 +99,7 @@ def conv_model_loss(Ylogits, Y_, mode):
     if mode == tf.estimator.ModeKeys.TRAIN or mode == tf.estimator.ModeKeys.EVAL:
         loss = tf.reduce_mean(tf.losses.softmax_cross_entropy(tf.one_hot(Y_,10), Ylogits)) * 100
         # Tensorboard training curves
-        tf.summary.scalar("loss", loss)
+        #tf.summary.scalar("loss", loss)
         return loss
     else:
         return None
@@ -81,7 +120,7 @@ def conv_model_train_op(loss, mode, params):
 def conv_model_eval_metrics(classes, Y_, mode):
     if mode == tf.estimator.ModeKeys.TRAIN or mode == tf.estimator.ModeKeys.EVAL:
         accuracy = tf.metrics.accuracy(classes, Y_)
-        tf.summary.scalar("accuracy", tf.reduce_mean(accuracy))
+        #tf.summary.scalar("accuracy", tf.reduce_mean(accuracy))
         # You can name the fields of your metrics dictionary as you like.
         return {'accuracy': accuracy}
     else:
@@ -105,14 +144,18 @@ def conv_model(features, labels, mode, params):
     XX = tf.reshape(X, [-1, 28, 28, 1])
     Y1 = tf.layers.conv2d(XX,  filters=params['conv1'],  kernel_size=[6, 6], padding="same", kernel_initializer=weights_init)
     Y1bn = tf.nn.relu(batch_norm_cnv(Y1))
+
     Y2 = tf.layers.conv2d(Y1bn, filters=params['conv2'], kernel_size=[5, 5], padding="same", strides=2, kernel_initializer=weights_init)
     Y2bn = tf.nn.relu(batch_norm_cnv(Y2))
+
     Y3 = tf.layers.conv2d(Y2bn, filters=params['conv3'], kernel_size=[4, 4], padding="same", strides=2, kernel_initializer=weights_init)
     Y3bn = tf.nn.relu(batch_norm_cnv(Y3))
+
 
     Y4 = tf.reshape(Y3bn, [-1, params['conv3']*7*7])
     Y5 = tf.layers.dense(Y4, 200, kernel_initializer=weights_init)
     Y5bn = tf.nn.relu(batch_norm(Y5))
+
 
     # to deactivate dropout on the dense layer, set rate=1. The rate is the % of dropped neurons.
     Y5d = tf.layers.dropout(Y5bn, rate=params['dropout'], training=(mode == tf.estimator.ModeKeys.TRAIN))
@@ -142,7 +185,7 @@ def main(argv):
     # gcloud ml-engine jobs submit training jobXXX --job-dir=... --ml-engine-args -- --user-args
 
     # no batch norm: lr 0.002-0.0002-2000 is ok, over 10000 iterations (final accuracy 0.9937 loss 2.39 job156)
-    # batch norm: lr 0.02-0.0001-600 conv 16-32-64 trains in 3000 iteration (final accuracy 0.0.8849 loss 1.466 job 159)
+    # batch norm: lr 0.02-0.0001-600 conv 16-32-64 trains in 3000 iteration (final accuracy 0.9949 loss 1.466 job 159)
     parser.add_argument('--job-dir', default="checkpoints", help='GCS or local path where to store training checkpoints')
     parser.add_argument('--data-dir', default="data", help='Where training data will be loaded and unzipped')
     parser.add_argument('--hp-lr0', default=0.02, type=float, help='Hyperparameter: initial (max) learning rate')
@@ -153,7 +196,7 @@ def main(argv):
     parser.add_argument('--hp-conv2', default=12, type=int, help='Hyperparameter: depth of second convolutional layer.')
     parser.add_argument('--hp-conv3', default=24, type=int, help='Hyperparameter: depth of third convolutional layer.')
     parser.add_argument('--hp-bnexp', default=0.993, type=float, help='Hyperparameter: exponential decay for batch norm moving averages.')
-    parser.add_argument('--hp-iterations', default=10000, type=int, help='Hyperparameter: number of training iterations.')
+    parser.add_argument('--hp-iterations', default=3000, type=int, help='Hyperparameter: number of training iterations.')
     args = parser.parse_args()
     arguments = args.__dict__
 
@@ -165,13 +208,15 @@ def main(argv):
     data_dir = otherargs['data_dir']
     job_dir = otherargs.pop('job_dir')
 
-    mnist = mnist_data.read_data_sets(data_dir, reshape=True, one_hot=False, validation_size=0) # loads training and eval data in memory
+    train_images_file, train_labels_file, test_images_file, test_labels_file = load_mnist_data(data_dir)
+    def train_input_fn(): return train_data_input_fn(train_images_file, train_labels_file)
+    def eval_input_fn(): return eval_data_input_fn(test_images_file, test_labels_file)
 
-    training_config = tf.estimator.RunConfig(model_dir=job_dir, save_summary_steps=100, save_checkpoints_steps=1000)
+    training_config = tf.estimator.RunConfig(model_dir=job_dir, save_summary_steps=10, save_checkpoints_steps=200)
     estimator = tf.estimator.Estimator(model_fn=conv_model, model_dir=job_dir, params=hparams, config=training_config)
-    train_spec = tf.estimator.TrainSpec(input_fn=lambda: train_data_input_fn(mnist), max_steps=hparams['iterations'])
+    train_spec = tf.estimator.TrainSpec(train_input_fn, max_steps=hparams['iterations'])
     export_latest = tf.estimator.LatestExporter("mnist-model",serving_input_receiver_fn=serving_input_fn)
-    eval_spec = tf.estimator.EvalSpec(input_fn=lambda: eval_data_input_fn(mnist), steps=1, exporters=export_latest, throttle_secs=1, start_delay_secs=1)
+    eval_spec = tf.estimator.EvalSpec(eval_input_fn, steps=1, exporters=export_latest, throttle_secs=60)
     tf.estimator.train_and_evaluate(estimator, train_spec, eval_spec)
 
 if __name__ == '__main__':
