@@ -157,7 +157,9 @@ It = tensorflowvisu.tf_format_mnist_images(X, Y, Y_, 1000, lines=25)
 datavis = tensorflowvisu.MnistDataVis(title4="Logits", title5="Max activations across batch", histogram4colornum=2, histogram5colornum=2)
 
 
-# training step, the learning rate is a placeholder
+# training step
+# the learning rate is: # 0.0001 + 0.03 * (1/e)^(step/1000)), i.e. exponential decay from 0.03->0.0001
+lr = 0.0001 +  tf.train.exponential_decay(0.03, iter, 1000, 1/math.e)
 train_step = tf.train.AdamOptimizer(lr).minimize(cross_entropy)
 
 # init
@@ -172,20 +174,11 @@ def training_step(i, update_test_data, update_train_data):
     # training on batches of 100 images with 100 labels
     batch_X, batch_Y = mnist.train.next_batch(100)
 
-    # learning rate decay (without batch norm)
-    #max_learning_rate = 0.003
-    #min_learning_rate = 0.0001
-    #decay_speed = 2000
-    # learning rate decay (with batch norm)
-    max_learning_rate = 0.03
-    min_learning_rate = 0.0001
-    decay_speed = 1000.0
-    learning_rate = min_learning_rate + (max_learning_rate - min_learning_rate) * math.exp(-i/decay_speed)
-
     # compute training values for visualisation
     if update_train_data:
-        a, c, im, al, ac = sess.run([accuracy, cross_entropy, I, alllogits, allactivations], {X: batch_X, Y_: batch_Y, tst: False})
-        print(str(i) + ": accuracy:" + str(a) + " loss: " + str(c) + " (lr:" + str(learning_rate) + ")")
+        a, c, im, al, ac, l = sess.run([accuracy, cross_entropy, I, alllogits, allactivations, lr],
+                                       feed_dict={X: batch_X, Y_: batch_Y, iter: i, tst: False})
+        print(str(i) + ": accuracy:" + str(a) + " loss: " + str(c) + " (lr:" + str(l) + ")")
         datavis.append_training_curves_data(i, a, c)
         datavis.update_image1(im)
         datavis.append_data_histograms(i, al, ac)
@@ -198,8 +191,7 @@ def training_step(i, update_test_data, update_train_data):
         datavis.update_image2(im)
 
     # the backpropagation training step
-    sess.run(train_step, {X: batch_X, Y_: batch_Y, lr: learning_rate, tst: False})
-    sess.run(update_ema, {X: batch_X, Y_: batch_Y, tst: False, iter: i})
+    sess.run([train_step, update_ema], feed_dict={X: batch_X, Y_: batch_Y, tst: False, iter: i})
 
 datavis.animate(training_step, iterations=10000+1, train_data_update_freq=20, test_data_update_freq=100, more_tests_at_start=True)
 

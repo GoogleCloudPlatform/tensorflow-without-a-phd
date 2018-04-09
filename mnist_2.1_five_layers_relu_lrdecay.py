@@ -41,8 +41,8 @@ mnist = mnist_data.read_data_sets("data", one_hot=True, reshape=False, validatio
 X = tf.placeholder(tf.float32, [None, 28, 28, 1])
 # correct answers will go here
 Y_ = tf.placeholder(tf.float32, [None, 10])
-# variable learning rate
-lr = tf.placeholder(tf.float32)
+# step for variable learning rate
+step = tf.placeholder(tf.int32)
 
 # five layers and their number of neurons (tha last layer has 10 softmax neurons)
 L = 200
@@ -88,7 +88,9 @@ I = tensorflowvisu.tf_format_mnist_images(X, Y, Y_)
 It = tensorflowvisu.tf_format_mnist_images(X, Y, Y_, 1000, lines=25)
 datavis = tensorflowvisu.MnistDataVis()
 
-# training step, the learning rate is a placeholder
+# training step
+# the learning rate is: # 0.0001 + 0.003 * (1/e)^(step/2000)), i.e. exponential decay from 0.003->0.0001
+lr = 0.0001 +  tf.train.exponential_decay(0.003, step, 2000, 1/math.e)
 train_step = tf.train.AdamOptimizer(lr).minimize(cross_entropy)
 
 # init
@@ -103,29 +105,24 @@ def training_step(i, update_test_data, update_train_data):
     # training on batches of 100 images with 100 labels
     batch_X, batch_Y = mnist.train.next_batch(100)
 
-    # learning rate decay
-    max_learning_rate = 0.003
-    min_learning_rate = 0.0001
-    decay_speed = 2000.0 # 0.003-0.0001-2000=>0.9826 done in 5000 iterations
-    learning_rate = min_learning_rate + (max_learning_rate - min_learning_rate) * math.exp(-i/decay_speed)
-
     # compute training values for visualisation
     if update_train_data:
-        a, c, im, w, b = sess.run([accuracy, cross_entropy, I, allweights, allbiases], {X: batch_X, Y_: batch_Y})
-        print(str(i) + ": accuracy:" + str(a) + " loss: " + str(c) + " (lr:" + str(learning_rate) + ")")
+        a, c, im, w, b, l = sess.run([accuracy, cross_entropy, I, allweights, allbiases, lr],
+                                     feed_dict={X: batch_X, Y_: batch_Y, step: i})
+        print(str(i) + ": accuracy:" + str(a) + " loss: " + str(c) + " (lr:" + str(l) + ")")
         datavis.append_training_curves_data(i, a, c)
         datavis.update_image1(im)
         datavis.append_data_histograms(i, w, b)
 
     # compute test values for visualisation
     if update_test_data:
-        a, c, im = sess.run([accuracy, cross_entropy, It], {X: mnist.test.images, Y_: mnist.test.labels})
+        a, c, im = sess.run([accuracy, cross_entropy, It], feed_dict={X: mnist.test.images, Y_: mnist.test.labels})
         print(str(i) + ": ********* epoch " + str(i*100//mnist.train.images.shape[0]+1) + " ********* test accuracy:" + str(a) + " test loss: " + str(c))
         datavis.append_test_curves_data(i, a, c)
         datavis.update_image2(im)
 
     # the backpropagation training step
-    sess.run(train_step, {X: batch_X, Y_: batch_Y, lr: learning_rate})
+    sess.run(train_step, feed_dict={X: batch_X, Y_: batch_Y, step: i})
 
 datavis.animate(training_step, iterations=10000+1, train_data_update_freq=20, test_data_update_freq=100, more_tests_at_start=True)
 

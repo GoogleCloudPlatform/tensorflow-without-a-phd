@@ -45,6 +45,8 @@ Y_ = tf.placeholder(tf.float32, [None, 10])
 lr = tf.placeholder(tf.float32)
 # Probability of keeping a node during dropout = 1.0 at test time (no dropout) and 0.75 at training time
 pkeep = tf.placeholder(tf.float32)
+# step for variable learning rate
+step = tf.placeholder(tf.int32)
 
 # three convolutional layers with their channel counts, and a
 # fully connected layer (the last layer has 10 softmax neurons)
@@ -99,6 +101,8 @@ It = tensorflowvisu.tf_format_mnist_images(X, Y, Y_, 1000, lines=25)
 datavis = tensorflowvisu.MnistDataVis()
 
 # training step, the learning rate is a placeholder
+# the learning rate is: # 0.0001 + 0.003 * (1/e)^(step/2000)), i.e. exponential decay from 0.003->0.0001
+lr = 0.0001 +  tf.train.exponential_decay(0.003, step, 2000, 1/math.e)
 train_step = tf.train.AdamOptimizer(lr).minimize(cross_entropy)
 
 # init
@@ -113,16 +117,11 @@ def training_step(i, update_test_data, update_train_data):
     # training on batches of 100 images with 100 labels
     batch_X, batch_Y = mnist.train.next_batch(100)
 
-    # learning rate decay
-    max_learning_rate = 0.003
-    min_learning_rate = 0.0001
-    decay_speed = 2000.0
-    learning_rate = min_learning_rate + (max_learning_rate - min_learning_rate) * math.exp(-i/decay_speed)
-
     # compute training values for visualisation
     if update_train_data:
-        a, c, im, w, b = sess.run([accuracy, cross_entropy, I, allweights, allbiases], {X: batch_X, Y_: batch_Y, pkeep: 1.0})
-        print(str(i) + ": accuracy:" + str(a) + " loss: " + str(c) + " (lr:" + str(learning_rate) + ")")
+        a, c, im, w, b, l = sess.run([accuracy, cross_entropy, I, allweights, allbiases, lr],
+                                  feed_dict={X: batch_X, Y_: batch_Y, pkeep: 1.0, step: i})
+        print(str(i) + ": accuracy:" + str(a) + " loss: " + str(c) + " (lr:" + str(l) + ")")
         datavis.append_training_curves_data(i, a, c)
         datavis.update_image1(im)
         datavis.append_data_histograms(i, w, b)
@@ -135,7 +134,7 @@ def training_step(i, update_test_data, update_train_data):
         datavis.update_image2(im)
 
     # the backpropagation training step
-    sess.run(train_step, {X: batch_X, Y_: batch_Y, lr: learning_rate, pkeep: 0.75})
+    sess.run(train_step, {X: batch_X, Y_: batch_Y, step: i, pkeep: 0.75})
 
 datavis.animate(training_step, 10001, train_data_update_freq=20, test_data_update_freq=100)
 
