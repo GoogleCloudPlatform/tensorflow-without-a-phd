@@ -34,8 +34,13 @@ function initMap() {
         center: latlng,
         mapTypeId: google.maps.MapTypeId.SATELLITE
     })
+    // this works on map load
+    google.maps.event.addListenerOnce(googlemap, 'tilesloaded', grabPixels)
+    // this works after the maps has loaded once, and for some reason the setTimeout is necessary
     google.maps.event.removeListener(googlemapevtlistener)
-    googlemapevtlistener = google.maps.event.addListener(googlemap, 'idle', grabPixels)
+    googlemapevtlistener = google.maps.event.addListener(googlemap, 'idle', function() {
+        setTimeout(grabPixels, 1)
+    })
 }
 
 // Google Auth2, PubSub, CRM API initialisation
@@ -114,7 +119,7 @@ function centerImage(filename) {
     var imgnod  = document.getElementById('imgmap');
     imgnod.innerHTML = "";
     imgnod.appendChild(img);
-    imgnod.addEventListener("scroll", onScroll)
+    makeDragScrollable(imgnod)
     function onLoaded() {
         if (img.complete)
             grabPixels()
@@ -127,11 +132,13 @@ function centerImage(filename) {
 function switchToMap() {
     document.getElementById('map').style.display = "block"
     document.getElementById('imgmap') .style.display = "none"
+    document.getElementById('zoomctrl') .style.display = "none"
 }
 
 function switchToImage() {
     document.getElementById('map').style.display = "none"
     document.getElementById('imgmap') .style.display = "block"
+    document.getElementById('zoomctrl') .style.display = "block"
 }
 
 function centerMapOnCode(airportCode) {
@@ -149,6 +156,7 @@ function centerMapOnCode(airportCode) {
         switchToMap()
         centerMap(coords[0], coords[1])
     }
+    google.maps.event.addListenerOnce(googlemap, 'tilesloaded', grabPixels)
 }
 
 

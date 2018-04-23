@@ -41,7 +41,11 @@ gcloud ml-engine jobs submit training plane$N \
     --hp-cell-swarm True \
     --hp-cell-grow 1.0 \
     --hp-rnd-hue True \
-    --hp-dropout 0.5 \
+    --hp-dropout 0.0 \
+    --hp-spatial-dropout True \
     --hp-shuffle-buf 50000 \
-    --hp-layers21 10 \
-    --hp-base-depth5 15
+    --hp-layers 15 \
+    --hp-first-layer-filter-size 3 \
+    --hp-first-layer-filter-stride 1 \
+    --hp-first-layer-filter-depth 128 \
+    --hp-depth-increment 8

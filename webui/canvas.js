@@ -14,49 +14,127 @@
  * limitations under the License.
  */
 
+function is_rect_intersecting(x1, y1, w1, h1, x2, y2, w2, h2) {
+    return (x1 <= x2+w2 &&
+        x2 <= x1+w1 &&
+        y1 <= y2+h2 &&
+        y2 <= y1+h1)
+}
+
 function grabPixels() {
-    var map = document.getElementById('map')
-    var imgmap = document.getElementById('imgmap')
+    // zone to grab
     var zone = document.getElementById('zone')
+    // visualisation of the grabbed pixels for control
     var visu = document.getElementById('cap')
-
-    var node_to_grab = map
-    if (map.style.display == "none")
-        node_to_grab = imgmap
-
+    var map = document.getElementById('map')
     resetResults()
-    disableMapScroll()
 
-    html2canvas(node_to_grab, {
-        onrendered: function(canvas) {processPixels(canvas, zone.offsetLeft, zone.offsetTop, zone.clientWidth, zone.clientHeight, visu)},
-        width: node_to_grab.clientWidth,
-        height: node_to_grab.clientHeight,
-        useCORS: true
+    if (map.style.display !== "none")
+        grabPixelsFromMap(map, zone, visu)
+    else
+        grabPixelsFromImage(zone, visu)
+}
+
+function grabPixelsFromImage(zone, visu) {
+    var imgmap = document.getElementById("imgmap")
+    var img = document.querySelector("#imgmap img")
+    if (img == null)
+        return
+
+    var offscreen = document.createElement('canvas')
+    offscreen.width = zone.clientWidth
+    offscreen.height = zone.clientHeight
+
+    var ctx = offscreen.getContext('2d')
+    var zoomX = img.naturalWidth / img.width
+    var zoomY = img.naturalHeight / img.height
+    ctx.drawImage(img,
+        (zone.offsetLeft + imgmap.scrollLeft) * zoomX,
+        (zone.offsetTop + imgmap.scrollTop) * zoomY,
+        zone.clientWidth * zoomX,
+        zone.clientHeight * zoomY,
+        0,
+        0,
+        zone.clientWidth,
+        zone.clientHeight)
+
+    processPixels(offscreen, 0, 0, zone.clientWidth, zone.clientHeight, visu)
+}
+
+function grabPixelsFromMap(map, zone, visu) {
+    disableMapScroll()
+    setMapLocationInURL(googlemap.getCenter(), googlemap.getZoom(), 0)
+
+    // Hack to get the pixels from Google Maps: with som knowledge of the HTML structure
+    // of a Google Maps satellite image rendition, it is possible to get to the image tiles directly
+    // and download them into a canvas. Google Maps supports CORS (Cross Origin Ressource Sharing) so
+    // access to the pixels in a canvas is possible.
+    var offscreen = document.createElement('canvas')
+    offscreen.width = map.clientWidth
+    offscreen.height = map.clientHeight
+    var ctx = offscreen.getContext('2d')
+    ctx.clearRect(0, 0, offscreen.width, offscreen.height)
+    var imgNodes = document.querySelectorAll("#map img")
+    var images = []
+    imgNodes.forEach(function(nod) {
+        if (nod.parentElement != null &&
+            nod.parentElement.parentElement != null &&
+            nod.parentElement.parentElement.parentElement != null &&
+            nod.parentElement.parentElement.parentElement.parentElement != null) {
+            var center_offset_x = nod.parentElement.parentElement.parentElement.parentElement.offsetLeft
+            var center_offset_y = nod.parentElement.parentElement.parentElement.parentElement.offsetTop
+            var img_x = nod.parentElement.offsetLeft
+            var img_y = nod.parentElement.offsetTop
+            var img_width = 256
+            var img_height = 256
+            var transformation_matrix = getComputedStyle(nod.parentElement.parentElement).getPropertyValue("transform")
+            if (transformation_matrix !== "none") {
+                var values = transformation_matrix.substring(0, transformation_matrix.length - 1).split(", ")
+                var offset_x = parseInt(values[4])
+                var offset_y = parseInt(values[5])
+                var map_tile_x = img_x + center_offset_x + offset_x
+                var map_tile_y = img_y + center_offset_y + offset_y
+                if (is_rect_intersecting(map_tile_x, map_tile_y, img_width, img_height, zone.offsetLeft, zone.offsetTop, zone.clientWidth, zone.clientHeight)) {
+                    images.push({x:map_tile_x, y:map_tile_y, src: nod.src})
+                }
+            }
+        }
+    })
+
+    var promises = images.map(function (im) {
+        return new Promise(function(resolve) {
+            var img = new Image()
+            img.crossOrigin = ""
+            img.onload = function () {
+                ctx.drawImage(this, im.x, im.y)
+                resolve()
+            }
+            img.src = im.src
+            // Debug: superimpose loaded images on the map
+            //img.style = "position:absolute; left:" + (im.x) + "px; top:" + (im.y) + "px; opacity:0.6; border: 0px yellow solid"
+            //document.getElementById("zone-container").appendChild(img)
+            //return 0
+        })
+    })
+
+    Promise.all(promises).then(function() {
+        processPixels(offscreen, zone.offsetLeft, zone.offsetTop, zone.clientWidth, zone.clientHeight, visu)
+        enableMapScroll()
     })
 }
+
 
 function processPixels(canvas, sx, sy, sw, sh, visu) {
     var sctx = canvas.getContext("2d")
     var vctx = visu.getContext("2d")
 
     // copy from source to destination context
-    var sz = tile_size
     //var step = tile_size
     var data = sctx.getImageData(sx, sy, sw, sh)
     vctx.putImageData(data, 0, 0)
-
-    // hack: if grab fails, this will be the browser's default background color
-    // forcing a reload usually makes the grab work again
-    if (hasBackgroundInAnyCorner(data)) {
-        var query = new URLSearchParams(window.location.search)
-        var rlonce = query.get("r")
-        if (rlonce != "1") {
-            setMapLocationInURL(googlemap.getCenter(), googlemap.getZoom(), 1)
-            setTimeout(grabPixels, 100)  // it works better to retry the grab
-            //location.reload()         // rather than reload everyting...
-            return
-        }
-    }
+    // drawimage would always work but the goal here is to check wether access to pixels is possible
+    // That is why we use getImageData / putImageData.
+    //vctx.drawImage(canvas, 0, 0)
 
     payload_tiles = []
     // This will always tile with overlapping tiles unless there is s single tile position possible
@@ -72,19 +150,17 @@ function processPixels(canvas, sx, sy, sw, sh, visu) {
     xstep = xstep > 0 ? xstep : tile_size
     ystep = ystep > 0 ? ystep : tile_size
     var epsilon = 0.0001
-    for (var y=0; y+sz<=data.height+epsilon; y+=ystep) {
-        for (var x=0; x + sz <= data.width+epsilon; x+=xstep) {
+    for (var y=0; y+tile_size<=data.height+epsilon; y+=ystep) {
+        for (var x=0; x + tile_size <= data.width+epsilon; x+=xstep) {
             var xoffset = Math.floor(x)
             var yoffset = Math.floor(y)
-            var tile = sctx.getImageData(sx + xoffset, sy + yoffset, sz, sz)
-            var b64jpegtile = imageCropAndExport(canvas, sx + xoffset, sy + yoffset, sz, sz)
-            var tile = {image_bytes:b64jpegtile, pos:{x:xoffset, y:yoffset, sz:sz}}
+            var tile = sctx.getImageData(sx + xoffset, sy + yoffset, tile_size, tile_size)
+            var b64jpegtile = imageCropAndExport(canvas, sx + xoffset, sy + yoffset, tile_size, tile_size)
+            var tile = {image_bytes:b64jpegtile, pos:{x:xoffset, y:yoffset, sz:tile_size}}
             payload_tiles.push(tile)
         }
     }
-    setMapLocationInURL(googlemap.getCenter(), googlemap.getZoom(), 0)
     displayPayload(payload_tiles)
-    enableMapScroll()
 }
 
 function imageCropAndExport(img, x, y, w, h) {
@@ -103,14 +179,4 @@ function imageCropAndExport(img, x, y, w, h) {
 
     txt = txt.substring("data:image/jpeg;base64,".length)
     return txt
-}
-
-function hasBackgroundInAnyCorner(imgdata) {
-    var data = imgdata.data
-    var w = imgdata.width
-    var h = imgdata.height
-    var r=229, g=227, b=223
-    function is_background_pix(x, y) {return data[(y*w+x)*4]==r && data[(y*w+x)*4+1]==g && data[(y*w+x)*4+2]==b}
-    a = is_background_pix(0,0)
-    return is_background_pix(0,0) || is_background_pix(w-1, 0) || is_background_pix(0, h-1) || is_background_pix(w-1, h-1)
 }

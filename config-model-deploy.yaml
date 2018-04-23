@@ -1,12 +1,20 @@
-description: "plane533, batch 10, lw 1-1-1, lr2 5000, 16x16x2 swarm 1.3, shuffle 50K, rnd_hue"
+description: ""
+# YOLO v27
+#deploymentUri:   gs://ml1-demo-martin/jobs/plane663/export/planesnet/1518717311/
+# YOLO v26
+#deploymentUri:   gs://ml1-demo-martin/jobs/plane664b/export/planesnet/1518737239/
+# YOLO v25
+# deploymentUri:   gs://ml1-demo-martin/jobs/plane657/export/planesnet/1518700222/
+# YOLO v24
+# deploymentUri:   gs://ml1-demo-martin/jobs/plane647/export/planesnet/1518722018/
 # YOLO v23
-deploymentUri:   gs://ml1-demo-martin/jobs/plane533/export/planesnet/1518180119/
+# deploymentUri:   gs://ml1-demo-martin/jobs/plane533/export/planesnet/1518180119/
 # YOLO v22
 # deploymentUri:   gs://ml1-demo-martin/jobs/plane569/export/planesnet/1518224289/
 # YOLO v21
 # deploymentUri:   gs://ml1-demo-martin/jobs/plane578/export/planesnet/1518446174/
 # YOLO v20
-# deploymentUri:   gs://ml1-demo-martin/jobs/plane536/export/planesnet/1518188266/
+deploymentUri:   gs://ml1-demo-martin/jobs/plane536/export/planesnet/1518188266/
 # YOLO v19
 # deploymentUri:   gs://ml1-demo-martin/jobs/plane533/export/planesnet/1518180119/
 # YOLO v18
@@ -20,7 +28,7 @@ deploymentUri:   gs://ml1-demo-martin/jobs/plane533/export/planesnet/1518180119/
 # 20x20 tile v02
 # deploymentUri: gs://ml1-demo-martin/jobs/plane234/export/Servo/1509145962
 # 20x20 tile v00
-# deploymentUri: gs://ml1-demo-martin/jobs/plane232/export/Servo/1509141478
+#deploymentUri: gs://ml1-demo-martin/jobs/plane232/export/Servo/1509141478
 runtimeVersion: '1.4'
 #autoScaling:
 #  minNodes: 10

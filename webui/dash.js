@@ -45,7 +45,9 @@ function analyze() {
     var delay = 0
 
     var model_url = "projects/cloudml-demo-martin/models/" + document.modsel.model.value
-    var model_version = /\/v([0-9].*)/.exec(model_url)[1] // can be undefined
+    var model_version = model_url.match(/\/v([0-9]+)/) // can be undefined
+    //var model_version = /\/v([0-9].*).*/.match(model_url) // can be undefined
+    model_version = model_version[1]
 
     payload_tiles.map(function (tile) {
         setTimeout(function() {

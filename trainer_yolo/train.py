@@ -197,7 +197,7 @@ def generate(pixels, json_bytes, repeat_slice, grid_nn, cell_n, cell_swarm, cell
     return tf.data.Dataset.range(repeat_slice).flat_map(lambda i: generate_slice(pixels, rois, grid_nn, cell_n, cell_swarm, cell_grow, rnd_hue, rnd_distmax, i))
 
 
-def dataset_input_fn(img_filelist, roi_filelist, grid_nn, cell_n, cell_swarm, cell_grow, shuffle_buf, rnd_hue, rnd_distmax):
+def dataset_input_fn(img_filelist, roi_filelist, batch_size, grid_nn, cell_n, cell_swarm, cell_grow, shuffle_buf, rnd_hue, rnd_distmax):
     fileset = tf.data.Dataset.from_tensor_slices((tf.constant(img_filelist), tf.constant(roi_filelist)))
     #fileset.repeat(6)
     dataset = fileset.map(load_files)
@@ -213,12 +213,12 @@ def dataset_input_fn(img_filelist, roi_filelist, grid_nn, cell_n, cell_swarm, ce
     dataset = dataset.cache(tempfile.mkdtemp(prefix="datacache") + "/datacache")
     dataset = dataset.repeat()  # indefinitely
     dataset = dataset.shuffle(shuffle_buf)
-    dataset = dataset.prefetch(10)
-    dataset = dataset.batch(10)
+    dataset = dataset.prefetch(batch_size)
+    dataset = dataset.batch(batch_size)
     return features_and_labels(dataset)
 
 
-def dataset_eval_input_fn(img_filelist, roi_filelist, grid_nn, cell_n, cell_swarm):
+def dataset_eval_input_fn(img_filelist, roi_filelist, eval_batch_size, grid_nn, cell_n, cell_swarm):
     dataset = tf.data.Dataset.from_tensor_slices((tf.constant(img_filelist), tf.constant(roi_filelist)))
     dataset = dataset.map(load_files)
     dataset = dataset.flat_map(lambda pix,json: generate(pix, json,
@@ -231,10 +231,11 @@ def dataset_eval_input_fn(img_filelist, roi_filelist, grid_nn, cell_n, cell_swar
                                                          rnd_distmax=2.0))
 
     dataset = dataset.cache(tempfile.mkdtemp(prefix="evaldatacache") + "/evaldatacache")
+    dataset = dataset.repeat(1)
     # eval dataset was 3820 tiles (60 batches of 64). A larger batch will OOM.
     # eval dataset is 8380 tiles (131 batches of 64). A larger batch will OOM.
     # eval dataset is 8380 tiles (262 batches of 32). A larger batch will OOM.
-    dataset = dataset.batch(32)
+    dataset = dataset.batch(eval_batch_size)
     return features_and_labels(dataset)
 
 
@@ -244,7 +245,7 @@ def serving_input_fn():
 
     # input expects a list of jpeg images
 
-    input_bytes = {'image_bytes': tf.placeholder(tf.string),
+    input_bytes = {'image_bytes': tf.placeholder(tf.string),  # this should be shape [None] TODO: test and fix
                    'square_size': tf.placeholder(tf.int32)}
 
     input_images = input_bytes['image_bytes']
@@ -263,11 +264,16 @@ def start_training(output_dir, hparams, data, **kwargs):
     img_filelist, roi_filelist = load_file_list(data)
     img_filelist_eval, roi_filelist_eval = load_file_list(data + "_eval")
 
+    # this does not work
+    #eval_summary_hook = tf.train.SummarySaverHook(save_steps=1,output_dir=output_dir + "/eval",
+    #                                              scaffold=tf.train.Scaffold(summary_op=tf.summary.merge_all()))
+
     export_latest = tf.estimator.LatestExporter(name="planesnet",
                                                 serving_input_receiver_fn=serving_input_fn,
                                                 exports_to_keep=1)
 
     train_spec = tf.estimator.TrainSpec(input_fn=lambda:dataset_input_fn(img_filelist, roi_filelist,
+                                                                         hparams["batch_size"],
                                                                          hparams["grid_nn"],
                                                                          hparams["cell_n"],
                                                                          hparams["cell_swarm"],
@@ -278,20 +284,23 @@ def start_training(output_dir, hparams, data, **kwargs):
                                         max_steps=hparams["iterations"])
 
     eval_spec = tf.estimator.EvalSpec(input_fn=lambda: dataset_eval_input_fn(img_filelist_eval, roi_filelist_eval,
+                                                                             hparams["eval_batch_size"],
                                                                              hparams["grid_nn"],
                                                                              hparams["cell_n"],
                                                                              hparams["cell_swarm"]),
-                                      steps=hparams["evalsteps"], # 477 to exhaust all eval data with eval batch size 8
+                                      steps=99999, # evals until Dataset is exhausted (bug: steps=None works but disables evaluation logs)
                                       exporters=export_latest,
                                       start_delay_secs=1,  # Confirmed: this does not work (plane533 for ex.)
-                                      throttle_secs=1)
+                                      throttle_secs=1 #,
+                                      #hooks=[eval_summary_hook]
+                                      )
 
     training_config = tf.estimator.RunConfig(model_dir=output_dir,
                                              save_summary_steps=100,
-                                             save_checkpoints_steps=1000,
+                                             save_checkpoints_steps=2000,
                                              keep_checkpoint_max=1)
 
-    estimator=tf.estimator.Estimator(model_fn=model.model_fn_squeeze3,
+    estimator=tf.estimator.Estimator(model_fn=model.model_fn_squeeze,
                                      model_dir=output_dir,
                                      config=training_config,
                                      params=hparams)
@@ -306,25 +315,31 @@ def main(argv):
     parser.add_argument('--job-dir', default="checkpoints", help='GCS or local path where to store training checkpoints')
     parser.add_argument('--data', default="sample_data/USGS_public_domain_airports", help='Path to data file (can be on Google cloud storage gs://...)')
     parser.add_argument('--hp-iterations', default=50000, type=int, help='Hyperparameter: number of training iterations')
-    parser.add_argument('--hp-evalsteps', default=262, type=int, help='Hyperparameter: number of training iterations')
+    parser.add_argument('--hp-batch-size', default=10, type=int, help='Hyperparameter: training batch size')
+    parser.add_argument('--hp-eval-batch-size', default=32, type=int, help='Hyperparameter: evaluation batch size')
     parser.add_argument('--hp-shuffle-buf', default=50000, type=int, help='Hyperparameter: data shuffle buffer size')
-    parser.add_argument('--hp-lr0', default=0.01, type=float, help='Hyperparameter: initial (max) learning rate')
-    parser.add_argument('--hp-lr1', default=0.0001, type=float, help='Hyperparameter: target (min) learning rate')
-    parser.add_argument('--hp-lr2', default=3000, type=float, help='Hyperparameter: learning rate decay speed in steps. Learning rate decays by exp(-1) every N steps.')
-    parser.add_argument('--hp-bnexp', default=0.993, type=float, help='Hyperparameter: exponential decay for batch norm moving averages.')
-    parser.add_argument('--hp-lw1', default=1, type=float, help='Hyperparameter: loss weight LW1')
-    parser.add_argument('--hp-lw2', default=1, type=float, help='Hyperparameter: loss weight LW2')
-    parser.add_argument('--hp-lw3', default=1, type=float, help='Hyperparameter: loss weight LW3')
+    parser.add_argument('--hp-layers', default=5, type=int, help='Hyperparameter: number of layers')
+    parser.add_argument('--hp-first-layer-filter-size', default=3, type=int, help='Hyperparameter: filter size in first layer')
+    parser.add_argument('--hp-first-layer-filter-stride', default=1, type=int, help='Hyperparameter: filter stride in first layer')
+    parser.add_argument('--hp-first-layer-filter-depth', default=50, type=int, help='Hyperparameter: the number of filters in the first and last layers')
+    parser.add_argument('--hp-depth-increment', default=5, type=int, help='Hyperparameter: increment the decrement filter depth by this amount between first and last layer')
     parser.add_argument('--hp-grid-nn', default=16, type=int, help='Hyperparameter: size of YOLO grid: grid-nn x grid-nn')
     parser.add_argument('--hp-cell-n', default=2, type=int, help='Hyperparameter: number of ROIs detected per YOLO grid cell')
     parser.add_argument('--hp-cell-swarm', default=True, type=str2bool, help='Hyperparameter: ground truth ROIs selection algorithm. The better swarm algorithm is only implemented for cell_n=2')
     parser.add_argument('--hp-cell-grow', default=1.3, type=float, help='Hyperparameter: ROIs allowed to be cetered beyond grid cell by this factor')
+    parser.add_argument('--hp-lr0', default=0.01, type=float, help='Hyperparameter: initial (max) learning rate')
+    parser.add_argument('--hp-lr1', default=0.0001, type=float, help='Hyperparameter: target (min) learning rate')
+    parser.add_argument('--hp-lr2', default=3000, type=float, help='Hyperparameter: learning rate decay speed in steps. Learning rate decays by exp(-1) every N steps.')
+    parser.add_argument('--hp-dropout', default=0.0, type=float, help='Hyperparameter: dropout rate')
+    parser.add_argument('--hp-spatial-dropout', default=False, type=str2bool, help='Hyperparameter: dropout type, spatial or ordinary')
+    parser.add_argument('--hp-bnexp', default=0.993, type=float, help='Hyperparameter: exponential decay for batch norm moving averages.')
+    parser.add_argument('--hp-lw1', default=1, type=float, help='Hyperparameter: loss weight LW1')
+    parser.add_argument('--hp-lw2', default=1, type=float, help='Hyperparameter: loss weight LW2')
+    parser.add_argument('--hp-lw3', default=1, type=float, help='Hyperparameter: loss weight LW3')
+    # hyperparameters for training data generation. They do not affect test data.
     parser.add_argument('--hp-rnd-hue', default=True, type=str2bool, help='Hyperparameter: data augmentation with random hue on training images')
     parser.add_argument('--hp-rnd-distmax', default=2.0, type=float, help='Hyperparameter: training tiles selection max random distance from ground truth ROI (always 2.0 for eval tiles)')
-    parser.add_argument('--hp-dropout', default=0.0, type=float, help='Hyperparameter: dropout rate')
-    parser.add_argument('--hp-base-depth5', default=10, type=int, help='Hyperparameter: number of filters in the first and last squeeze layers divided by 5')
-    parser.add_argument('--hp-depth-increment', default=5, type=int, help='Hyperparameter: increment the decrement filter depth by this amount between first and last layer')
-    parser.add_argument('--hp-layers21', default=5, type=int, help='Hyperparameter: number of layers = layers21 * 2 + 1')
+
     args = parser.parse_args()
     arguments = args.__dict__
 

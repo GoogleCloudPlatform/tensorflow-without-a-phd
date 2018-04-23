@@ -389,5 +389,20 @@ class BoxRoiUtilsTest(unittest.TestCase):
             d4 = np.linalg.norm(np.reshape(br9, [-1])-np.reshape(correct_br, [-1]))
             self.assertTrue(d1+d2+d3+d4<1e-6, "digits test failed")
 
-
+    def test_ensure_sum_divisible_by_5(self):
+        a = range(30)
+        b = range(30,-1,-1)
+        for i in range(30):
+            c, d = ensure_sum_divisible_by_5(a[i], a[i])
+            print(a[i], a[i], c, d, c+d)
+            self.assertTrue((c+d)%5==0, "ensure_sum_divisible_by_5 test failed")
+            c, d = ensure_sum_divisible_by_5(a[i], b[i])
+            print(a[i], b[i], c, d, c+d)
+            self.assertTrue((c+d)%5==0, "ensure_sum_divisible_by_5 test failed")
+            c, d = ensure_sum_divisible_by_5(a[i], a[i]+1)
+            print(a[i], a[i]+1, c, d, c+d)
+            self.assertTrue((c+d)%5==0, "ensure_sum_divisible_by_5 test failed")
+            c, d = ensure_sum_divisible_by_5(a[i], b[i]+1)
+            print(a[i], b[i]+1, c, d, c+d)
+            self.assertTrue((c+d)%5==0, "ensure_sum_divisible_by_5 test failed")
 

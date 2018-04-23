@@ -503,6 +503,12 @@ class IOUCalculator(object):
         safe_m = tf.where(tf.equal(n, 0.0), tf.ones_like(m), m)
         return safe_m/safe_n
 
+def ensure_sum_divisible_by_5(a, b):
+    rev = False
+    while (a + b) % 5 != 0:
+        b, a = a+1, b
+        rev = not rev
+    return (b, a) if rev else (a, b)
 
 
 
