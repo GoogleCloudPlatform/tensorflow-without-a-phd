@@ -25,27 +25,13 @@ gcloud ml-engine jobs submit training plane$N \
     --config ${CONFIG} \
     --project ${PROJECT} \
     --region ${REGION} \
-    --module-name trainer_yolo.train \
+    --module-name trainer_yolo.main \
     --package-path trainer_yolo \
     --runtime-version 1.4 \
     -- \
     --data "${DATA}" \
     --hp-iterations 25000 \
-    --hp-lw1 1 \
-    --hp-lw2 1 \
-    --hp-lw3 1 \
     --hp-lr2 5000 \
-    --hp-rnd-distmax 2.0 \
-    --hp-grid-nn 16 \
-    --hp-cell-n 2 \
-    --hp-cell-swarm True \
-    --hp-cell-grow 1.0 \
-    --hp-rnd-hue True \
-    --hp-dropout 0.0 \
-    --hp-spatial-dropout True \
-    --hp-shuffle-buf 50000 \
-    --hp-layers 15 \
-    --hp-first-layer-filter-size 3 \
-    --hp-first-layer-filter-stride 1 \
-    --hp-first-layer-filter-depth 128 \
-    --hp-depth-increment 8
+    --hp-layers 11 \
+    --hp-first-layer-filter-depth 50 \
+    --hp-depth-increment 5

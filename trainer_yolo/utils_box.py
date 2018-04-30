@@ -1,37 +1,21 @@
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+"""Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+_______________________________________________________________________
+
+Utility functions for rectangle manipulation in Tensorflow. Unit tests
+are available for all functions."""
 
 from builtins import zip
 import tensorflow as tf
-from tensorflow.python.platform import tf_logging as logging
-
-
-def __tf_log(msg):
-    logging.info(msg.decode("utf-8"))
-
-
-def __tf_logten(msg, ten):
-    logging.info(msg.decode("utf-8") + str(ten))
-
-
-# log a string message from tensorflow code
-def tf_log(msg):
-    tf.py_func(__tf_log, [tf.constant(msg)], [])
-
-
-# long a message with a tensor value from tnesorflow code
-def tf_logten(msg, ten):
-    tf.py_func(__tf_logten, [tf.constant(msg), ten], [])
-
 
 def one_d_intersect(px1, px2, qx1, qx2):
     # this assumes px2>=px1 and qx2>=qx1
@@ -425,29 +409,36 @@ def rois_in_tile_relative(tiles, rois, tile_size, max_per_tile, assert_on_overfl
 class IOUCalculator(object):
 
     @staticmethod
-    def __iou_tile_coordinate(x, SIZE):
+    def __iou_tile_coordinate(x, tile_size):
+        """Replicate a number across a bitmap of size tile_size"""
+
         xx = tf.cast(tf.round(x), dtype=tf.int16)
         xx = tf.expand_dims(xx, axis=-1)
-        xx = tf.tile(xx, [1, 1, SIZE])
+        xx = tf.tile(xx, [1, 1, tile_size])
         xx = tf.expand_dims(xx, axis=2)
-        xx = tf.tile(xx, [1, 1, SIZE, 1])
+        xx = tf.tile(xx, [1, 1, tile_size, 1])
         return xx
 
     @staticmethod
-    def __iou_gen_linmap(batch, n, SIZE):
-        row = tf.cast(tf.linspace(0.0, (SIZE-1)*1.0, SIZE), dtype=tf.int16)
-        linmap = tf.tile([row], [SIZE, 1])
+    def __iou_gen_linmap(batch, n, tile_size):
+        """Creates two bitmaps filled with numbers increasing in X and Y direction.
+        This trick makes it easier to draw filled rectangles usinf tf.less and tf.greater."""
+
+        row = tf.cast(tf.linspace(0.0, (tile_size - 1) * 1.0, tile_size), dtype=tf.int16)
+        linmap = tf.tile([row], [tile_size, 1])
         linmap = tf.tile([linmap], [n, 1, 1])
         linmap = tf.tile([linmap], [batch, 1, 1, 1])  # shape [batch, n, SIZE, SIZE]
         return linmap
 
     @classmethod
-    def __iou_gen_rectmap(cls, linmap, rects, SIZE):
+    def __iou_gen_rectmap(cls, linmap, rects, tile_size):
+        """Draws filled rectangles"""
+
         x1, y1, x2, y2 = tf.unstack(rects, axis=-1)  # shapes [batch, n]
-        x1tile = cls.__iou_tile_coordinate(x1, SIZE)
-        x2tile = cls.__iou_tile_coordinate(x2, SIZE)
-        y1tile = cls.__iou_tile_coordinate(y1, SIZE)
-        y2tile = cls.__iou_tile_coordinate(y2, SIZE)
+        x1tile = cls.__iou_tile_coordinate(x1, tile_size)
+        x2tile = cls.__iou_tile_coordinate(x2, tile_size)
+        y1tile = cls.__iou_tile_coordinate(y1, tile_size)
+        y2tile = cls.__iou_tile_coordinate(y2, tile_size)
         zeros = tf.zeros_like(linmap, dtype=tf.uint8)
         ones = tf.ones_like(linmap, dtype=tf.uint8)
         mapx = tf.where(tf.greater_equal(linmap, x1tile), ones, zeros)
@@ -458,22 +449,33 @@ class IOUCalculator(object):
         map = tf.logical_and(tf.cast(mapx, tf.bool), tf.cast(mapy, tf.bool))
         return map
 
-    # Computes the intersection over union of two sets of rectangles.
-    # The actual computation is intersection_area(union(rects1), union(rects2)) / union_area(rects1, rects2)
-    # rects1, rects2: detected and ground truth rectangles, shape [batch, n, 4] with coordinates x1, y1, x2, y2
-    # the size of the rectangles is [x2-x1, y2-y1].
-    # Returns an array of shape [batch]. Use batch_mean() to correctly average it.
-    # Returns 1 in cases in the batch where both rects1 and rects2 contain
-    # no rectangles(correctly detected nothing when there was nothing to detect).
+
     @classmethod
-    def batch_intersection_over_union(cls, rects1, rects2, SIZE):
+    def batch_intersection_over_union(cls, rects1, rects2, tile_size):
+        """Computes the intersection over union of two sets of rectangles.
+        The actual computation is:
+            intersection_area(union(rects1), union(rects2)) / union_area(rects1, rects2)
+        This works on batches of rectangles but instantiates a bitmap of size tile_size to compute
+        the intersections and is therefore both slow and memory-intensive. Use sparingly.
+
+        Args:
+            rects1: detected rectangles, shape [batch, n, 4] with coordinates x1, y1, x2, y2
+            rects2: ground truth rectangles, shape [batch, n, 4] with coordinates x1, y1, x2, y2
+                The size of the rectangles is [x2-x1, y2-y1].
+            tile_size: size of the images where the rectangles apply (also size of internal bitmaps)
+
+        Returns:
+            An array of shape [batch]. Use batch_mean() to correctly average it.
+            Returns 1 in cases in the batch where both rects1 and rects2 contain
+            no rectangles (correctly detected nothing when there was nothing to detect).
+        """
         batch = tf.shape(rects1)[0]
         n1 = tf.shape(rects1)[1]  # number of rectangles per batch element in rect1
         n2 = tf.shape(rects2)[1]  # number of rectangles per batch element in rect2
-        linmap1 = cls.__iou_gen_linmap(batch, n1, SIZE)
-        linmap2 = cls.__iou_gen_linmap(batch, n2, SIZE)
-        map1 = cls.__iou_gen_rectmap(linmap1, rects1, SIZE)  # shape [batch, n, SIZE, SIZE]
-        map2 = cls.__iou_gen_rectmap(linmap2, rects2, SIZE)  # shape [batch, n, SIZE, SIZE]
+        linmap1 = cls.__iou_gen_linmap(batch, n1, tile_size)
+        linmap2 = cls.__iou_gen_linmap(batch, n2, tile_size)
+        map1 = cls.__iou_gen_rectmap(linmap1, rects1, tile_size)  # shape [batch, n, tile_size, tile_size]
+        map2 = cls.__iou_gen_rectmap(linmap2, rects2, tile_size)  # shape [batch, n, tile_size, tile_size]
         union_all = tf.concat([map1, map2], axis=1)
         union_all = tf.reduce_any(union_all, axis=1)
         union1 = tf.reduce_any(map1, axis=1)  # shape [batch, SIZE, SIZE]
@@ -486,15 +488,23 @@ class IOUCalculator(object):
         iou = safe_inter_area / safe_union_area  # returns 0 even if the union is null
         return iou
 
-    # Computes the average IOU across a batch of IOUs
-    # IOUs of value 1 mean that the network correctly detected nothing when there was nothing to detect.
-    # To compute the average IOU, 1 values are eliminated. The result is the average IOU acroos all
-    # instances where either something was detected or there was something to detect.
-    # In the rare case where the result would be 0/0, the return value is 1 which is not really correct
-    # but should be rare and only offset a further average of batch_mean() results only a little.
-    # ious: shape[batch]
+
     @staticmethod
     def batch_mean(ious):
+        """Computes the average IOU across a batch of IOUs
+        IOUs of value 1 mean that the network correctly detected nothing when there was
+        nothing to detect. To compute the average IOU, 1 values are eliminated. The result
+        is the average IOU across all instances where either something was detected or
+        there was something to detect. In the rare case where the result would be 0/0,
+        the return value is 1 which is not really correct but should be rare and offset
+        a further average of batch_mean() results only a little.
+
+        Args:
+            ious: shape[batch]
+
+        Returns:
+            mean IOU
+        """
         correct_non_detections = tf.equal(ious, 1.0)
         other_detections = tf.logical_not(correct_non_detections)
         n = tf.reduce_sum(tf.cast(other_detections, tf.float32))
@@ -503,14 +513,47 @@ class IOUCalculator(object):
         safe_m = tf.where(tf.equal(n, 0.0), tf.ones_like(m), m)
         return safe_m/safe_n
 
-def ensure_sum_divisible_by_5(a, b):
-    rev = False
-    while (a + b) % 5 != 0:
-        b, a = a+1, b
-        rev = not rev
-    return (b, a) if rev else (a, b)
+
+def compute_safe_IOU(target_rois, detected_rois, detected_rois_overflow, tile_size):
+    """Computes the Intersection Over Union (IOU) of a batch of detected boxes
+    against a batch of target boxes. Logs a message if a problem occurs."""
+
+    iou_accuracy = IOUCalculator.batch_intersection_over_union(detected_rois * tile_size, target_rois * tile_size, tile_size=tile_size)
+    iou_accuracy_overflow = tf.greater(tf.reduce_sum(detected_rois_overflow), 0)
+    # check that we are not overflowing the tensor size. Issue a warning if we are. This should only happen at
+    # the beginning of the training with a completely uninitialized network.
+    iou_accuracy = tf.cond(iou_accuracy_overflow,
+                           lambda: tf.Print(iou_accuracy, [detected_rois_overflow],
+                                            summarize=250, message="ROI tensor overflow in IOU computation. "
+                                                                   "The computed IOU is not correct and will "
+                                                                   "be reported as 0. This can be normal in initial "
+                                                                   "training iteration when all weights are random."
+                                                                   "Increase MAX_DETECTED_ROIS_PER_TILE to avoid."),
+                           lambda: tf.identity(iou_accuracy))
+    iou_accuracy = IOUCalculator.batch_mean(iou_accuracy)
+    # set iou_accuracy to 0 if there has been any overflow in its computation
+    iou_accuracy = tf.where(iou_accuracy_overflow, tf.zeros_like(iou_accuracy), iou_accuracy)
+    return iou_accuracy
 
 
+def compute_mistakes(box_x, box_y, box_w, box_c_sim, target_x, target_y, target_w, target_is_plane, grid_nn):
+    DETECTION_TRESHOLD = 0.5  # plane "detected" if predicted C>0.5 TODO: refactor this
+    ERROR_TRESHOLD = 0.3  # plane correctly localized if predicted x,y,w within % of ground truth
+    detect_correct = tf.logical_not(tf.logical_xor(tf.greater(box_c_sim, DETECTION_TRESHOLD), target_is_plane))
+    ones = tf.ones(tf.shape(target_w))
+    nonzero_target_w = tf.where(target_is_plane, target_w, ones)
+    # true if correct size where there is a plane, nonsense value where there is no plane
+    size_correct = tf.less(tf.abs(box_w - target_w) / nonzero_target_w, ERROR_TRESHOLD)
+    # true if correct position where there is a plane, nonsense value where there is no plane
+    position_correct = tf.less(tf.sqrt(tf.square(box_x - target_x) + tf.square(box_y - target_y)) / nonzero_target_w / grid_nn, ERROR_TRESHOLD)
+    truth_no_plane = tf.logical_not(target_is_plane)
+    size_correct = tf.logical_or(size_correct, truth_no_plane)
+    position_correct = tf.logical_or(position_correct, truth_no_plane)
+    size_correct = tf.logical_and(detect_correct, size_correct)
+    position_correct = tf.logical_and(detect_correct, position_correct)
+    all_correct = tf.logical_and(size_correct, position_correct)
+    mistakes = tf.reduce_sum(tf.cast(tf.logical_not(all_correct), tf.int32), axis=[1,2,3])  # shape [batch]
+    return mistakes, size_correct, position_correct, all_correct
 
 
 

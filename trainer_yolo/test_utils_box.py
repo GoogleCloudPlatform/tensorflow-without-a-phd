@@ -1,20 +1,24 @@
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+"""Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+_______________________________________________________________________
+
+Unit tests for utils_box. To run the tests, execute
+python -m unittest discover -s trainer_yolo"""
 
 import tensorflow as tf
 import numpy as np
 import unittest
-from trainer_yolo.boxutils import *
-from trainer_yolo.digits import *
+from trainer_yolo.utils_box import *
+from trainer_yolo.utils_imgdbg import *
 
 class BoxRoiUtilsTest(unittest.TestCase):
 
@@ -123,8 +127,8 @@ class BoxRoiUtilsTest(unittest.TestCase):
         batch_roisA = tf.stack([rois1, rois3, rois1, norois1, rois3], axis=0)
         batch_roisB = tf.stack([rois2, rois2, norois1, norois2, partrois], axis=0)
         batch_roisBb = tf.stack([rois2b, rois2b, norois1b, norois2b, partroisb], axis=0)
-        iou1 = IOUCalculator.batch_intersection_over_union(batch_roisA, batch_roisB, SIZE=5)
-        iou2 = IOUCalculator.batch_intersection_over_union(batch_roisA, batch_roisBb, SIZE=5)
+        iou1 = IOUCalculator.batch_intersection_over_union(batch_roisA, batch_roisB, tile_size=5)
+        iou2 = IOUCalculator.batch_intersection_over_union(batch_roisA, batch_roisBb, tile_size=5)
         correct1 = np.array([1.0, 10.0/12.0, 0.0, 1.0, 4.0/10.0])
         correct2 = np.array([1.0, 10.0/12.0, 0.0, 1.0, 4.0/10.0])
         with tf.Session() as sess:
@@ -406,3 +410,5 @@ class BoxRoiUtilsTest(unittest.TestCase):
             print(a[i], b[i]+1, c, d, c+d)
             self.assertTrue((c+d)%5==0, "ensure_sum_divisible_by_5 test failed")
 
+if __name__ == '__main__':
+    unittest.main()

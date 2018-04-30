@@ -21,11 +21,23 @@ from tensorflow.python.lib.io import file_io as gcsfile
 from tensorflow.python.platform import tf_logging as logging
 
 from trainer_yolo import model
-from trainer_yolo import boxutils
-from trainer_yolo.boxutils import tf_logten
+from trainer_yolo import settings
+from trainer_yolo import utils_box as box
 
 logging.set_verbosity(logging.INFO)
 logging.log(logging.INFO, "Tensorflow version " + tf.__version__)
+
+
+def log_tensor(message, tensor):
+    """Log the value of a tensor at graph execution time.
+
+    Warning: this will only work if the tensor is evaluated in your graph.
+
+    Args:
+        message: Prefix message string
+        tensor: The tensor to evaluate
+    """
+    tf.Print(tensor, [tensor], message)
 
 def extract_filename_without_extension(filename):
     basename = os.path.basename(filename)
@@ -75,13 +87,11 @@ def generate_slice(pixels, rois, grid_nn, cell_n, cell_swarm, cell_grow, rnd_hue
     rois = tf.reshape(rois, [-1, 4])  # I know the shape but Tensorflow does not
     rois_n = tf.shape(rois)[0] # known shape [n, 4]
 
-    TILE_SIZE = 256
     TILE_INTERSECT_FRACTION = 0.75
-    MAX_TARGET_ROIS_PER_TILE = 50  # max number of rois in training or test images
 
     # random displacements around each ROI (typically 1.4 to 3.0. Fixed at 2.0 for all evals)
     # adjusted so that tiles with planes and no planes happen with roughly equal frequency
-    RANDOM_MAX_DISTANCE = rnd_distmax*TILE_SIZE
+    RANDOM_MAX_DISTANCE = rnd_distmax*settings.TILE_SIZE
     N_RANDOM_POSITIONS = 20  # 20 * max nb of planes in one input image = nb of tiles generated in RAM (watch out!)
     # you can increase sdtev to reach more zones without airplanes
     rnd_x = tf.truncated_normal([N_RANDOM_POSITIONS], mean=0.0, stddev=RANDOM_MAX_DISTANCE/2.0)
@@ -96,10 +106,10 @@ def generate_slice(pixels, rois, grid_nn, cell_n, cell_swarm, cell_grow, rnd_hue
         # but with a random translation and of size [TILE_SIZE, TILE_SIZE]
         roi_x = tf.add(roi_x, rnd_x)  # broadcasting !
         roi_y = tf.add(roi_y, rnd_y)  # broadcasting !
-        roi_x1 = tf.add(roi_x, -TILE_SIZE/2.0)
-        roi_y1 = tf.add(roi_y, -TILE_SIZE/2.0)
-        roi_x2 = tf.add(roi_x, TILE_SIZE/2.0)
-        roi_y2 = tf.add(roi_y, TILE_SIZE/2.0)
+        roi_x1 = tf.add(roi_x, -settings.TILE_SIZE/2.0)
+        roi_y1 = tf.add(roi_y, -settings.TILE_SIZE/2.0)
+        roi_x2 = tf.add(roi_x, settings.TILE_SIZE/2.0)
+        roi_y2 = tf.add(roi_y, settings.TILE_SIZE/2.0)
         roisx = tf.stack([roi_x1, roi_y1, roi_x2, roi_y2], axis=1)
         return roisx
 
@@ -110,7 +120,7 @@ def generate_slice(pixels, rois, grid_nn, cell_n, cell_swarm, cell_grow, rnd_hue
     tiles_n = tf.shape(tiles)[0]  # known shape [n, 4]
 
     def count_planes(roi):
-        inter = boxutils.boxintersect(roi, rois, TILE_INTERSECT_FRACTION)
+        inter = box.boxintersect(roi, rois, TILE_INTERSECT_FRACTION)
         return tf.reduce_sum(tf.cast(inter, dtype=tf.int32))
 
     # plane counting
@@ -124,11 +134,8 @@ def generate_slice(pixels, rois, grid_nn, cell_n, cell_swarm, cell_grow, rnd_hue
     #plane_counts2 = tf.count_nonzero(tf.floor_div(plane_counts, 2)) - plane_counts3
     plane_counts1 = tf.count_nonzero(tf.floor_div(plane_counts, 1)) #- plane_counts3 - plane_counts2
     plane_counts0 = tf.count_nonzero(tf.add(plane_counts, 1))       - plane_counts1 #- plane_counts2 - plane_counts3
-    tf_logten("Generating training tiles: ", tiles_n)
-    tf_logten("Tiles with 0 planes : ", plane_counts0)
-    tf_logten("Tiles with 1+ planes  : ", plane_counts1)
-    #tf_logten("Labels 2: ", plane_counts2)
-    #tf_logten("Labels 3: ", plane_counts3)
+    tf.Print(tiles_n, [tiles_n, plane_counts0, plane_counts1],
+             "Generating training tiles [total tiles][tiles with no planes][tiles with 1+ planes]: ")
 
     # Vocabulary:
     # "tile": a 256x256 region under consideration
@@ -138,16 +145,16 @@ def generate_slice(pixels, rois, grid_nn, cell_n, cell_swarm, cell_grow, rnd_hue
     # Tile divided in grid_nn x grid_nn grid
     # Recognizing cell_n boxes per grid cell
     # For each tile, for each grid cell, determine the cell_n largest ROIs centered in that cell
-    # Output shape [tiles_n, grid_nn, grid_nn, cell_n, 3]
+    # Output shape [tiles_n, grid_nn, grid_nn, cell_n, 3] 3 for x, y, w
     if cell_n == 2 and cell_swarm:
-        yolo_target_rois = tf.map_fn(lambda tile: boxutils.n_experimental_roi_selection_strategy(tile, rois, rois_n, grid_nn, cell_n, cell_grow), tiles)
+        yolo_target_rois = tf.map_fn(lambda tile: box.n_experimental_roi_selection_strategy(tile, rois, rois_n, grid_nn, cell_n, cell_grow), tiles)
     elif not cell_swarm:
-        yolo_target_rois = tf.map_fn(lambda tile: boxutils.n_largest_rois_in_cell_relative(tile, rois, rois_n, grid_nn, cell_n), tiles)
+        yolo_target_rois = tf.map_fn(lambda tile: box.n_largest_rois_in_cell_relative(tile, rois, rois_n, grid_nn, cell_n), tiles)
     else:
         raise ValueError('Ground truth ROI selection strategy cell_swarm is only implemented for cell_n=2')
 
     # Compute ground truth ROIs (required coordinate format)
-    target_rois = boxutils.rois_in_tile_relative(tiles, rois, TILE_SIZE, MAX_TARGET_ROIS_PER_TILE)  # shape [n_tiles, MAX_TARGET_ROIS_PER_TILE, 4]
+    target_rois = box.rois_in_tile_relative(tiles, rois, settings.TILE_SIZE, settings.MAX_TARGET_ROIS_PER_TILE)  # shape [n_tiles, MAX_TARGET_ROIS_PER_TILE, 4]
 
     # resize rois to units used by crop_and_resize
     tile_x1, tile_y1, tile_x2, tile_y2 = tf.unstack(tiles, axis=1)
@@ -160,11 +167,11 @@ def generate_slice(pixels, rois, grid_nn, cell_n, cell_swarm, cell_grow, rnd_hue
 
     indices = tf.zeros([tiles_n], dtype=tf.int32) # all the rois refer to image #0 (there is only one)
     # expand_dims needed because crop_and_resize expects a batch of images
-    image_tiles = tf.image.crop_and_resize(tf.expand_dims(pixels, 0), tiles, indices, [TILE_SIZE, TILE_SIZE])
+    image_tiles = tf.image.crop_and_resize(tf.expand_dims(pixels, 0), tiles, indices, [settings.TILE_SIZE, settings.TILE_SIZE])
     # crop_and_resize does not output a defined pixel depth but the convolutional layers need it
-    image_tiles = tf.reshape(image_tiles, [-1, TILE_SIZE, TILE_SIZE, 3])
+    image_tiles = tf.reshape(image_tiles, [-1, settings.TILE_SIZE, settings.TILE_SIZE, 3])  # 3 for r, g, b
     image_tiles = tf.cast(image_tiles, tf.uint8)
-    yolo_target_rois = tf.reshape(yolo_target_rois, [-1, grid_nn, grid_nn, cell_n, 3])
+    yolo_target_rois = tf.reshape(yolo_target_rois, [-1, grid_nn, grid_nn, cell_n, 3])  # 3 for x, y, w
 
     if rnd_hue:  # random hue shift for all training images
         image_tiles = batch_random_hue(image_tiles)
@@ -173,7 +180,7 @@ def generate_slice(pixels, rois, grid_nn, cell_n, cell_swarm, cell_grow, rnd_hue
 
 
 def load_files(img_filename, roi_filename):
-    tf_logten("Loading ", img_filename)
+    log_tensor("Loading ", img_filename)
     img_bytes = tf.read_file(img_filename)
     pixels = tf.image.decode_image(img_bytes, channels=3)
     pixels = tf.cast(pixels, tf.uint8)
@@ -239,7 +246,7 @@ def dataset_eval_input_fn(img_filelist, roi_filelist, eval_batch_size, grid_nn, 
     return features_and_labels(dataset)
 
 
-# input function for base64 encoded JPEG in JSON, with automatic scanning
+# input function for base64 encoded JPEG in JSON
 # Called when the model is deployed for online predictions on Cloud ML Engine.
 def serving_input_fn():
 
@@ -263,10 +270,6 @@ def start_training(output_dir, hparams, data, **kwargs):
     # load data
     img_filelist, roi_filelist = load_file_list(data)
     img_filelist_eval, roi_filelist_eval = load_file_list(data + "_eval")
-
-    # this does not work
-    #eval_summary_hook = tf.train.SummarySaverHook(save_steps=1,output_dir=output_dir + "/eval",
-    #                                              scaffold=tf.train.Scaffold(summary_op=tf.summary.merge_all()))
 
     export_latest = tf.estimator.LatestExporter(name="planesnet",
                                                 serving_input_receiver_fn=serving_input_fn,
@@ -300,7 +303,7 @@ def start_training(output_dir, hparams, data, **kwargs):
                                              save_checkpoints_steps=2000,
                                              keep_checkpoint_max=1)
 
-    estimator=tf.estimator.Estimator(model_fn=model.model_fn_squeeze,
+    estimator=tf.estimator.Estimator(model_fn=model.model_fn,
                                      model_dir=output_dir,
                                      config=training_config,
                                      params=hparams)
@@ -314,11 +317,11 @@ def main(argv):
     def str2bool(v): return v=='True'
     parser.add_argument('--job-dir', default="checkpoints", help='GCS or local path where to store training checkpoints')
     parser.add_argument('--data', default="sample_data/USGS_public_domain_airports", help='Path to data file (can be on Google cloud storage gs://...)')
-    parser.add_argument('--hp-iterations', default=50000, type=int, help='Hyperparameter: number of training iterations')
+    parser.add_argument('--hp-iterations', default=25000, type=int, help='Hyperparameter: number of training iterations')
     parser.add_argument('--hp-batch-size', default=10, type=int, help='Hyperparameter: training batch size')
     parser.add_argument('--hp-eval-batch-size', default=32, type=int, help='Hyperparameter: evaluation batch size')
     parser.add_argument('--hp-shuffle-buf', default=50000, type=int, help='Hyperparameter: data shuffle buffer size')
-    parser.add_argument('--hp-layers', default=5, type=int, help='Hyperparameter: number of layers')
+    parser.add_argument('--hp-layers', default=11, type=int, help='Hyperparameter: number of layers')
     parser.add_argument('--hp-first-layer-filter-size', default=3, type=int, help='Hyperparameter: filter size in first layer')
     parser.add_argument('--hp-first-layer-filter-stride', default=1, type=int, help='Hyperparameter: filter stride in first layer')
     parser.add_argument('--hp-first-layer-filter-depth', default=50, type=int, help='Hyperparameter: the number of filters in the first and last layers')
@@ -331,17 +334,21 @@ def main(argv):
     parser.add_argument('--hp-lr1', default=0.0001, type=float, help='Hyperparameter: target (min) learning rate')
     parser.add_argument('--hp-lr2', default=3000, type=float, help='Hyperparameter: learning rate decay speed in steps. Learning rate decays by exp(-1) every N steps.')
     parser.add_argument('--hp-dropout', default=0.0, type=float, help='Hyperparameter: dropout rate')
-    parser.add_argument('--hp-spatial-dropout', default=False, type=str2bool, help='Hyperparameter: dropout type, spatial or ordinary')
+    parser.add_argument('--hp-spatial-dropout', default=False, type=str2bool, help='Hyperparameter: dropout type, spatial or ordinary. Spatial works better.')
     parser.add_argument('--hp-bnexp', default=0.993, type=float, help='Hyperparameter: exponential decay for batch norm moving averages.')
     parser.add_argument('--hp-lw1', default=1, type=float, help='Hyperparameter: loss weight LW1')
-    parser.add_argument('--hp-lw2', default=1, type=float, help='Hyperparameter: loss weight LW2')
-    parser.add_argument('--hp-lw3', default=1, type=float, help='Hyperparameter: loss weight LW3')
+    parser.add_argument('--hp-lw2', default=3, type=float, help='Hyperparameter: loss weight LW2')
+    parser.add_argument('--hp-lw3', default=30, type=float, help='Hyperparameter: loss weight LW3')
     # hyperparameters for training data generation. They do not affect test data.
     parser.add_argument('--hp-rnd-hue', default=True, type=str2bool, help='Hyperparameter: data augmentation with random hue on training images')
     parser.add_argument('--hp-rnd-distmax', default=2.0, type=float, help='Hyperparameter: training tiles selection max random distance from ground truth ROI (always 2.0 for eval tiles)')
 
     args = parser.parse_args()
     arguments = args.__dict__
+
+    # TODO: spatial dropout should be true by default
+    # TODO: split data generation of images and ROIs on one side, assignment of ROIs into YOLO grid cells
+    # to the other. Keep YOLO assignments during training but put the rest into a data generation script or option.
 
     hparams = {k[3:]: v for k, v in arguments.items() if k.startswith('hp_')}
     otherargs = {k: v for k, v in arguments.items() if not k.startswith('hp_')}

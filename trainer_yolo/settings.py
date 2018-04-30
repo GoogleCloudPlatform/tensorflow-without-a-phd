@@ -1,4 +1,3 @@
-# -*- coding: UTF-8 -*-
 """Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
@@ -12,9 +11,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 _______________________________________________________________________
 
-Training and inference code for airplane detection neural network model
-based on the YOLO (You Look Only Once) architecture, modified for swarm
-detection."""
-__author__ = "Martin Görner"
+Global settings for YOLO (You Look Only Once) detection model"""
 
+# ROI = Region of Interest
 
+TILE_SIZE = 256  # size of training and inference images
+MAX_DETECTED_ROIS_PER_TILE = 60  # max number of ROIs in inference images. The max possible is GRID_N * GRID_N * CELL_B.
+MAX_TARGET_ROIS_PER_TILE = 50  # max number of ROIs in training or test images
