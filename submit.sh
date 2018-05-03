@@ -1,3 +1,4 @@
+# GCS_BUCKET="gs://my-bucket/"
 BUCKET=$GCS_BUCKET
 
 TRAINER_PACKAGE_PATH="./trainer"
@@ -16,6 +17,6 @@ gcloud ml-engine jobs submit training $JOB_NAME \
     --config config.yaml \
     --runtime-version 1.4 \
     -- \
-    --output-dir $BUCKET"/pong_$now" \
+    --output-dir $BUCKET"pong_$now" \
     --learning-rate 0.0005 \
     --save-checkpoint-steps 10 \

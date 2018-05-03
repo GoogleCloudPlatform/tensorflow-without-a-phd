@@ -5,7 +5,6 @@ import numpy as np
 import gym
 import json
 import random
-import time
 import sys
 
 from helpers import discount_rewards, prepro
@@ -25,7 +24,7 @@ def main(args):
     # (observation, label, reward)
     MEMORY = deque([], maxlen=MEMORY_CAPACITY)
     def gen():
-        for m in MEMORY:
+        for m in list(MEMORY):
             yield m
 
     args_dict = vars(args)
@@ -56,6 +55,7 @@ def main(args):
             logits_for_sampling = tf.reshape(logits, shape=(1, len(ACTIONS)))
             logits_for_sampling = tf.check_numerics(logits_for_sampling, 'logits_for_sampling error:')
 
+            # Sample the action to be played during rollout.
             sample_action = tf.squeeze(tf.multinomial(logits=logits_for_sampling, num_samples=1))
         
         optimizer = tf.train.RMSPropOptimizer(
@@ -65,29 +65,22 @@ def main(args):
 
         # dataset subgraph for experience replay
         with tf.name_scope('dataset'):
-            # the dataset reads from the shared MEMORY
+            # the dataset reads from MEMORY
             ds = tf.data.Dataset.from_generator(gen, output_types=(tf.float32, tf.int32, tf.float32))
             ds = ds.shuffle(MEMORY_CAPACITY).repeat().batch(args.batch_size)
             iterator = ds.make_one_shot_iterator()
 
         # training subgraph
         with tf.name_scope('loss'):
-            # the train_op includes getting a batch of data from the dataset.
+            # the train_op includes getting a batch of data from the dataset, so we do not need to use a feed_dict when running the train_op.
             next_batch = iterator.get_next()
             train_observations, labels, processed_rewards = next_batch
-
-            # testing whether this blows up
-            train_observations = tf.check_numerics(train_observations, 'train_observations error:')
-
-            # testing whether this blows up
-            weights_1 = tf.check_numerics(weights_1, 'weights_1 error:')
 
             # the same weights as in the rollout subgraph
             train_hidden = tf.nn.relu(tf.matmul(train_observations, weights_0))
             train_logits = tf.matmul(train_hidden, weights_1)
 
-            # testing whether this blows up
-            train_logits = tf.check_numerics(train_logits, 'train_logits error:')
+            train_logits = tf.check_numerics(train_logits, 'train_logits error.')
 
             cross_entropies = tf.nn.sparse_softmax_cross_entropy_with_logits(
                 logits=train_logits,
@@ -96,9 +89,6 @@ def main(args):
 
             loss = tf.reduce_sum(processed_rewards * cross_entropies)
 
-            # track loss
-            tf.summary.scalar('loss', loss)
-
         global_step = tf.train.get_or_create_global_step()
 
         train_op = optimizer.minimize(loss, global_step=global_step)
@@ -106,8 +96,6 @@ def main(args):
         init = tf.global_variables_initializer()
         saver = tf.train.Saver(max_to_keep=args.max_to_keep)
 
-        # summaries
-        # running rollout reward
         with tf.name_scope('summaries'):
             rollout_reward = tf.placeholder(
                 shape=(),
@@ -127,12 +115,16 @@ def main(args):
                 tf.summary.scalar('{}_min'.format(var.op.name), tf.reduce_min(var))
                 
             tf.summary.scalar('rollout_reward', rollout_reward)
+            tf.summary.scalar('loss', loss)
 
             merged = tf.summary.merge_all()
 
     # for training
     inner_env = gym.make('Pong-v0')
+
+    # tf.agents helper to more easily track consecutive pairs of frames
     env = FrameHistory(inner_env, past_indices=[0, 1], flatten=False)
+    # tf.agents helper to automatically reset the environment
     env = AutoReset(env)
 
     with tf.Session(graph=g) as sess:
@@ -143,9 +135,8 @@ def main(args):
         else:
             sess.run(init)
 
-        if not args.dry_run:
-            summary_path = os.path.join(args.output_dir, 'summary')
-            summary_writer = tf.summary.FileWriter(summary_path, sess.graph)
+        summary_path = os.path.join(args.output_dir, 'summary')
+        summary_writer = tf.summary.FileWriter(summary_path, sess.graph)
 
         # lowest possible score after an episode as the
         # starting value of the running reward
@@ -155,7 +146,6 @@ def main(args):
             print('>>>>>>> epoch {}'.format(i+1))
 
             print('>>> Rollout phase')
-            rollout_time = time.time()
             epoch_memory = []
             episode_memory = []
 
@@ -212,31 +202,24 @@ def main(args):
             MEMORY.extend(epoch_memory)
 
             print('>>> Train phase')
-            train_time = time.time()
-
-            print('....rollout took.... {} sec'.format(train_time - rollout_time))
-
             print('rollout reward: {}'.format(_rollout_reward))
 
-            if not args.dry_run:
-                feed_dict = {rollout_reward: _rollout_reward}
+            feed_dict = {rollout_reward: _rollout_reward}
 
-                _, _global_step = sess.run([train_op, global_step], feed_dict=feed_dict)
+            # Here we train only once.
+            _, _global_step = sess.run([train_op, global_step], feed_dict=feed_dict)
 
-                end_train_time = time.time()
-                print('....train took.... {} sec'.format(end_train_time - train_time))
-                
-                if _global_step % args.save_checkpoint_steps == 0:
+            if _global_step % args.save_checkpoint_steps == 0:
 
-                    print('Writing summary')
+                print('Writing summary')
 
-                    summary = sess.run(merged, feed_dict=feed_dict)
+                summary = sess.run(merged, feed_dict=feed_dict)
 
-                    summary_writer.add_summary(summary, _global_step)
+                summary_writer.add_summary(summary, _global_step)
 
-                    save_path = os.path.join(args.output_dir, 'model.ckpt')
-                    save_path = saver.save(sess, save_path, global_step=_global_step)
-                    print('Model checkpoint saved: {}'.format(save_path))
+                save_path = os.path.join(args.output_dir, 'model.ckpt')
+                save_path = saver.save(sess, save_path, global_step=_global_step)
+                print('Model checkpoint saved: {}'.format(save_path))
 
 
 if __name__ == '__main__':
@@ -264,10 +247,6 @@ if __name__ == '__main__':
         action='store_true')
     parser.add_argument(
         '--render',
-        default=False,
-        action='store_true')
-    parser.add_argument(
-        '--dry-run',
         default=False,
         action='store_true')
     parser.add_argument(
