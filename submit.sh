@@ -1,4 +1,4 @@
-BUCKET="gs://sandbox-cmle/"
+BUCKET=$GCS_BUCKET
 
 TRAINER_PACKAGE_PATH="./trainer"
 MAIN_TRAINER_MODULE="trainer.task"
@@ -14,15 +14,8 @@ gcloud ml-engine jobs submit training $JOB_NAME \
     --module-name $MAIN_TRAINER_MODULE \
     --region us-central1 \
     --config config.yaml \
+    --runtime-version 1.4 \
     -- \
-    --output-dir "gs://pong-demo/pong_200_noop_lazy" \
+    --output-dir $BUCKET"/pong_$now" \
     --learning-rate 0.0005 \
-    --allow-noop \
-    --beta 0.02 \
-    --gamma 0.99 \
-    --decay 0.99 \
-
-    
-# python trainer/task.py --render --dry-run --restore --allow-noop --output-dir "gs://pong-demo/rl-pong/pong_200_noop_smooth_new" --n-batch 1 --batch-size 1
-
-# tensorboard --logdir="gs://pong-demo/rl-pong/pong_200_noop_smooth_new"
+    --save-checkpoint-steps 10 \

@@ -2,6 +2,9 @@ from setuptools import find_packages
 from setuptools import setup
 
 #####
+# We need to install some additional packages in order to compile
+# OpenAI Gym on CMLE.
+# Reference:
 # https://github.com/apache/beam/blob/master/sdks/python/apache_beam/examples/complete/juliaset/setup.py
 import subprocess
 from distutils.command.build import build as _build
@@ -17,6 +20,8 @@ class build(_build):
     """
     sub_commands = _build.sub_commands + [('CustomCommands', None)]
 
+# The list of required libraries is taken from:
+# https://github.com/openai/gym#installing-everything
 _LIBS = 'python-numpy python-dev cmake zlib1g-dev libjpeg-dev xvfb libav-tools xorg-dev python-opengl libboost-all-dev libsdl2-dev swig'.split()
 
 CUSTOM_COMMANDS = [
@@ -52,8 +57,9 @@ class CustomCommands(setuptools.Command):
 #####
 
 REQUIRED_PACKAGES = [
-    'numpy==1.13.3',
-    'gym[atari]==0.9.3'
+    'numpy==1.14.2',
+    'gym[atari]==0.10.4',
+    'agents==1.4.0',
 ]
 
 setup(
