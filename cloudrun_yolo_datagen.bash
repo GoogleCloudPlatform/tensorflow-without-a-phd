@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 
-#CONFIG="config-distributed.yaml"
-#CONFIG="config-master-worker.yaml"
+# this is a data generation job. No training will be performed.
+
 CONFIG="config.yaml"
-#CONFIG="config-hptune-yolo1.yaml"
 BUCKET="gs://ml1-demo-martin"
 DATA="gs://ml1-demo-martin/data/USGS_public_domain_airports"
-#DATA="gs://ml1-demo-martin/data/USGS_public_domainTINY_airports"
+# Destination directory of the data. The folder as well as the <samename>_eval folder must exist.
+TILEDATA="gs://ml1-demo-martin/data/USGS_public_domain_airports_tiles2"
 PROJECT="cloudml-demo-martin"
 REGION="us-central1"
 #REGION="europe-west1"
@@ -21,20 +21,13 @@ printf -v N "%03d" $N
 
 set -x
 gcloud ml-engine jobs submit training plane$N \
-    --job-dir "${BUCKET}/jobs/airplane$N" \
-    --config ${CONFIG} \
+    --job-dir "${BUCKET}/jobs/airplane_datagen$N" \
+    --scale-tier BASIC \
     --project ${PROJECT} \
     --region ${REGION} \
-    --module-name trainer_yolo.main \
+    --module-name trainer_yolo.datagen \
     --package-path trainer_yolo \
     --runtime-version 1.4 \
     -- \
     --data "${DATA}" \
-    --hp-shuffle-buf 50000 \
-    --hp-iterations 25000 \
-    --hp-lr2 5000 \
-    --hp-layers 12 \
-    --hp-first-layer-filter-depth 32 \
-    --hp-first-layer-filter-size 6 \
-    --hp-first-layer-filter-stride 2 \
-    --hp-depth-increment 5
+    --output-dir "${TILEDATA}"

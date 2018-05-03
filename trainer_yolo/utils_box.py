@@ -132,6 +132,12 @@ def gen_grid_for_tile(tile, grid_n):
 # comparator="furthest_from_center": roi furthest from cell center
 # comparator="closest_to_center": roi closest to cell center
 def n_largest_rois_in_cell(tile, rois, rois_n, grid_n, n, comparator="largest_w", expand=1.0):
+
+    # handle the case of rois_n == 0 by creating one dummy empty roi, otherwise the code will not work with rois_n=0
+    rois, rois_n = tf.cond(tf.equal(rois_n, 0),
+                           true_fn=lambda: (tf.constant([[0.0, 0.0, 0.0, 0.0]]), tf.constant(1)),
+                           false_fn=lambda: (rois, rois_n))
+
     grid, cell_w = gen_grid_for_tile(tile, grid_n)
 
     # grid shape [grid_n, grid_n, 2]
@@ -527,7 +533,7 @@ def compute_safe_IOU(target_rois, detected_rois, detected_rois_overflow, tile_si
                                             summarize=250, message="ROI tensor overflow in IOU computation. "
                                                                    "The computed IOU is not correct and will "
                                                                    "be reported as 0. This can be normal in initial "
-                                                                   "training iteration when all weights are random."
+                                                                   "training iteration when all weights are random. "
                                                                    "Increase MAX_DETECTED_ROIS_PER_TILE to avoid."),
                            lambda: tf.identity(iou_accuracy))
     iou_accuracy = IOUCalculator.batch_mean(iou_accuracy)

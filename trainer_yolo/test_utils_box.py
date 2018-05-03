@@ -35,7 +35,9 @@ class BoxRoiUtilsTest(unittest.TestCase):
                                  [6.0, 5.0, 6.9, 5.9],
                                  [4.5, 3.1, 4.9, 3.5],
                                  [6.1, 5.1, 7.0, 6.0]], dtype=tf.float32)
-        self.rois2 = tf.constant([[3.0, 2.0, 4.0, 3.0]], dtype=tf.float32)
+        self.rois_1 = tf.constant([[3.0, 2.0, 4.0, 3.0]], dtype=tf.float32)
+        # zero-sized rois
+        self.rois_0, _ = tf.split(tf.constant([[1.0, 1.0, 1.0, 1.0]], dtype=tf.float32), [0, 1], axis=0)
         #[batch, grid_n, grid_n, n, 4] grid 3x3
         self.relative_rois = tf.constant([
             [[[[[0],[0],[0.1]],[[1],[1],[1]]],[[[-1],[-1],[0.5]],[[0],[0],[0.1]]],[[[0.1],[0.1],[0.1]],[[0],[0],[0]]]],
@@ -296,6 +298,43 @@ class BoxRoiUtilsTest(unittest.TestCase):
         res2 = n_largest_rois_in_cell(self.tile0, self.rois, rois_n=rois_n, grid_n=4, n=2)
         res1 = n_largest_rois_in_cell(self.tile0, self.rois, rois_n=rois_n, grid_n=4, n=1)
 
+        res_1 = n_largest_rois_in_cell(self.tile0, self.rois_1, rois_n=1, grid_n=4, n=3)
+        res_0 = n_largest_rois_in_cell(self.tile0, self.rois_0, rois_n=0, grid_n=4, n=3)
+
+        correct_0 = np.array([[[[0., 0., 0.], [0., 0., 0.], [0., 0., 0.]],
+                               [[0., 0., 0.], [0., 0., 0.], [0., 0., 0.]],
+                               [[0., 0., 0.], [0., 0., 0.], [0., 0., 0.]],
+                               [[0., 0., 0.], [0., 0., 0.], [0., 0., 0.]]],
+                              [[[0., 0., 0.], [0., 0., 0.], [0., 0., 0.]],
+                               [[0., 0., 0.], [0., 0., 0.], [0., 0., 0.]],
+                               [[0., 0., 0.], [0., 0., 0.], [0., 0., 0.]],
+                               [[0., 0., 0.], [0., 0., 0.], [0., 0., 0.]]],
+                              [[[0., 0., 0.], [0., 0., 0.], [0., 0., 0.]],
+                               [[0., 0., 0.], [0., 0., 0.], [0., 0., 0.]],
+                               [[0., 0., 0.], [0., 0., 0.], [0., 0., 0.]],
+                               [[0., 0., 0.], [0., 0., 0.], [0., 0., 0.]]],
+                              [[[0., 0., 0.], [0., 0., 0.], [0., 0., 0.]],
+                               [[0., 0., 0.], [0., 0., 0.], [0., 0., 0.]],
+                               [[0., 0., 0.], [0., 0., 0.], [0., 0., 0.]],
+                               [[0., 0., 0.], [0., 0., 0.], [0., 0., 0.]]]])
+
+        correct_1 = np.array([[[[3.5, 2.5, 1.0], [0., 0., 0.], [0., 0., 0.]],
+                               [[0., 0., 0.], [0., 0., 0.], [0., 0., 0.]],
+                               [[0., 0., 0.], [0., 0., 0.], [0., 0., 0.]],
+                               [[0., 0., 0.], [0., 0., 0.], [0., 0., 0.]]],
+                              [[[0., 0., 0.], [0., 0., 0.], [0., 0., 0.]],
+                               [[0., 0., 0.], [0., 0., 0.], [0., 0., 0.]],
+                               [[0., 0., 0.], [0., 0., 0.], [0., 0., 0.]],
+                               [[0., 0., 0.], [0., 0., 0.], [0., 0., 0.]]],
+                              [[[0., 0., 0.], [0., 0., 0.], [0., 0., 0.]],
+                               [[0., 0., 0.], [0., 0., 0.], [0., 0., 0.]],
+                               [[0., 0., 0.], [0., 0., 0.], [0., 0., 0.]],
+                               [[0., 0., 0.], [0., 0., 0.], [0., 0., 0.]]],
+                              [[[0., 0., 0.], [0., 0., 0.], [0., 0., 0.]],
+                               [[0., 0., 0.], [0., 0., 0.], [0., 0., 0.]],
+                               [[0., 0., 0.], [0., 0., 0.], [0., 0., 0.]],
+                               [[0., 0., 0.], [0., 0., 0.], [0., 0., 0.]]]])
+
         correct1 = np.array([[[[3.7, 2.1, 1.2]],[[0.0, 0.0, 0.0]],[[0.0, 0.0, 0.0]],[[0.0, 0.0, 0.0]]],
                             [[[0.0, 0.0, 0.0]],[[4.7, 3.3, 0.4]],[[0.0, 0.0, 0.0]],[[0.0, 0.0, 0.0]]],
                             [[[0.0, 0.0, 0.0]],[[0.0, 0.0, 0.0]],[[0.0, 0.0, 0.0]],[[0.0, 0.0, 0.0]]],
@@ -336,13 +375,17 @@ class BoxRoiUtilsTest(unittest.TestCase):
                               [[6.5, 5.5, 1.0],[6.45, 5.45, 0.9],[6.55, 5.55, 0.9]]]])
 
         with tf.Session() as sess:
-            out1, out2, out3 = sess.run([res1, res2, res3])
+            out1, out2, out3, out_0, out_1 = sess.run([res1, res2, res3, res_0, res_1])
             d1 = np.linalg.norm(np.reshape(out1, [-1])-np.reshape(correct1, [-1]))
             d2 = np.linalg.norm(np.reshape(out2, [-1])-np.reshape(correct2, [-1]))
             d3 = np.linalg.norm(np.reshape(out3, [-1])-np.reshape(correct3, [-1]))
+            d_0 = np.linalg.norm(np.reshape(out_0, [-1])-np.reshape(correct_0, [-1]))
+            d_1 = np.linalg.norm(np.reshape(out_1, [-1])-np.reshape(correct_1, [-1]))
         self.assertTrue(d1<1e-6, "n_largest_rois_in_cell generation test failed")
         self.assertTrue(d2<1e-6, "n_largest_rois_in_cell generation test failed")
         self.assertTrue(d3<1e-6, "n_largest_rois_in_cell generation test failed")
+        self.assertTrue(d_0<1e-6, "n_largest_rois_in_cell generation test failed")
+        self.assertTrue(d_1<1e-6, "n_largest_rois_in_cell generation test failed")
 
     def test_digits(self):
         correct_tl = np.array([[0, 0, 0, 0, 0, 0],
@@ -392,23 +435,6 @@ class BoxRoiUtilsTest(unittest.TestCase):
             d3 = np.linalg.norm(np.reshape(bl9, [-1])-np.reshape(correct_bl, [-1]))
             d4 = np.linalg.norm(np.reshape(br9, [-1])-np.reshape(correct_br, [-1]))
             self.assertTrue(d1+d2+d3+d4<1e-6, "digits test failed")
-
-    def test_ensure_sum_divisible_by_5(self):
-        a = range(30)
-        b = range(30,-1,-1)
-        for i in range(30):
-            c, d = ensure_sum_divisible_by_5(a[i], a[i])
-            print(a[i], a[i], c, d, c+d)
-            self.assertTrue((c+d)%5==0, "ensure_sum_divisible_by_5 test failed")
-            c, d = ensure_sum_divisible_by_5(a[i], b[i])
-            print(a[i], b[i], c, d, c+d)
-            self.assertTrue((c+d)%5==0, "ensure_sum_divisible_by_5 test failed")
-            c, d = ensure_sum_divisible_by_5(a[i], a[i]+1)
-            print(a[i], a[i]+1, c, d, c+d)
-            self.assertTrue((c+d)%5==0, "ensure_sum_divisible_by_5 test failed")
-            c, d = ensure_sum_divisible_by_5(a[i], b[i]+1)
-            print(a[i], b[i]+1, c, d, c+d)
-            self.assertTrue((c+d)%5==0, "ensure_sum_divisible_by_5 test failed")
 
 if __name__ == '__main__':
     unittest.main()
