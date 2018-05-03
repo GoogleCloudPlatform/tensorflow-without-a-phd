@@ -204,15 +204,14 @@ def main(args):
             print('>>> Train phase')
             print('rollout reward: {}'.format(_rollout_reward))
 
-            feed_dict = {rollout_reward: _rollout_reward}
-
             # Here we train only once.
-            _, _global_step = sess.run([train_op, global_step], feed_dict=feed_dict)
+            _, _global_step = sess.run([train_op, global_step])
 
             if _global_step % args.save_checkpoint_steps == 0:
 
                 print('Writing summary')
 
+                feed_dict = {rollout_reward: _rollout_reward}
                 summary = sess.run(merged, feed_dict=feed_dict)
 
                 summary_writer.add_summary(summary, _global_step)
