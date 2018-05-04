@@ -1,4 +1,4 @@
-gym[atari]==0.10.4
-numpy==1.14.2
-tensorflow==1.4
-agents==1.4.0
+gym[atari]==0.9.4
+numpy>=1.14
+tensorflow>=1.4
+agents>=1.4

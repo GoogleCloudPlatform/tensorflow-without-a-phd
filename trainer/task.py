@@ -19,7 +19,7 @@ import tensorflow as tf
 import numpy as np
 import gym
 
-from helpers import discount_rewards, prepro
+from trainer.helpers import discount_rewards, prepro
 from agents.tools.wrappers import AutoReset, FrameHistory
 from collections import deque
 
@@ -112,7 +112,7 @@ def main(args):
 
             # the weights to the hidden layer can be visualized
             hidden_weights = tf.trainable_variables()[0]
-            for h in xrange(args.hidden_dim):
+            for h in range(args.hidden_dim):
                 slice_ = tf.slice(hidden_weights, [0, h], [-1, 1])
                 image = tf.reshape(slice_, [1, 80, 80, 1])
                 tf.summary.image('hidden_{:04d}'.format(h), image)
@@ -279,6 +279,6 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # save all checkpoints
-    args.max_to_keep = args.n_epoch / args.save_checkpoint_steps
+    args.max_to_keep = args.n_epoch // args.save_checkpoint_steps
 
     main(args)
