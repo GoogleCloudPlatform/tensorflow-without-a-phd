@@ -18,9 +18,6 @@ import os
 import tensorflow as tf
 import numpy as np
 import gym
-import json
-import random
-import sys
 
 from helpers import discount_rewards, prepro
 from agents.tools.wrappers import AutoReset, FrameHistory
@@ -34,14 +31,28 @@ OBSERVATION_DIM = 80 * 80
 MEMORY_CAPACITY = 100000
 ROLLOUT_SIZE = 10000
 
-def main(args):
-    # MEMORY stores tuples:
-    # (observation, label, reward)
-    MEMORY = deque([], maxlen=MEMORY_CAPACITY)
-    def gen():
-        for m in list(MEMORY):
-            yield m
 
+# MEMORY stores tuples:
+# (observation, label, reward)
+MEMORY = deque([], maxlen=MEMORY_CAPACITY)
+def gen():
+    for m in list(MEMORY):
+        yield m
+
+
+def build_graph(observations):
+    """Calculates logits from the input observations tensor.
+    This function will be called twice: rollout and train.
+    The weights will be shared.
+    """
+    with tf.variable_scope('model', reuse=tf.AUTO_REUSE):
+        hidden = tf.keras.layers.Dense(args.hidden_dim, use_bias=False, activation='relu')(observations)
+        logits = tf.keras.layers.Dense(len(ACTIONS), use_bias=False)(hidden)
+
+    return logits
+
+
+def main(args):
     args_dict = vars(args)
     print('args: {}'.format(args_dict))
 
@@ -50,25 +61,9 @@ def main(args):
         with tf.name_scope('rollout'):
             observations = tf.placeholder(shape=(None, OBSERVATION_DIM), dtype=tf.float32)
             
-            weights_0 = tf.get_variable(
-                name='weights_0',
-                dtype=tf.float32,
-                shape=(OBSERVATION_DIM, args.hidden_dim),
-                initializer=tf.contrib.layers.xavier_initializer(uniform=False)
-            )
-            weights_1 = tf.get_variable(
-                name='weights_1',
-                dtype=tf.float32,
-                shape=(args.hidden_dim, len(ACTIONS)),
-                initializer=tf.contrib.layers.xavier_initializer(uniform=False)
-            )
-
-            hidden = tf.nn.relu(tf.matmul(observations, weights_0))
-            logits = tf.matmul(hidden, weights_1)
-            probs = tf.nn.softmax(logits=logits)
+            logits = build_graph(observations)
 
             logits_for_sampling = tf.reshape(logits, shape=(1, len(ACTIONS)))
-            logits_for_sampling = tf.check_numerics(logits_for_sampling, 'logits_for_sampling error:')
 
             # Sample the action to be played during rollout.
             sample_action = tf.squeeze(tf.multinomial(logits=logits_for_sampling, num_samples=1))
@@ -86,16 +81,14 @@ def main(args):
             iterator = ds.make_one_shot_iterator()
 
         # training subgraph
-        with tf.name_scope('loss'):
+        with tf.name_scope('train'):
             # the train_op includes getting a batch of data from the dataset, so we do not need to use a feed_dict when running the train_op.
             next_batch = iterator.get_next()
             train_observations, labels, processed_rewards = next_batch
 
-            # the same weights as in the rollout subgraph
-            train_hidden = tf.nn.relu(tf.matmul(train_observations, weights_0))
-            train_logits = tf.matmul(train_hidden, weights_1)
-
-            train_logits = tf.check_numerics(train_logits, 'train_logits error.')
+            # This reuses the same weights in the rollout phase.
+            train_observations.set_shape((args.batch_size, OBSERVATION_DIM))
+            train_logits = build_graph(train_observations)
 
             cross_entropies = tf.nn.sparse_softmax_cross_entropy_with_logits(
                 logits=train_logits,
@@ -104,9 +97,9 @@ def main(args):
 
             loss = tf.reduce_sum(processed_rewards * cross_entropies)
 
-        global_step = tf.train.get_or_create_global_step()
+            global_step = tf.train.get_or_create_global_step()
 
-        train_op = optimizer.minimize(loss, global_step=global_step)
+            train_op = optimizer.minimize(loss, global_step=global_step)
 
         init = tf.global_variables_initializer()
         saver = tf.train.Saver(max_to_keep=args.max_to_keep)
@@ -118,12 +111,12 @@ def main(args):
             )
 
             # the weights to the hidden layer can be visualized
+            hidden_weights = tf.trainable_variables()[0]
             for h in xrange(args.hidden_dim):
-                slice_ = tf.slice(weights_0, [0, h], [-1, 1])
+                slice_ = tf.slice(hidden_weights, [0, h], [-1, 1])
                 image = tf.reshape(slice_, [1, 80, 80, 1])
                 tf.summary.image('hidden_{:04d}'.format(h), image)
 
-            # track the weights to find out how the logits became NaN
             for var in tf.trainable_variables():
                 tf.summary.histogram(var.op.name, var)
                 tf.summary.scalar('{}_max'.format(var.op.name), tf.reduce_max(var))
@@ -134,9 +127,7 @@ def main(args):
 
             merged = tf.summary.merge_all()
 
-    # for training
     inner_env = gym.make('Pong-v0')
-
     # tf.agents helper to more easily track consecutive pairs of frames
     env = FrameHistory(inner_env, past_indices=[0, 1], flatten=False)
     # tf.agents helper to automatically reset the environment
