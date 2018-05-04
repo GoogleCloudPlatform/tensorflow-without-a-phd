@@ -262,7 +262,35 @@ def dataset_from_tfrecords(tfrec_filelist, yolo_cfg):
     np.random.shuffle(fileset)
     # num_parallel_reads not supported in TF 1.4
     dataset = tf.data.TFRecordDataset(fileset, buffer_size=10*1024*1024)
+    #dataset = dataset.apply(tf.contrib.data.map_and_batch(lambda tfrec: read_tfrecord_features(tfrec, yolo_cfg), 1000)) # just for performance, not real batch size
     dataset = dataset.map(lambda tfrec: read_tfrecord_features(tfrec, yolo_cfg))
+    #dataset = dataset.flat_map(lambda a, b, c, d, e: tf.data.Dataset.from_tensor_slices((a, b, c, d, e)))  # remove the batching applied previously
+    return dataset
+
+def dataset_from_tfrecords2(tfrec_filelist, yolo_cfg):
+
+    features = {
+        "img": tf.FixedLenFeature((), tf.string),
+        "rois": tf.FixedLenFeature((), tf.string),
+        "name": tf.FixedLenFeature((), tf.string)
+    }
+
+    fileset = np.array(tfrec_filelist)
+    np.random.shuffle(fileset)
+
+    def gen():
+        for filename in fileset:
+            records = [rec for rec in tf.python_io.tf_record_iterator(filename)]
+            yield records
+
+    def dec(records):
+        parsed_examples = tf.parse_example(records, features)
+        return parsed_examples["img"], parsed_examples["rois"], parsed_examples["name"]
+
+    dataset = tf.data.Dataset.from_generator(gen, tf.string, tf.TensorShape([None]))
+    dataset = dataset.map(dec)
+    #dataset = tf.data.Dataset.from_generator(gen, (tf.string, tf.string, tf.string), (tf.TensorShape([None]), tf.TensorShape([None]), tf.TensorShape([None])))
+    dataset = dataset.flat_map(lambda a, b, c: read_tfrecord_features2(a, b, c, yolo_cfg))
     return dataset
 
 
@@ -282,7 +310,7 @@ def train_data_input_fn_from_images(img_filelist, roi_filelist, batch_size, shuf
 
 
 def train_data_input_fn_from_tfrecords(tfrec_filelist, batch_size, shuffle_buf, yolo_cfg):
-    dataset = dataset_from_tfrecords(tfrec_filelist, yolo_cfg)
+    dataset = dataset_from_tfrecords2(tfrec_filelist, yolo_cfg)
     dataset = train_dataset_configure(dataset, batch_size, shuffle_buf)
     return features_and_labels(dataset)
 
@@ -312,7 +340,7 @@ def eval_data_input_fn_from_images(img_filelist, roi_filelist, eval_batch_size, 
 
 
 def eval_data_input_fn_from_tfrecords(tfrec_filelist, eval_batch_size, yolo_cfg):
-    dataset = dataset_from_tfrecords(tfrec_filelist, yolo_cfg)
+    dataset = dataset_from_tfrecords2(tfrec_filelist, yolo_cfg)
     dataset = eval_dataset_configure(dataset, eval_batch_size)
     return features_and_labels(dataset)
 
@@ -351,8 +379,30 @@ def read_tfrecord_features(example, yolo_cfg):
     # TODO: remove plane_counts entirely from the model (dummy 0 for the time being)
     return pixels, tf.constant(0), airport_name, yolo_target_rois, target_rois
 
+def read_tfrecord_features2(jpeg, json, name, yolo_cfg):
 
-def run_data_generation(data, output_dir, rnd_hue, rnd_distmax, eval):
+    def decode_l(jpeg_l, json_l, name_l):
+        pixels, rois = decode_image_and_json_bytes(jpeg_l, json_l)
+        airport_name = name_l
+
+        # TODO: refactor coordinate formats so that target_rois and yolo_target_rois use the same format
+        pixels = tf.reshape(pixels, [settings.TILE_SIZE, settings.TILE_SIZE, 3])  # 3 for r, g, b
+        # the tile is already cut
+        one_tile = tf.constant([[0, 0, settings.TILE_SIZE, settings.TILE_SIZE]], tf.float32)
+        # Compute ground truth ROIs
+        target_rois = box.rois_in_tile_relative(one_tile, rois, settings.TILE_SIZE, settings.MAX_TARGET_ROIS_PER_TILE)  # shape [n_tiles, MAX_TARGET_ROIS_PER_TILE, 4]
+        target_rois = tf.reshape(target_rois, [settings.MAX_TARGET_ROIS_PER_TILE, 4])  # 4 for x1, y1, x2, y2
+        # Compute ground truth ROIs assigned to YOLO grid cells
+        yolo_target_rois = yolo_roi_attribution(one_tile, rois, yolo_cfg)
+        yolo_target_rois = tf.reshape(yolo_target_rois, [yolo_cfg.grid_nn, yolo_cfg.grid_nn, yolo_cfg.cell_n, 3])  # 3 for x, y, w
+        # TODO: remove plane_counts entirely from the model (dummy 0 for the time being)
+        return pixels, tf.constant(0), airport_name, yolo_target_rois, target_rois
+
+    a,b,c,d,e= tf.map_fn(lambda x:decode_l(*x), (jpeg, json, name), dtype=(tf.uint8, tf.int32, tf.string, tf.float32, tf.float32))
+    return tf.data.Dataset.from_tensor_slices((a,b,c,d,e))
+
+
+def run_data_generation(data, output_dir, record_batch_size, rnd_hue, rnd_distmax, eval):
 
     img_filelist, roi_filelist = load_file_list(data)
 
@@ -372,7 +422,7 @@ def run_data_generation(data, output_dir, rnd_hue, rnd_distmax, eval):
     else:
         dataset = train_dataset_from_images(img_filelist, roi_filelist, yolo_cfg, rnd_hue, rnd_distmax)
 
-    dataset = dataset.batch(1000)  # batch into set of TFRecords
+    dataset = dataset.batch(record_batch_size)  # batch into set of TFRecords
     dataset = dataset.repeat(1)
 
     # TF graph for JPEG image encoding
@@ -395,7 +445,7 @@ def run_data_generation(data, output_dir, rnd_hue, rnd_distmax, eval):
             # write ROIs
             basename = os.path.basename(fname_r[0].decode("utf-8"))
             basename, _ = os.path.splitext(basename)
-            filename = os.path.join(output_dir, "tileset1K{:04}_{}.tfrecord".format(i, basename))
+            filename = os.path.join(output_dir, "{}tiles{:06}_{}.tfrecord".format(record_batch_size, i, basename))
             with tf.python_io.TFRecordWriter(filename) as file:
                 # TODO: it's a bit silly to write the rois to TFRecords in JSON format. See if there is a better way.
                 for one_image_jpeg, per_image_target_rois in zip(image_jpegs_r, target_rois_r):
@@ -422,6 +472,7 @@ def datagen_main(argv):
     parser.add_argument('--job-dir', default="checkpoints", help='Not used in datagen mode but required by ML engine')
     parser.add_argument('--data', default="sample_data/USGS_public_domain_airports", help='Path to data file (can be on Google cloud storage gs://...)')
     parser.add_argument('--output-dir', default="tilecache", help='Folder where generated training and eavl tiles will be stored (can be on Google cloud storage gs://...)')
+    parser.add_argument('--record-batch-size', default=100, type=int, help='How many tiles per TFRecord file in the output')
     parser.add_argument('--hp-rnd-hue', default=True, type=str2bool, help='Hyperparameter: data augmentation with random hue on training images')
     parser.add_argument('--hp-rnd-distmax', default=2.0, type=float, help='Hyperparameter: training tiles selection max random distance from ground truth ROI (always 2.0 for eval tiles)')
 
@@ -430,6 +481,7 @@ def datagen_main(argv):
 
     data = arguments["data"]
     output_dir = arguments["output_dir"]
+    record_batch_size = arguments["record_batch_size"]
     rnd_hue = arguments["hp_rnd_hue"]
     rnd_distmax = arguments["hp_rnd_distmax"]
 
@@ -447,8 +499,8 @@ def datagen_main(argv):
                               "Eval data is generated with hard-coded parameters so as to offer "
                               "a consistent evaluation benchmark.")
 
-    run_data_generation(data, output_dir, rnd_hue, rnd_distmax, eval=False)
-    run_data_generation(data_eval, output_dir_eval, rnd_hue, rnd_distmax, eval=True)
+    run_data_generation(data, output_dir, record_batch_size, rnd_hue, rnd_distmax, eval=False)
+    run_data_generation(data_eval, output_dir_eval, record_batch_size, rnd_hue, rnd_distmax, eval=True)
 
 if __name__ == '__main__':
     datagen_main(sys.argv)

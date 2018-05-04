@@ -59,7 +59,7 @@ def start_training(output_dir, hparams, data, tiledata, **kwargs):
                                                                                  yolo_cfg)
         tfrec_filelist_eval = gcsfile.get_matching_files(tiledata + "_eval" + "/*.tfrecord")
         eval_data_input_fn = lambda: datagen.eval_data_input_fn_from_tfrecords(tfrec_filelist_eval,
-                                                                               hparams["batch_size"],
+                                                                               hparams["eval_batch_size"],
                                                                                eval_yolo_cfg)
     elif data != "" and  tiledata == "":  # training from aerial imagery directly
         img_filelist, roi_filelist = datagen.load_file_list(data)

@@ -6,7 +6,7 @@ CONFIG="config.yaml"
 BUCKET="gs://ml1-demo-martin"
 DATA="gs://ml1-demo-martin/data/USGS_public_domain_airports"
 # Destination directory of the data. The folder as well as the <samename>_eval folder must exist.
-TILEDATA="gs://ml1-demo-martin/data/USGS_public_domain_tiled_airports_tfrecords"
+TILEDATA="gs://ml1-demo-martin/data/USGS_public_domain_tiled_airports_tfrecords2"
 PROJECT="cloudml-demo-martin"
 REGION="us-central1"
 #REGION="europe-west1"
