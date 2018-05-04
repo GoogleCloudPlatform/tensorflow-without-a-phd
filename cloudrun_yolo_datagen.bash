@@ -6,7 +6,7 @@ CONFIG="config.yaml"
 BUCKET="gs://ml1-demo-martin"
 DATA="gs://ml1-demo-martin/data/USGS_public_domain_airports"
 # Destination directory of the data. The folder as well as the <samename>_eval folder must exist.
-TILEDATA="gs://ml1-demo-martin/data/USGS_public_domain_airports_tiles2"
+TILEDATA="gs://ml1-demo-martin/data/USGS_public_domain_tiled_airports_tfrecords"
 PROJECT="cloudml-demo-martin"
 REGION="us-central1"
 #REGION="europe-west1"
@@ -20,7 +20,7 @@ echo $N > $NFILE;
 printf -v N "%03d" $N
 
 set -x
-gcloud ml-engine jobs submit training plane$N \
+gcloud ml-engine jobs submit training airplane_datagen$N \
     --job-dir "${BUCKET}/jobs/airplane_datagen$N" \
     --scale-tier BASIC \
     --project ${PROJECT} \

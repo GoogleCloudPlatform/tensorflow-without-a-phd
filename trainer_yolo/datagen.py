@@ -11,7 +11,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 _______________________________________________________________________
 
-Datageneration for YOLO (You Look Only Once) detection model."""
+Data generation for YOLO (You Look Only Once) detection model."""
 
 import os
 import sys
@@ -25,6 +25,9 @@ from tensorflow.python.platform import tf_logging as logging
 
 from trainer_yolo import settings
 from trainer_yolo import utils_box as box
+from collections import namedtuple
+
+YOLOConfig = namedtuple('Person', 'grid_nn cell_n cell_swarm cell_grow')
 
 tf.logging.set_verbosity(tf.logging.INFO)
 
@@ -84,11 +87,16 @@ def batch_random_hue(images):
     return tf.map_fn(lambda img: tf.image.random_hue(img, 0.5), images)
 
 
-def yolo_roi_attribution(tiles, rois, grid_nn, cell_n, cell_swarm, cell_grow):
+def yolo_roi_attribution(tiles, rois, yolo_cfg):
     # Tile divided in grid_nn x grid_nn grid
     # Recognizing cell_n boxes per grid cell
     # For each tile, for each grid cell, determine the cell_n largest ROIs centered in that cell
     # Output shape [tiles_n, grid_nn, grid_nn, cell_n, 3] 3 for x, y, w
+
+    grid_nn = yolo_cfg.grid_nn
+    cell_n = yolo_cfg.cell_n
+    cell_swarm = yolo_cfg.cell_swarm
+    cell_grow = yolo_cfg.cell_grow
 
     # dynamic number of rois
     rois = tf.reshape(rois, [-1, 4])  # I know the shape but Tensorflow does not
@@ -106,7 +114,7 @@ def yolo_roi_attribution(tiles, rois, grid_nn, cell_n, cell_swarm, cell_grow):
     return yolo_target_rois
 
 
-def generate_slice(pixels, rois, fname, grid_nn, cell_n, cell_swarm, cell_grow, rnd_hue, rnd_distmax, idx):
+def generate_slice(pixels, rois, fname, yolo_cfg, rnd_hue, rnd_distmax, idx):
     # dynamic image shapes
     img_shape = tf.cast(tf.shape(pixels), tf.float32)  # known shape [height, width, 3]
     img_shape = tf.reshape(img_shape, [3])  # tensorflow needs help here
@@ -169,13 +177,13 @@ def generate_slice(pixels, rois, fname, grid_nn, cell_n, cell_swarm, cell_grow, 
     # Vocabulary:
     # "tile": a 256x256 region under consideration
     # "cell": tiles are evenly divided into 4 x 4 = 16 cells
-    # "roi": a plane bounding box (gorund thruth)
+    # "roi": a plane bounding box (gorund truth)
 
     # Compute ground truth ROIs
     target_rois = box.rois_in_tile_relative(tiles, rois, settings.TILE_SIZE, settings.MAX_TARGET_ROIS_PER_TILE)  # shape [n_tiles, MAX_TARGET_ROIS_PER_TILE, 4]
 
     # Compute ground truth ROIs assigned to YOLO grid cells
-    yolo_target_rois = yolo_roi_attribution(tiles, rois, grid_nn, cell_n, cell_swarm, cell_grow)
+    yolo_target_rois = yolo_roi_attribution(tiles, rois, yolo_cfg)
 
     # resize rois to units used by crop_and_resize
     # TODO: refactor unit conversion into utils_box
@@ -203,42 +211,28 @@ def generate_slice(pixels, rois, fname, grid_nn, cell_n, cell_swarm, cell_grow, 
     return tf.data.Dataset.from_tensor_slices((image_tiles, plane_counts, filenames, yolo_target_rois, target_rois))
 
 
-def load_files(img_filename, roi_filename):
-    log_tensor("Loading ", img_filename)
-    img_bytes = tf.read_file(img_filename)
+def decode_image_and_json_bytes(img_bytes, json_bytes):
+    # decode jpeg
     pixels = tf.image.decode_image(img_bytes, channels=3)
     pixels = tf.cast(pixels, tf.uint8)
-    json_bytes = tf.read_file(roi_filename)
     # parse json
     rois = tf.py_func(decode_json_py, [json_bytes], [tf.float32])
     rois = tf.reshape(rois[0], [-1, 4])
+    return pixels, rois
+
+
+def load_files(img_filename, roi_filename):
+    log_tensor("Loading ", img_filename)
+    img_bytes = tf.read_file(img_filename)
+    json_bytes = tf.read_file(roi_filename)
+    pixels, rois = decode_image_and_json_bytes(img_bytes, json_bytes)
     return pixels, rois, img_filename
 
 
-def load_tiles(img_filename, roi_filename, grid_nn, cell_n, cell_swarm, cell_grow):
-    # TODO: refactor coordinate formats so that target_rois and yolo_target_rois use the same format
-    pixels, rois, img_filename = load_files(img_filename, roi_filename)
-    pixels = tf.reshape(pixels, [settings.TILE_SIZE, settings.TILE_SIZE, 3])  # 3 for r, g, b
-    # the tile is already cut
-    one_tile = tf.constant([[0, 0, settings.TILE_SIZE, settings.TILE_SIZE]], tf.float32)
-    # Compute ground truth ROIs
-    target_rois = box.rois_in_tile_relative(one_tile, rois, settings.TILE_SIZE, settings.MAX_TARGET_ROIS_PER_TILE)  # shape [n_tiles, MAX_TARGET_ROIS_PER_TILE, 4]
-    target_rois = tf.reshape(target_rois, [settings.MAX_TARGET_ROIS_PER_TILE, 4])  # 4 for x1, y1, x2, y2
-    # Compute ground truth ROIs assigned to YOLO grid cells
-    yolo_target_rois = yolo_roi_attribution(one_tile, rois, grid_nn, cell_n, cell_swarm, cell_grow)
-    yolo_target_rois = tf.reshape(yolo_target_rois, [grid_nn, grid_nn, cell_n, 3])  # 3 for x, y, w
-    a = tf.constant(0, tf.float32)
-    b = tf.constant("toto", tf.string)
-    # TODO: remove plane_counts entirely from the model
-    return pixels, a, b, yolo_target_rois, target_rois
-
-
-def generate(pixels, rois, fname, repeat_slice, grid_nn, cell_n, cell_swarm, cell_grow, rnd_hue, rnd_distmax):
+def generate(pixels, rois, fname, repeat_slice, yolo_cfg, rnd_hue, rnd_distmax):
     # generate_slice generates random image tiles in memory from a large aerial shot
     # we call it multiple tiles to get more random tiles from the same image, without exceeding available memory.
-    return tf.data.Dataset.range(repeat_slice).flat_map(lambda i: generate_slice(pixels, rois, fname,
-                                                                                 grid_nn, cell_n,
-                                                                                 cell_swarm, cell_grow,
+    return tf.data.Dataset.range(repeat_slice).flat_map(lambda i: generate_slice(pixels, rois, fname, yolo_cfg,
                                                                                  rnd_hue, rnd_distmax, i))
 
 
@@ -250,63 +244,112 @@ def features_and_labels(dataset):
     return features, labels
 
 
-def train_dataset(img_filelist, roi_filelist, from_tiles, grid_nn, cell_n, cell_swarm, cell_grow, rnd_hue, rnd_distmax):
+def train_dataset_from_images(img_filelist, roi_filelist, yolo_cfg, rnd_hue, rnd_distmax):
     fileset = tf.data.Dataset.from_tensor_slices((tf.constant(img_filelist), tf.constant(roi_filelist)))
-    fileset = fileset.shuffle(500000)  # shuffle filenames
+    fileset = fileset.shuffle(1000)  # shuffle filenames
     #fileset.repeat(6)
-    # TODO: when loading from tiles, make sure ROIs are in the correct format
-    # TODO: when loading from tiles, make sure YOLO-assigned ROIs are computed
-    if from_tiles:
-        dataset = fileset.map(lambda tilef, jsonf: load_tiles(tilef, jsonf, grid_nn, cell_n, cell_swarm, cell_grow))
-    else:
-        dataset = fileset.map(load_files)
-        dataset = dataset.flat_map(lambda pix, rois, fname: generate(pix, rois, fname,
-                                                                     repeat_slice=5,
-                                                                     grid_nn=grid_nn,
-                                                                     cell_n=cell_n,
-                                                                     cell_swarm=cell_swarm,
-                                                                     cell_grow=cell_grow,
-                                                                     rnd_hue=rnd_hue,
-                                                                     rnd_distmax=rnd_distmax))
+    dataset = fileset.map(load_files)
+    dataset = dataset.flat_map(lambda pix, rois, fname: generate(pix, rois, fname,
+                                                                 repeat_slice=5,
+                                                                 yolo_cfg=yolo_cfg,
+                                                                 rnd_hue=rnd_hue,
+                                                                 rnd_distmax=rnd_distmax))
     return dataset
 
 
-def train_data_input_fn(img_filelist, roi_filelist, from_tiles, batch_size, grid_nn, cell_n, cell_swarm, cell_grow, shuffle_buf, rnd_hue, rnd_distmax):
-    dataset = train_dataset(img_filelist, roi_filelist, from_tiles, grid_nn, cell_n, cell_swarm, cell_grow, rnd_hue, rnd_distmax)
+def dataset_from_tfrecords(tfrec_filelist, yolo_cfg):
+    fileset = np.array(tfrec_filelist)
+    np.random.shuffle(fileset)
+    # num_parallel_reads not supported in TF 1.4
+    dataset = tf.data.TFRecordDataset(fileset, buffer_size=10*1024*1024)
+    dataset = dataset.map(lambda tfrec: read_tfrecord_features(tfrec, yolo_cfg))
+    return dataset
+
+
+def train_dataset_configure(dataset, batch_size, shuffle_buf):
     dataset = dataset.cache(tempfile.mkdtemp(prefix="datacache") + "/datacache")
     dataset = dataset.repeat()  # indefinitely
     dataset = dataset.shuffle(shuffle_buf)
     dataset = dataset.prefetch(batch_size)
     dataset = dataset.batch(batch_size)
-    return features_and_labels(dataset)
-
-
-def eval_dataset(img_filelist, roi_filelist, from_tiles, grid_nn, cell_n, cell_swarm):
-    fileset = tf.data.Dataset.from_tensor_slices((tf.constant(img_filelist), tf.constant(roi_filelist)))
-    if from_tiles:
-        dataset = fileset.map(lambda tilef, jsonf: load_tiles(tilef, jsonf, grid_nn, cell_n, cell_swarm, cell_grow=1.0))
-    else:
-        dataset = fileset.map(load_files)
-        dataset = dataset.flat_map(lambda pix, rois, fname: generate(pix, rois, fname,
-                                                                     repeat_slice=1,
-                                                                     grid_nn=grid_nn,
-                                                                     cell_n=cell_n,
-                                                                     cell_swarm=cell_swarm,
-                                                                     cell_grow=1.0,
-                                                                     rnd_hue=False,
-                                                                     rnd_distmax=2.0))
     return dataset
 
 
-def eval_data_input_fn(img_filelist, roi_filelist, from_tiles, eval_batch_size, grid_nn, cell_n, cell_swarm):
-    dataset = eval_dataset(img_filelist, roi_filelist, from_tiles, grid_nn, cell_n, cell_swarm)
+def train_data_input_fn_from_images(img_filelist, roi_filelist, batch_size, shuffle_buf, yolo_cfg, rnd_hue, rnd_distmax):
+    dataset = train_dataset_from_images(img_filelist, roi_filelist, yolo_cfg, rnd_hue, rnd_distmax)
+    dataset = train_dataset_configure(dataset, batch_size, shuffle_buf)
+    return features_and_labels(dataset)
+
+
+def train_data_input_fn_from_tfrecords(tfrec_filelist, batch_size, shuffle_buf, yolo_cfg):
+    dataset = dataset_from_tfrecords(tfrec_filelist, yolo_cfg)
+    dataset = train_dataset_configure(dataset, batch_size, shuffle_buf)
+    return features_and_labels(dataset)
+
+
+def eval_dataset_from_images(img_filelist, roi_filelist, yolo_cfg):
+    fileset = tf.data.Dataset.from_tensor_slices((tf.constant(img_filelist), tf.constant(roi_filelist)))
+    dataset = fileset.map(load_files)
+    dataset = dataset.flat_map(lambda pix, rois, fname: generate(pix, rois, fname,
+                                                                 repeat_slice=1,
+                                                                 yolo_cfg=yolo_cfg,
+                                                                 rnd_hue=False,
+                                                                 rnd_distmax=2.0))
+    return dataset
+
+
+def eval_dataset_configure(dataset, eval_batch_size):
     dataset = dataset.cache(tempfile.mkdtemp(prefix="evaldatacache") + "/evaldatacache")
     dataset = dataset.repeat(1)
-    # eval dataset was 3820 tiles (60 batches of 64). A larger batch will OOM.
-    # eval dataset is 8380 tiles (131 batches of 64). A larger batch will OOM.
-    # eval dataset is 8380 tiles (262 batches of 32). A larger batch will OOM.
-    dataset = dataset.batch(eval_batch_size)
+    dataset = dataset.batch(eval_batch_size)  # eval dataset is 8380 tiles (262 batches of 32) - larger batch will OOM.
+    return dataset
+
+
+def eval_data_input_fn_from_images(img_filelist, roi_filelist, eval_batch_size, yolo_cfg):
+    dataset = eval_dataset_from_images(img_filelist, roi_filelist, yolo_cfg)
+    dataset = eval_dataset_configure(dataset, eval_batch_size)
     return features_and_labels(dataset)
+
+
+def eval_data_input_fn_from_tfrecords(tfrec_filelist, eval_batch_size, yolo_cfg):
+    dataset = dataset_from_tfrecords(tfrec_filelist, yolo_cfg)
+    dataset = eval_dataset_configure(dataset, eval_batch_size)
+    return features_and_labels(dataset)
+
+
+def write_tfrecord_features(tfrec_filewriter, img_bytes, json_bytes, name_bytes):
+    # helper function for TFRecords generation
+    def _bytes_feature(value):
+        return tf.train.Feature(bytes_list=tf.train.BytesList(value=[value]))
+
+    tfrec_filewriter.write(tf.train.Example(features=tf.train.Features(feature={
+        "img": _bytes_feature(img_bytes),
+        "rois": _bytes_feature(json_bytes),
+        "name": _bytes_feature(name_bytes)})).SerializeToString())
+
+
+def read_tfrecord_features(example, yolo_cfg):
+    features = {
+        "img": tf.FixedLenFeature((), tf.string),
+        "rois": tf.FixedLenFeature((), tf.string),
+        "name": tf.FixedLenFeature((), tf.string)
+    }
+    parsed_example = tf.parse_single_example(example, features)
+    pixels, rois = decode_image_and_json_bytes(parsed_example["img"], parsed_example["rois"])
+    airport_name = parsed_example["name"]
+
+    # TODO: refactor coordinate formats so that target_rois and yolo_target_rois use the same format
+    pixels = tf.reshape(pixels, [settings.TILE_SIZE, settings.TILE_SIZE, 3])  # 3 for r, g, b
+    # the tile is already cut
+    one_tile = tf.constant([[0, 0, settings.TILE_SIZE, settings.TILE_SIZE]], tf.float32)
+    # Compute ground truth ROIs
+    target_rois = box.rois_in_tile_relative(one_tile, rois, settings.TILE_SIZE, settings.MAX_TARGET_ROIS_PER_TILE)  # shape [n_tiles, MAX_TARGET_ROIS_PER_TILE, 4]
+    target_rois = tf.reshape(target_rois, [settings.MAX_TARGET_ROIS_PER_TILE, 4])  # 4 for x1, y1, x2, y2
+    # Compute ground truth ROIs assigned to YOLO grid cells
+    yolo_target_rois = yolo_roi_attribution(one_tile, rois, yolo_cfg)
+    yolo_target_rois = tf.reshape(yolo_target_rois, [yolo_cfg.grid_nn, yolo_cfg.grid_nn, yolo_cfg.cell_n, 3])  # 3 for x, y, w
+    # TODO: remove plane_counts entirely from the model (dummy 0 for the time being)
+    return pixels, tf.constant(0), airport_name, yolo_target_rois, target_rois
 
 
 def run_data_generation(data, output_dir, rnd_hue, rnd_distmax, eval):
@@ -322,57 +365,56 @@ def run_data_generation(data, output_dir, rnd_hue, rnd_distmax, eval):
 
     # dummy args only used in YOLO box assignments, which will be discarded anyway
     # TODO: refactor these outside of the generate_slice function
-    grid_nn = 16
-    cell_n = 2
-    cell_swarm = True
-    cell_grow = 1.0
-    from_tiles = False
+    yolo_cfg = YOLOConfig(grid_nn = 16, cell_n = 2, cell_swarm = True, cell_grow = 1.0)
 
     if eval:
-        dataset = eval_dataset(img_filelist, roi_filelist, from_tiles, grid_nn, cell_n, cell_swarm)
+        dataset = eval_dataset_from_images(img_filelist, roi_filelist, yolo_cfg)
     else:
-        dataset = train_dataset(img_filelist, roi_filelist, from_tiles, grid_nn, cell_n, cell_swarm, cell_grow, rnd_hue, rnd_distmax)
+        dataset = train_dataset_from_images(img_filelist, roi_filelist, yolo_cfg, rnd_hue, rnd_distmax)
 
+    dataset = dataset.batch(1000)  # batch into set of TFRecords
     dataset = dataset.repeat(1)
-    image_tiles, counts, fname, _, target_rois = dataset.make_one_shot_iterator().get_next()
 
     # TF graph for JPEG image encoding
-    unencoded_image = tf.placeholder(tf.uint8, [settings.TILE_SIZE, settings.TILE_SIZE, 3])
-    encoded_jpeg = tf.image.encode_jpeg(unencoded_image, optimize_size=True, chroma_downsampling=False)
+    image_tiles, _, fname, _, target_rois = dataset.make_one_shot_iterator().get_next()
+    encoded_jpegs = tf.map_fn(lambda image_bytes:
+                              tf.image.encode_jpeg(image_bytes, optimize_size=True, chroma_downsampling=False),
+                              image_tiles, dtype=tf.string)
+    # end of TF graph for image encoding
 
     i = 0
     with tf.Session() as sess:
         while True:
             try:
-                i += 1
-                image_tile_r, target_rois_r, fname_r = sess.run([image_tiles, target_rois, fname])
-                image_jpeg_r = sess.run(encoded_jpeg, feed_dict={unencoded_image: image_tile_r})
+                image_jpegs_r, target_rois_r, fname_r = sess.run([encoded_jpegs, target_rois, fname])
             except tf.errors.OutOfRangeError:
                 break
             except tf.errors.NotFoundError:
                 break
+            i += 1
             # write ROIs
-            markers = []
-            basename = os.path.basename(fname_r.decode("utf-8"))
+            basename = os.path.basename(fname_r[0].decode("utf-8"))
             basename, _ = os.path.splitext(basename)
-            filename = os.path.join(output_dir, "tile{:08}_{}.json".format(i, basename))
-            with gcsfile.FileIO(filename, "w") as file:
-                for k, roi in enumerate(target_rois_r):
-                    box_x1 = roi[0]
-                    box_y1 = roi[1]
-                    box_x2 = roi[2]
-                    box_y2 = roi[3]
-                    box_x = box_x1 * settings.TILE_SIZE
-                    box_y = box_y2 * settings.TILE_SIZE
-                    box_w = (box_x2 - box_x1) * settings.TILE_SIZE
-                    if box_w > 0:
-                        markers.append({"x": int(round(box_x)), "y": int(round(box_y)), "w": int(round(box_w))})
-                json_rois = {"markers": markers}
-                file.write(json.dumps(json_rois))
-            # write image
-            filename = os.path.join(output_dir, "tile{:08}_{}.jpeg".format(i, basename))
-            with gcsfile.FileIO(filename, "w") as file:
-                file.write(image_jpeg_r)
+            filename = os.path.join(output_dir, "tileset1K{:04}_{}.tfrecord".format(i, basename))
+            with tf.python_io.TFRecordWriter(filename) as file:
+                # TODO: it's a bit silly to write the rois to TFRecords in JSON format. See if there is a better way.
+                for one_image_jpeg, per_image_target_rois in zip(image_jpegs_r, target_rois_r):
+                    markers = []
+                    for roi in per_image_target_rois:
+                        box_x1 = roi[0]
+                        box_y1 = roi[1]
+                        box_x2 = roi[2]
+                        box_y2 = roi[3]
+                        box_x = box_x1 * settings.TILE_SIZE
+                        box_y = box_y1 * settings.TILE_SIZE
+                        box_w = (box_x2 - box_x1) * settings.TILE_SIZE
+                        if box_w > 0:
+                            markers.append({"x": int(round(box_x)), "y": int(round(box_y)), "w": int(round(box_w))})
+                    json_rois = {"markers": markers}
+                    json_roi_string = json.dumps(json_rois)
+                    # write to TFRecord file
+                    write_tfrecord_features(file, one_image_jpeg, json_roi_string.encode("utf-8"), fname_r[0])
+
 
 def datagen_main(argv):
     parser = argparse.ArgumentParser()

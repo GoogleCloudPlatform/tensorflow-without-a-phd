@@ -6,6 +6,7 @@ CONFIG="config.yaml"
 #CONFIG="config-hptune-yolo1.yaml"
 BUCKET="gs://ml1-demo-martin"
 DATA="gs://ml1-demo-martin/data/USGS_public_domain_airports"
+TILEDATA="gs://ml1-demo-martin/data/USGS_public_domain_tiled_airports_tfrecords"
 #DATA="gs://ml1-demo-martin/data/USGS_public_domainTINY_airports"
 PROJECT="cloudml-demo-martin"
 REGION="us-central1"
@@ -20,7 +21,7 @@ echo $N > $NFILE;
 printf -v N "%03d" $N
 
 set -x
-gcloud ml-engine jobs submit training plane$N \
+gcloud ml-engine jobs submit training airplane$N \
     --job-dir "${BUCKET}/jobs/airplane$N" \
     --config ${CONFIG} \
     --project ${PROJECT} \
@@ -29,7 +30,7 @@ gcloud ml-engine jobs submit training plane$N \
     --package-path trainer_yolo \
     --runtime-version 1.4 \
     -- \
-    --data "${DATA}" \
+    --tiledata "${TILEDATA}" \
     --hp-shuffle-buf 50000 \
     --hp-iterations 25000 \
     --hp-lr2 5000 \

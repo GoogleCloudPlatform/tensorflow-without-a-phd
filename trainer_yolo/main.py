@@ -13,6 +13,7 @@
 import sys
 import argparse
 import tensorflow as tf
+from tensorflow.python.lib.io import file_io as gcsfile
 from tensorflow.python.platform import tf_logging as logging
 
 from trainer_yolo import model
@@ -45,47 +46,50 @@ def serving_input_fn():
 
 def start_training(output_dir, hparams, data, tiledata, **kwargs):
 
-    # parameter sanity checks and messages
-    path = data
-    from_tiles = False
-    if (data == "" and tiledata == "") or (data != "" and tiledata != "") :
+    # YOLO configuration for ROI assignments
+    yolo_cfg = datagen.YOLOConfig(hparams["grid_nn"], hparams["cell_n"], hparams["cell_swarm"], hparams["cell_grow"])
+    eval_yolo_cfg = datagen.YOLOConfig(hparams["grid_nn"], hparams["cell_n"], hparams["cell_swarm"], 1.0)
+
+    # data source selection: full aerial imagery of TFRecords containing individual 256x256 tiles
+    if tiledata != "" and  data == "":  # training from tfrecords
+        tfrec_filelist = gcsfile.get_matching_files(tiledata + "/*.tfrecord")
+        train_data_input_fn = lambda: datagen.train_data_input_fn_from_tfrecords(tfrec_filelist,
+                                                                                 hparams["batch_size"],
+                                                                                 hparams["shuffle_buf"],
+                                                                                 yolo_cfg)
+        tfrec_filelist_eval = gcsfile.get_matching_files(tiledata + "_eval" + "/*.tfrecord")
+        eval_data_input_fn = lambda: datagen.eval_data_input_fn_from_tfrecords(tfrec_filelist_eval,
+                                                                               hparams["batch_size"],
+                                                                               eval_yolo_cfg)
+    elif data != "" and  tiledata == "":  # training from aerial imagery directly
+        img_filelist, roi_filelist = datagen.load_file_list(data)
+        train_data_input_fn = lambda: datagen.train_data_input_fn_from_images(img_filelist, roi_filelist,
+                                                                              hparams["batch_size"],
+                                                                              hparams["shuffle_buf"],
+                                                                              yolo_cfg,
+                                                                              hparams["rnd_hue"],
+                                                                              hparams["rnd_distmax"])
+        img_filelist_eval, roi_filelist_eval = datagen.load_file_list(data + "_eval")
+        eval_data_input_fn = lambda: datagen.eval_data_input_fn_from_images(img_filelist_eval, roi_filelist_eval,
+                                                                            hparams["eval_batch_size"],
+                                                                            eval_yolo_cfg)
+    else:
         logging.log(logging.ERROR, "One and only one of parameters 'data' and 'tiledata' must be supplied.")
         return
-    elif data == "":
-        path = tiledata
-        from_tiles = True
 
-    # load data
-    img_filelist, roi_filelist = datagen.load_file_list(path)
-    img_filelist_eval, roi_filelist_eval = datagen.load_file_list(path + "_eval")
-
+    # Estimator configuration
     export_latest = tf.estimator.LatestExporter(name="planesnet",
                                                 serving_input_receiver_fn=serving_input_fn,
                                                 exports_to_keep=1)
 
-    train_spec = tf.estimator.TrainSpec(input_fn=
-                                        lambda:datagen.train_data_input_fn(img_filelist, roi_filelist, from_tiles,
-                                                                           hparams["batch_size"],
-                                                                           hparams["grid_nn"],
-                                                                           hparams["cell_n"],
-                                                                           hparams["cell_swarm"],
-                                                                           hparams["cell_grow"],
-                                                                           hparams["shuffle_buf"],
-                                                                           hparams["rnd_hue"],
-                                                                           hparams["rnd_distmax"]),
+    train_spec = tf.estimator.TrainSpec(input_fn=train_data_input_fn,
                                         max_steps=hparams["iterations"])
 
-    eval_spec = tf.estimator.EvalSpec(input_fn=
-                                      lambda: datagen.eval_data_input_fn(img_filelist_eval, roi_filelist_eval, from_tiles,
-                                                                         hparams["eval_batch_size"],
-                                                                         hparams["grid_nn"],
-                                                                         hparams["cell_n"],
-                                                                         hparams["cell_swarm"]),
+    eval_spec = tf.estimator.EvalSpec(input_fn=eval_data_input_fn,
                                       steps=99999, # evals until Dataset is exhausted (bug: steps=None works but disables evaluation logs)
                                       exporters=export_latest,
                                       start_delay_secs=1,  # Confirmed: this does not work (plane533 for ex.)
-                                      throttle_secs=1
-                                      )
+                                      throttle_secs=1)
 
     training_config = tf.estimator.RunConfig(model_dir=output_dir,
                                              save_summary_steps=100,
@@ -123,7 +127,7 @@ def main(argv):
     parser.add_argument('--hp-lr0', default=0.01, type=float, help='Hyperparameter: initial (max) learning rate')
     parser.add_argument('--hp-lr1', default=0.0001, type=float, help='Hyperparameter: target (min) learning rate')
     parser.add_argument('--hp-lr2', default=3000, type=float, help='Hyperparameter: learning rate decay speed in steps. Learning rate decays by exp(-1) every N steps.')
-    parser.add_argument('--hp-dropout', default=0.0, type=float, help='Hyperparameter: dropout rate')
+    parser.add_argument('--hp-dropout', default=0.0, type=float, help='Hyperparameter: dropout rate. It should be between 0.0 and 0.5. 0.0 for no dropout.')
     parser.add_argument('--hp-spatial-dropout', default=False, type=str2bool, help='Hyperparameter: dropout type, spatial or ordinary. Spatial works better.')
     parser.add_argument('--hp-bnexp', default=0.993, type=float, help='Hyperparameter: exponential decay for batch norm moving averages.')
     parser.add_argument('--hp-lw1', default=1, type=float, help='Hyperparameter: loss weight LW1')
