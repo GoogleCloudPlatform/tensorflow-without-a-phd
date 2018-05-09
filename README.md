@@ -27,7 +27,7 @@ python -m trainer.task --render
 This package comes with a trained checkpoint.  To play a game with it, run:
 
 ```
-python -m trainer.task --render --restore --output-dir ./checkpoints
+python -m trainer.task --render --restore --output-dir ./demo-checkpoint
 ```
 
 You can also run the following command for training locally, which defaults to write the output (TensorBoard summary and checkpoints) to `/tmp/pong_output`:
