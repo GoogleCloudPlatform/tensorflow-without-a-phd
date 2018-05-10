@@ -1,4 +1,4 @@
-![flyer](images/flyer_rnn.jpg)
+![flyer](images/flyer_rl.jpg)
 # Reinforcement Learning Pong on Cloud Machine Learning Engine
 
 ## Introduction
@@ -10,7 +10,7 @@ Author: Yu-Han Liu
 ## Prerequisites
 
 - Python 2.7 or Python 3
-- [Google Cloud SDK](https://cloud.google.com/sdk/)
+- [Google Cloud SDK](https://cloud.google.com/sdk/downloads#interactive)
 
 ## Installation
 
