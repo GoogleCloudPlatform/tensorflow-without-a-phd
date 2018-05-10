@@ -65,4 +65,8 @@ GCS_BUCKET=<gs://YOUR-BUCKET/> bash submit.sh
 
     It might take about 10 minutes before the first checkpoint is saved, and it might take a few hours before the trained model can consistently win a some points.  It might take about 20 hours of training before the trained model can consistently win games.
 
+---
+    
+*Disclaimer: This is not an official Google product but sample code provided for an educational purpose*
+
 
