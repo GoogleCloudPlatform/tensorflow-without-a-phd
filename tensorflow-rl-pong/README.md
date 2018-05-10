@@ -30,13 +30,14 @@ This package comes with a trained checkpoint.  To play a game with it, run:
 python -m trainer.task --render --restore --output-dir ./demo-checkpoint
 ```
 
-You can also run the following command for training locally, which defaults to write the output (TensorBoard summary and checkpoints) to `/tmp/pong_output`:
+You can also run the following command to train locally.
+By default, outputs (checkpoints and TensorBoard summaries) are written to `/tmp/pong_output`:
 
 ```
 python -m trainer.task
 ```
 
-## Run Training Job
+## Run training job
 
 To submit the training job to Cloud Machine Learning Engine:
 
@@ -45,9 +46,9 @@ GCS_BUCKET=<gs://YOUR-BUCKET/> bash submit.sh
 ```
 
 
-## Monitor Training Job
+## Monitor training job
 
-1. You can monitor the training job and find the logs on the [console](https://console.cloud.google.com/mlengine/jobs).
+1. You can monitor the training job and find the logs in the [cloud console](https://console.cloud.google.com/mlengine/jobs).
 
 1. To monitor the progress of training, use TensorBoard:
 
