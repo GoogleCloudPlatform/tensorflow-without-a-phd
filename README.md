@@ -38,7 +38,7 @@ code: soon
 [code](https://github.com/martin-gorner/tensorflow-mnist-tutorial/blob/master/README_BATCHNORM.md)
 
 - Tensorflow and deep reinforcement learning, without a PhD<br/>
-[video](https://youtu.be/aRKOJHRbXeo) |
+[video](https://youtu.be/t1A3NTttvBA) |
 [slides](https://docs.google.com/presentation/d/1qLVvgKxZlM6_oOZ4-ZoOAB0wTh2IdhbFvuBhsMvmK9I/pub?slide=id.g28cd71339f_0_0) |
 [code](tensorflow-rl-pong)
 
