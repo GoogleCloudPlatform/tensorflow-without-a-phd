@@ -95,7 +95,11 @@ def main(args):
                 labels=labels
             )
 
-            loss = tf.reduce_sum(processed_rewards * cross_entropies)
+            # Extra loss when the paddle is moved, to encourage more natural moves.
+            probs = tf.nn.softmax(logits=train_logits)
+            move_cost = args.beta * tf.reduce_sum(probs * [0, 1.0, 1.0], axis=1)
+
+            loss = tf.reduce_sum(processed_rewards * cross_entropies + move_cost)
 
             global_step = tf.train.get_or_create_global_step()
 
@@ -271,6 +275,10 @@ if __name__ == '__main__':
         '--gamma',
         type=float,
         default=0.99)
+    parser.add_argument(
+        '--beta',
+        type=float,
+        default=0.1)
     parser.add_argument(
         '--hidden-dim',
         type=int,
