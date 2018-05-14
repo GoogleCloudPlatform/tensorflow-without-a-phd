@@ -48,7 +48,7 @@ and engineering tips, tricks and best practices to build and train the neural ne
                   <a href="https://docs.google.com/presentation/d/19u0Tm0JHL5tpzyarLILvy4qLSuDBFNNx2hwSvZsFPI0/pub">slides</a> |
                   code: soon<br/><br/></div>
                   <p>Convolutional neural network architectures for image processing. Convnet basics, convolution filters and how to stack them. 
-                  Learnings from the Inception model: modules and parallel convolutions, 1x1 convolutions, ... A simple modern convnet architecture: Squeezenet.
+                  Learnings from the Inception model: modules with parallel convolutions, 1x1 convolutions. A simple modern convnet architecture: Squeezenet.
                   Convenets for detection: the YOLO (You Look Only Once) architecture. Full-scale model training and serving with Tensorflow's Estimator API on Google Cloud ML Engine.
                   Application: airplane detection in aerial imagery. Duration: 55 min</p></td>
         <td width="50%"><img alt="Tensorflow, deep learning and modern convnets, without a PhD" src="tensorflow-rl-pong/images/flds4.png"/></td>
@@ -62,7 +62,7 @@ and engineering tips, tricks and best practices to build and train the neural ne
                      code: soon<br/><br/></div>
                      <p>Advanced RNN architectures for natural language processing. Word embeddings, text classification,
                      bidirectional models, sequence to sequence models for translation. Attention mechanisms. This session also explores
-                     Tensorflow's powerful seq2seq API. Application: toxic comment detection and langauge translation.
+                     Tensorflow's powerful seq2seq API. Applications: toxic comment detection and langauge translation.
                      Co-author: Nithum Thain. Duration: 55 min</p></td>
     </tr>
     <tr>
