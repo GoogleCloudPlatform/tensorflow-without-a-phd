@@ -1,10 +1,14 @@
-Code samples from the "Tensorflow without a PhD" series by Martin Gorner []https://twitter.com/martin_gorner](@martin_gorner).
+Code samples from the "Tensorflow without a PhD" series by Martin Gorner [https://twitter.com/martin_gorner](@martin_gorner).
 
+## Featured sample
 
-#### [tensorflow-rl-pong](tensorflow-rl-pong)
+[tensorflow-rl-pong](tensorflow-rl-pong) fome the Google I/O 2018 session "Tensorflow and deep reinforcement learning, without a PhD".<br/>
+Other samples from the "Tensorflow without a PhD" series will soon be migrated to this repository.
 
-Other samples from the series will soon be migrated to this repository.
+## Tensorflow and deep learning without a PhD series by Martin Gorner [https://twitter.com/martin_gorner](@martin_gorner).
 
+A crash course in six episodes for software developers who want to learn machine learning, with examples, theoretical concepts,
+and engineering tips, tricks and best practices to build and train the neural networks that solve your problems.
 
 <table border=0 width=100%>
     <tr>
