@@ -1,10 +1,32 @@
 Sample code for "Tensorflow without a PhD" series.
 
+
 #### [tensorflow-rl-pong](tensorflow-rl-pong)
 
 A neural network trained to play the game of Pong for just the pixels of the game.
 Uses reinforcement learning and policy gradients. The approach can be generalized to
 other problem involving a non-differentiable step that cannot be trained using traditional supervised learning techniques.
+
+
+-----
+
+<div style="display: flex; flex-direction:column; border:3px red solid">
+    <div style="display: flex; flex-direction:row; border:3px green solid">
+        <div style="flex:0; border: 3px yellow solid"><img style="width:450px" src="tensorflow-rl-pong/images/flds1.png"></div>
+        <div style="flex:0; border: 3px yellow solid; width:100%">box</div>
+    </div>
+    <div style="display: flex; flex-direction:row; border:3px green solid">
+        <div style="border: 3px yellow solid; width:100%">box</div>
+        <div style="border: 3px yellow solid"><img src="tensorflow-rl-pong/images/cloud.png"></div>
+    </div>
+    <div style="display: flex; flex-direction:row; border:3px green solid">
+        <div style="border: 3px yellow solid"><img src="tensorflow-rl-pong/images/cloud.png"></div>
+        <div style="border: 3px yellow solid; width:100%">box</div>
+        </box>
+    </div>
+</div>
+
+
 
 ---
 
