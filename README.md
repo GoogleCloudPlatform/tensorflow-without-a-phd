@@ -1,4 +1,4 @@
-Code samples from the "Tensorflow without a PhD" series by Martin Gorner https://twitter.com/martin_gorner.
+Code samples from the "Tensorflow without a PhD" series by Martin Gorner []https://twitter.com/martin_gorner](@martin_gorner).
 
 
 #### [tensorflow-rl-pong](tensorflow-rl-pong)
