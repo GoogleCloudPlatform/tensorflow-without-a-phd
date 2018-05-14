@@ -8,31 +8,6 @@ Uses reinforcement learning and policy gradients. The approach can be generalize
 other problem involving a non-differentiable step that cannot be trained using traditional supervised learning techniques.
 
 
----
-
-<table border=0 width=100%>
-    <tr>
-        <td border=0 width="480" colspan=2><img alt="Tensorflow and deep learning without a PhD" width="450" src="tensorflow-rl-pong/images/flds1.png"/></td>
-        <td border=0>
-            <div align="center"><font size=6>
-                     <a href="https://youtu.be/u4alGiomYP4">video</a> |
-                     <a href="https://docs.google.com/presentation/d/1TVixw6ItiZ8igjp6U17tcgoFrLSaHWQmMOwjlgQY9co/pub?slide=id.p">slides</a> |
-                     <a href="https://codelabs.developers.google.com/codelabs/cloud-tensorflow-mnist/#0">codelab</a> |
-                     <a href="https://github.com/martin-gorner/tensorflow-mnist-tutorial">code</a><br/><br/></font></div>
-                     <p align="justify">The basics of building neural networks for software engineers. Neural weights and biases, activation functions, softmax, cross-entropy, supervised learning and gradient descent.
-                     Tips and best practices for efficient training: learning rate decay, dropout regularisation and the intricacies of overfitting. Dense and convolutional neural networks. This session starts with low-level
-                     Tensorflow and also has a sample of high-level Tensorflow code using layers and Datasets. Duration: 55 min</p></td>
-    </tr>
-    <tr>
-        <td border=0><div align="center"><font size=6>
-                                          <a href="https://youtu.be/vq2nnJ4g6N0?t=76m">video</a> |
-                                          <a href="https://docs.google.com/presentation/d/18MiZndRCOxB7g-TcCl2EZOElS5udVaCuxnGznLnmOlE/pub?slide=id.g1245051c73_0_25">slides</a> |
-                                          <a href="https://github.com/martin-gorner/tensorflow-mnist-tutorial/blob/master/README_BATCHNORM.md">code</a><br/><br/></font></div>
-                                          <p align="justify">What is batch normalisation, How to use it appropriately and how to see if it is working or not. Duration: 25 min</p></td>
-        <td border=0 width="480" colspan=2><img alt="The superpower: batch normalization" width="450" src="tensorflow-rl-pong/images/flds2.png"/></td>
-    </tr>
-</table>
-
 
 ---
 
