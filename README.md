@@ -1,4 +1,4 @@
-Code samples from the "Tensorflow without a PhD" series.
+Code samples from the "Tensorflow without a PhD" series by Martin Gorner https://twitter.com/martin_gorner.
 
 
 #### [tensorflow-rl-pong](tensorflow-rl-pong)
@@ -58,7 +58,7 @@ Other samples from the series will soon be migrated to this repository.
                      code: soon<br/><br/></div>
                      <p>Advanced RNN architectures for natural language processing. Word embeddings, text classification,
                      bidirectional models, sequence to sequence models for trqnslqtion. Attention mechanisms. This session also explores
-                     Tensorflow's powerful seq2seq API. Duration: 55 min</p></td>
+                     Tensorflow's powerful seq2seq API. Co-author: Nithum Thain. Duration: 55 min</p></td>
     </tr>
     <tr>
         <td width="50%"><div align="center">
@@ -69,7 +69,7 @@ Other samples from the series will soon be migrated to this repository.
             A neural network trained to play the game of Pong for just the pixels of the game.
             Uses reinforcement learning and policy gradients. The approach can be generalized to
             other problem involving a non-differentiable step that cannot be trained using traditional supervised learning techniques.
-            A practical application: neural architecture search - neural networks designing neural networks. Duration: 40 min</p></td>
+            A practical application: neural architecture search - neural networks designing neural networks. Co-author: Yu-Han Liu. Duration: 40 min</p></td>
         <td width="50%"><img alt="Tensorflow and deep reinforcement learning, without a PhD" src="tensorflow-rl-pong/images/flds6.png"/></td>
         </tr>
 </table>
