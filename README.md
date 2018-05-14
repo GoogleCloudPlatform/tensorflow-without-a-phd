@@ -42,7 +42,7 @@ Other samples from the series will soon be migrated to this repository.
         <td width="50%"><div align="center">
                   <a href="https://youtu.be/vaL1I2BD_xY">video</a> |
                   <a href="https://docs.google.com/presentation/d/19u0Tm0JHL5tpzyarLILvy4qLSuDBFNNx2hwSvZsFPI0/pub">slides</a> |
-                  code: soon
+                  code: soon<br/><br/></div>
                   <p>Convolutional neural network architectures for image processing. Convnet basics, convolution filters and how to stack them. 
                   Learnings from the Inception model: modules and parallel convolutions, 1x1 convolutions, ... A simple modern convnet architecture: Squeezenet.
                   Convenets for detection: the YOLO (You Look Only Once) architecture. Full-scale model training and serving with Tensorflow's Estimator API on Google Cloud ML Engine.
@@ -64,7 +64,7 @@ Other samples from the series will soon be migrated to this repository.
         <td width="50%"><div align="center">
             <a href="https://youtu.be/t1A3NTttvBA">video</a> |
             <a href="https://docs.google.com/presentation/d/1qLVvgKxZlM6_oOZ4-ZoOAB0wTh2IdhbFvuBhsMvmK9I/pub">slides</a> |
-            code: soon
+            <a href="tensorflow-rl-pong">code</a><br/><br/></div>
             <p>
             A neural network trained to play the game of Pong for just the pixels of the game.
             Uses reinforcement learning and policy gradients. The approach can be generalized to
