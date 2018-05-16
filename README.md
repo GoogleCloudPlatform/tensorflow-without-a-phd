@@ -3,7 +3,7 @@
 <table border=0 width=100%>
     <tr>
         <td width="50%">
-            <a href="tensorflow-rl-pong">tensorflow-rl-pong]</a> from the Google I/O 2018 session "Tensorflow and deep reinforcement
+            <b><a href="tensorflow-rl-pong">tensorflow-rl-pong</a></b> from the Google I/O 2018 session "Tensorflow and deep reinforcement
             learning, without a PhD".<br/>Other samples from the "Tensorflow without a PhD" series will soon be migrated
             to this repository.
         <td width="50%"><a href="https://youtu.be/t1A3NTttvBA"><img alt="Tensorflow and deep learning without a PhD" src="tensorflow-rl-pong/images/io2018thumb.jpg"/></a></td>
