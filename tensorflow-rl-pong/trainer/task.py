@@ -278,7 +278,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--beta',
         type=float,
-        default=0.1)
+        default=0.01)
     parser.add_argument(
         '--hidden-dim',
         type=int,
