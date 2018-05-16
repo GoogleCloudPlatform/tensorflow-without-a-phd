@@ -97,7 +97,7 @@ def main(args):
 
             # Extra loss when the paddle is moved, to encourage more natural moves.
             probs = tf.nn.softmax(logits=train_logits)
-            move_cost = args.beta * tf.reduce_sum(probs * [0, 1.0, 1.0], axis=1)
+            move_cost = args.laziness * tf.reduce_sum(probs * [0, 1.0, 1.0], axis=1)
 
             loss = tf.reduce_sum(processed_rewards * cross_entropies + move_cost)
 
@@ -276,7 +276,7 @@ if __name__ == '__main__':
         type=float,
         default=0.99)
     parser.add_argument(
-        '--beta',
+        '--laziness',
         type=float,
         default=0.01)
     parser.add_argument(
