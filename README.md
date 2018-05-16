@@ -13,8 +13,6 @@
 <br/>
 <br/>
 <br/>
-<br/>
-<br/>
 
 ## Tensorflow and deep learning without a PhD series by [@martin_gorner](https://twitter.com/martin_gorner).
 
