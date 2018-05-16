@@ -6,7 +6,7 @@
             Code from the Google I/O 2018 session "Tensorflow and deep reinforcement
             learning, without a PhD". Other samples from the "Tensorflow without a PhD" series will soon be migrated
             to this repository.
-        <td width="50%"><a href="https://youtu.be/t1A3NTttvBA"><img alt="Tensorflow and deep reinforcementlearning, without a PhD" src="tensorflow-rl-pong/images/io2018thumb.jpg"/></a></td>
+        <td width="50%"><a href="https://youtu.be/t1A3NTttvBA"><img alt="Tensorflow and deep reinforcement learning, without a PhD" src="tensorflow-rl-pong/images/io2018thumb.jpg"/></a></td>
     </tr>
 </table>
 
