@@ -94,7 +94,7 @@ and engineering tips, tricks and best practices to build and train the neural ne
     <tr>
         <td width="50%">
             <b><a href="tensorflow-rnn-tutorial">tensorflow-rnn-tutorial</a></b><br/>
-            recurrent Neural Network tutorial
+            recurrent neural network tutorial
         </td>
         <td width="50%">
             <b><a href="tensorflow-rl-pong">tensorflow-rl-pong</a></b><br/>
