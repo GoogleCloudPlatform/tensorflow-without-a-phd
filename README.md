@@ -1,4 +1,4 @@
-<table border=0 width=100%>
+<table width="100%">
     <tr>
         <td width="50%">
             <H2>Featured code sample</H2>
@@ -9,9 +9,6 @@
         <td width="50%"><a href="https://youtu.be/t1A3NTttvBA"><img alt="Tensorflow and deep reinforcement learning, without a PhD" src="tensorflow-rl-pong/images/io2018thumb.jpg"/></a></td>
     </tr>
 </table>
-
-<br/>
-<br/>
 <br/>
 
 ## Tensorflow and deep learning without a PhD series by [@martin_gorner](https://twitter.com/martin_gorner).
@@ -19,7 +16,7 @@
 A crash course in six episodes for software developers who want to learn machine learning, with examples, theoretical concepts,
 and engineering tips, tricks and best practices to build and train the neural networks that solve your problems.
 
-<table border=0 width=100%>
+<table width="100%">
     <tr>
         <td width="50%"><img alt="Tensorflow and deep learning without a PhD" src="tensorflow-rl-pong/images/flds1.png"/></td>
         <td width="50%">
@@ -47,7 +44,7 @@ and engineering tips, tricks and best practices to build and train the neural ne
             <div align="center">
                  <a href="https://youtu.be/fTUwdXUFfI8">video</a> |
                  <a href="https://docs.google.com/presentation/d/18MiZndRCOxB7g-TcCl2EZOElS5udVaCuxnGznLnmOlE/pub?slide=id.p">slides</a> |
-                 <a href="https://github.com/martin-gorner/tensorflow-rnn-tutorial">codelab</a> |
+                 <a href="tensorflow-rnn-tutorial">codelab</a> |
                  <a href="https://github.com/martin-gorner/tensorflow-rnn-shakespeare">code</a><br/><br/></div>
                  <p> RNN basics: the RNN cell as a state machine, training and unrolling (backpropagation through time).
                  More complex RNN cells: LSTM and GRU cells. Application to language modeling and generation. Tensorflow APIs for RNNs.
@@ -89,5 +86,23 @@ and engineering tips, tricks and best practices to build and train the neural ne
         <td width="50%"><img alt="Tensorflow and deep reinforcement learning, without a PhD" src="tensorflow-rl-pong/images/flds6.png"/></td>
         </tr>
 </table>
-
+<br/>
+<br/>
+<br/>
+<table width="50%">
+    <tr><td colspan="2">Quick access to all code samples:</td></tr>
+    <tr>
+        <td width="50%">
+            <b><a href="tensorflow-rnn-tutorial">tensorflow-rnn-tutorial</a></b><br/>
+            recurrent Neural Network tutorial
+        </td>
+        <td width="50%">
+            <b><a href="tensorflow-rl-pong">tensorflow-rl-pong</a></b><br/>
+            "pong" with reinforcement learning
+        </td>
+    </tr>
+</table>
+<br/>
+<br/>
+<br/>
 *Disclaimer: This is not an official Google product but sample code provided for an educational purpose*

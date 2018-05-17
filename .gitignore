@@ -1,2 +1,7 @@
-*.pyc
 events.out.tfevents.*
+.ipynb_checkpoints
+*.pyc
+tutorial/outputdir
+tutorial/checkpoints
+tutorial/temperatures_all
+tensorflow-rnn-tutorial/tutorial/task.py
