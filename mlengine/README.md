@@ -22,7 +22,7 @@ gcloud ml-engine jobs submit training jobXXX --job-dir gs://<bucket>/jobs/jobXXX
 ## Train in the cloud with hyperparameter tuning
 (jobXXX, jobs/jobXXX, &lt;project&gt; and &lt;bucket&gt; must be replaced with your own values)
 ```bash
-gcloud ml-engine jobs submit training jobXXX --job-dir gs://<bucket>/jobs/jobXXX --project <project> --config config-hptune6.yaml --module-name trainer.task --package-path trainer --runtime-version 1.4
+gcloud ml-engine jobs submit training jobXXX --job-dir gs://<bucket>/jobs/jobXXX --project <project> --config config-hptune.yaml --module-name trainer.task --package-path trainer --runtime-version 1.4
 ```
 --runtime-version specifies the version of Tensorflow to use.
 

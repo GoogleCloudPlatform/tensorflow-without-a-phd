@@ -175,12 +175,21 @@ test_digits = [sdigit8, sdigit7a, sdigit7b, sdigit5a, sdigit5b]
 if __name__ == '__main__':
 
     # for online predictions, ml-engine expects a valid JSON object with a list
-    print(json.dumps({'image': test_digits}))
+    # print(json.dumps({'image': test_digits}))
 
-    # for local predictions, ml-engine expects one valid JSON object per line
-    #print(json.dumps({'image': sdigit8}))
-    #print(json.dumps({'image': sdigit7a}))
-    #print(json.dumps({'image': sdigit7b}))
-    #print(json.dumps({'image': sdigit5a}))
-    #print(json.dumps({'image': sdigit5b}))
+    # "gcloud ml-engine [local] predict" expects one valid JSON object per line
+    print(json.dumps({"image": sdigit8}))
+    print(json.dumps({"image": sdigit7a}))
+    print(json.dumps({"image": sdigit7b}))
+    print(json.dumps({"image": sdigit5a}))
+    print(json.dumps({"image": sdigit5b}))
+
+    # This works too. In fact multiple images will be merged into a single tensor
+    # whatever you do:
+    # print(json.dumps({'image': test_digits}))
+
+    # WARNING
+    # If you sending JSON to the REST API directly (not through "gcloud ml-engine [local] predict")
+    # The JSON must wrap all the above in a single "instances" JSON object like this:
+    # {"instances": [{'image': sdigit8}, {'image': sdigit7a}]}
 

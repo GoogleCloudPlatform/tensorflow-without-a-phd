@@ -48,7 +48,6 @@ def load_mnist_data(data_dir):
 
 # Called when the model is deployed for online predictions on Cloud ML Engine.
 def serving_input_fn():
-    # TODO: test again with the None param. This is untested!!!
     inputs = {'image': tf.placeholder(tf.float32, [None, 28, 28])}
     # Here, you can transform the data received from the API call
     features = inputs
@@ -169,11 +168,10 @@ def conv_model(features, labels, mode, params):
 
     return tf.estimator.EstimatorSpec(
         mode=mode,
-        predictions={"predictions": predict, "classes": classes}, # name these fields as you like
+        predictions={"predictions": predict, "classes": classes},  # name these fields as you like
         loss=loss,
         train_op=train_op,
         eval_metric_ops=eval_metrics,
-        # ???
         export_outputs={'classes': tf.estimator.export.PredictOutput({"predictions": predict, "classes": classes})}
     )
 
