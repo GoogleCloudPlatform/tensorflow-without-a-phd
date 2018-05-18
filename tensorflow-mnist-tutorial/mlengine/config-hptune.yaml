@@ -1,0 +1,71 @@
+trainingInput:
+  scaleTier: BASIC_GPU
+  hyperparameters:
+    goal: MINIMIZE
+    hyperparameterMetricTag: loss
+    maxTrials: 53
+    maxParallelTrials: 7
+    params:
+      - parameterName: hp-conv1
+        type: INTEGER
+        minValue: 6
+        maxValue: 18
+        scaleType: UNIT_LINEAR_SCALE
+      - parameterName: hp-conv2
+        type: INTEGER
+        minValue: 12
+        maxValue: 40
+        scaleType: UNIT_LINEAR_SCALE
+      - parameterName: hp-conv3
+        type: INTEGER
+        minValue: 30
+        maxValue: 64
+        scaleType: UNIT_LINEAR_SCALE
+      - parameterName: hp-lr2
+        type: INTEGER
+        minValue: 500
+        maxValue: 5000
+        scaleType: UNIT_LINEAR_SCALE
+
+# best (job153):
+#"trialId": "44",
+#  "hyperparameters": {
+#    "hp-conv3": "64",
+#    "hp-conv2": "38",
+#    "hp-lr2": "601",
+#    "hp-conv1": "15"
+#  },
+#  "finalMetric": {
+#    "trainingStep": "10000",
+#    "objectiveValue": 1.48850083351
+#  }
+#},
+# => final accuracy 0.9954
+# => at 2000 iterations acc=0.9950 loss=1.663
+# => at 3000 iterations acc=0.9953 loss=1.526
+#{
+#  "trialId": "43",
+#  "hyperparameters": {
+#    "hp-conv2": "39",
+#    "hp-lr2": "541",
+#    "hp-conv1": "17",
+#    "hp-conv3": "63"
+#  },
+#  "finalMetric": {
+#    "trainingStep": "10000",
+#    "objectiveValue": 1.5163513422
+#  }
+# => final accuracy 0.9944
+# => at 2000 iterations acc=0.9942 loss=1.567
+# => at 3000 iterations acc=0.9942 loss=1.496
+#
+# Other params:
+# learning rate lr1=0.02-0.0001-???
+# conv layers: with patch sizes 6x6 5x5 4x4 with batch norm
+# dense layer: 200 batch norm
+# dropout 0.3
+# bnexp 0.993
+# activation: relu
+#
+# results: These two trials actually hit 0.9950 accuracy in 2000 iterations only
+# finally making true on the promise of batch normalisation to speed up training.

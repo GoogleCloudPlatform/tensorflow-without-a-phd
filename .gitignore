@@ -5,3 +5,6 @@ tensorflow-rnn-tutorial/tutorial/outputdir
 tensorflow-rnn-tutorial/tutorial/checkpoints
 tensorflow-rnn-tutorial/tutorial/temperatures_all
 tensorflow-rnn-tutorial/tutorial/task.py
+tensorflow-mnist-tutorial/data
+tensorflow-mnist-tutorial/mlengine/data
+tensorflow-mnist-tutorial/mlengine/checkpoints

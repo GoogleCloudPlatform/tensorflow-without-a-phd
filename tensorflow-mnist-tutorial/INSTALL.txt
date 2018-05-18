@@ -1,0 +1,39 @@
+Python 3 is recommended for this lab. Python 2 works as well if you adapt the installation instructions.
+
+Installation instructions for straightforward pip install below.
+
+If you are a power user under a specific Python environment ((virtualenv, anaconda,
+docker), please visit tensorflow.org and follow the Python 3 instructions.
+
+MacOS:
+	# If you do not have it already, install git from https://git-scm.com/download/mac
+	# Install the latest version of python 3 from https://www.python.org/downloads/
+	# and run this on the command line so that python3 can access https:// URLs:
+	sudo /Applications/Python\ 3.6/Install\ Certificates.command
+	# Now you can install tensorflow and matplotlib
+	pip3 install --upgrade tensorflow
+	pip3 install --upgrade matplotlib
+
+Ubuntu/Linux:
+	sudo -H apt-get install git
+	sudo -H apt-get install python3
+	sudo -H apt-get install python3-matplotlib
+	sudo -H apt-get install python3-pip
+	sudo -H pip3 install --upgrade tensorflow
+	# you might alo need to upgrade matplotlib, the version pulled by
+	# apt-get is sometimes stale (but comes with the gfx backend)
+	sudo -H pip3 install --upgrade matplotlib
+
+Windows:
+	Install Anaconda, Python 3 version: https://www.continuum.io/downloads#windows
+	Anaconda comes with matplotlib built in.
+	In the Anaconda shell type: pip install --upgrade tensorflow
+		If you get the error "Could not find a version that satisfies the requirement (...)" try the following alternative:
+		conda config --add channels conda-forge
+		conda install tensorflow
+
+TEST YOUR INSTALLATION:
+    git clone https://github.com/martin-gorner/tensorflow-mnist-tutorial.git
+    cd tensorflow-mnist-tutorial
+    python3 mnist_1.0_softmax.py
+    => A window should appear displaying a graphical visualisation and you should also see training data in the terminal.

@@ -89,14 +89,18 @@ and engineering tips, tricks and best practices to build and train the neural ne
 <br/>
 <br/>
 <br/>
-<table width="50%">
-    <tr><td colspan="2">Quick access to all code samples:</td></tr>
+<table width="75%">
+    <tr><td colspan="3">Quick access to all code samples:</td></tr>
     <tr>
-        <td width="50%">
+        <td width="33%">
+                    <b><a href="tensorflow-mnist-tutorial">tensorflow-mnist-tutorial</a></b><br/>
+                    dense and convolutional neural network tutorial
+                </td>
+        <td width="33%">
             <b><a href="tensorflow-rnn-tutorial">tensorflow-rnn-tutorial</a></b><br/>
             recurrent neural network tutorial
         </td>
-        <td width="50%">
+        <td width="33%">
             <b><a href="tensorflow-rl-pong">tensorflow-rl-pong</a></b><br/>
             "pong" with reinforcement learning
         </td>
