@@ -201,7 +201,7 @@ def main(args):
                     episode_memory = []
 
                     if args.render:
-                        _ = raw_input('episode done, press Enter to replay')
+                        _ = input('episode done, press Enter to replay')
                         epoch_memory = []
                         continue
 
