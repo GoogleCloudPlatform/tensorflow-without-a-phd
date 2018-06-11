@@ -18,6 +18,7 @@ import os
 import tensorflow as tf
 import numpy as np
 import gym
+from builtins import input
 
 from trainer.helpers import discount_rewards, prepro
 from agents.tools.wrappers import AutoReset, FrameHistory
@@ -201,7 +202,7 @@ def main(args):
                     episode_memory = []
 
                     if args.render:
-                        _ = raw_input('episode done, press Enter to replay')
+                        _ = input('episode done, press Enter to replay')
                         epoch_memory = []
                         continue
 
