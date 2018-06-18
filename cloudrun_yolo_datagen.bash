@@ -27,7 +27,7 @@ gcloud ml-engine jobs submit training airplane_datagen$N \
     --region ${REGION} \
     --module-name trainer_yolo.datagen \
     --package-path trainer_yolo \
-    --runtime-version 1.4 \
+    --runtime-version 1.8 \
     -- \
     --data "${DATA}" \
     --output-dir "${TILEDATA}"

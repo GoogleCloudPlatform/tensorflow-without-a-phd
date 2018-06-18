@@ -14,6 +14,8 @@ _______________________________________________________________________
 Unit tests for utils_box. To run the tests, execute
 python -m unittest discover -s trainer_yolo"""
 
+# TODO: move this under a tests/ directory
+
 import tensorflow as tf
 import numpy as np
 import unittest

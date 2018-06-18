@@ -13,6 +13,7 @@
 trainingInput:
   #scaleTier: BASIC
   scaleTier: BASIC_GPU
+  #scaleTier: BASIC_TPU
   #scaleTier: STANDARD_1
   #scaleTier: PREMIUM_1
 

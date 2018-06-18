@@ -9,6 +9,7 @@ DATA="gs://ml1-demo-martin/data/USGS_public_domain_airports"
 TILEDATA="gs://ml1-demo-martin/data/USGS_public_domain_tiles100_airports_tfrecords"
 #DATA="gs://ml1-demo-martin/data/USGS_public_domainTINY_airports"
 PROJECT="cloudml-demo-martin"
+#REGION="us-central1"
 REGION="us-central1"
 #REGION="europe-west1"
 
@@ -28,14 +29,16 @@ gcloud ml-engine jobs submit training airplane$N \
     --region ${REGION} \
     --module-name trainer_yolo.main \
     --package-path trainer_yolo \
-    --runtime-version 1.4 \
+    --runtime-version 1.8 \
     -- \
-    --tiledata "${TILEDATA}" \
-    --hp-shuffle-buf 2000 \
+    --data "${DATA}" \
+    --hp-shuffle-buf 4000 \
     --hp-iterations 25000 \
     --hp-lr2 5000 \
     --hp-layers 12 \
     --hp-first-layer-filter-depth 32 \
     --hp-first-layer-filter-size 6 \
     --hp-first-layer-filter-stride 2 \
-    --hp-depth-increment 5
+    --hp-depth-increment 5 \
+    --hp-spatial-dropout True \
+    --hp-dropout 0.0

@@ -67,8 +67,8 @@ def start_training(output_dir, hparams, data, tiledata, **kwargs):
                                                                               hparams["batch_size"],
                                                                               hparams["shuffle_buf"],
                                                                               yolo_cfg,
-                                                                              hparams["rnd_hue"],
-                                                                              hparams["rnd_distmax"])
+                                                                              hparams["data_rnd_hue"],
+                                                                              hparams["data_rnd_distmax"])
         img_filelist_eval, roi_filelist_eval = datagen.load_file_list(data + "_eval")
         eval_data_input_fn = lambda: datagen.eval_data_input_fn_from_images(img_filelist_eval, roi_filelist_eval,
                                                                             hparams["eval_batch_size"],
@@ -134,8 +134,10 @@ def main(argv):
     parser.add_argument('--hp-lw2', default=3, type=float, help='Hyperparameter: loss weight LW2')
     parser.add_argument('--hp-lw3', default=30, type=float, help='Hyperparameter: loss weight LW3')
     # hyperparameters for training data generation. They do not affect test data.
-    parser.add_argument('--hp-rnd-hue', default=True, type=str2bool, help='Hyperparameter: data augmentation with random hue on training images')
-    parser.add_argument('--hp-rnd-distmax', default=2.0, type=float, help='Hyperparameter: training tiles selection max random distance from ground truth ROI (always 2.0 for eval tiles)')
+    parser.add_argument('--hp-data-tiles-per-gt-roi', default=100, type=int, help='Data generation hyperparameter: number of training tiles generated around each ground truth ROI')
+    parser.add_argument('--hp-data-rnd-distmax', default=2.0, type=float, help='Data generation hyperparameter: training tiles selection max random distance from ground truth ROI (always 2.0 for eval tiles)')
+    parser.add_argument('--hp-data-rnd-hue', default=True, type=str2bool, help='Data generation hyperparameter: data augmentation with random hue on training images')
+    parser.add_argument('--hp-data-rnd-orientation', default=True, type=str2bool, help='Data generation hyperparameter: data augmentation by rotating and flipping tiles.')
 
     args = parser.parse_args()
     arguments = args.__dict__

@@ -89,6 +89,30 @@ def model_core_darknet(x, mode, params, info):
     # the last number of filters must be multiple of 5 so that the YOLO head can be added afterwards
     return y, info
 
+def model_core_darknet17(x, mode, params, info):
+    y, info = layer.conv2d_batch_norm_relu_dropout_l(x, mode, params, info, filters=100, kernel_size=3, strides=1)
+    y, info = layer.conv2d_batch_norm_relu_dropout_l(y, mode, params, info, filters=100, kernel_size=1, strides=1)
+    y, info = layer.maxpool_l(y, info) # output 128x128
+    y, info = layer.conv2d_batch_norm_relu_dropout_l(y, mode, params, info, filters=100, kernel_size=3, strides=1)
+    y, info = layer.conv2d_batch_norm_relu_dropout_l(y, mode, params, info, filters=100, kernel_size=1, strides=1)
+    y, info = layer.conv2d_batch_norm_relu_dropout_l(y, mode, params, info, filters=100, kernel_size=3, strides=1)
+    y, info = layer.conv2d_batch_norm_relu_dropout_l(y, mode, params, info, filters=100, kernel_size=1, strides=1)
+    y, info = layer.maxpool_l(y, info) # output 64x64
+    y, info = layer.conv2d_batch_norm_relu_dropout_l(y, mode, params, info, filters=100, kernel_size=3, strides=1)
+    y, info = layer.conv2d_batch_norm_relu_dropout_l(y, mode, params, info, filters=100, kernel_size=1, strides=1)
+    y, info = layer.conv2d_batch_norm_relu_dropout_l(y, mode, params, info, filters=100, kernel_size=3, strides=1)
+    y, info = layer.conv2d_batch_norm_relu_dropout_l(y, mode, params, info, filters=100, kernel_size=1, strides=1)
+    y, info = layer.maxpool_l(y, info) # output 32x32
+    y, info = layer.conv2d_batch_norm_relu_dropout_l(y, mode, params, info, filters=100, kernel_size=3, strides=1)
+    y, info = layer.conv2d_batch_norm_relu_dropout_l(y, mode, params, info, filters=100, kernel_size=1, strides=1)
+    y, info = layer.conv2d_batch_norm_relu_dropout_l(y, mode, params, info, filters=100, kernel_size=3, strides=1)
+    y, info = layer.conv2d_batch_norm_relu_dropout_l(y, mode, params, info, filters=100, kernel_size=1, strides=1)
+    y, info = layer.maxpool_l(y, info) # output 16x16
+    y, info = layer.conv2d_batch_norm_relu_dropout_l(y, mode, params, info, filters=100, kernel_size=3, strides=1)
+    y, info = layer.conv2d_batch_norm_relu_dropout_l(y, mode, params, info, filters=100, kernel_size=1, strides=1)
+    # the last number of filters must be multiple of 5 so that the YOLO head can be added afterwards
+    return y, info
+
 def model_core_configurable_squeezenet(x, mode, params, info):
     """This configurable model tries to spread the layers evenly between the maxpool layers
     and also spread depth increases and decreases in a progressive way. Depth at the end is
@@ -147,6 +171,7 @@ def model_fn(features, labels, mode, params):
     #Y, info = model_core_squeezenet(X, mode, params, info)
     #Y, info = model_core_squeezenet2(X, mode, params, info)
     #Y, info = model_core_darknet(X, mode, params, info)
+    #Y, info = model_core_darknet17(X, mode, params, info)
     Y, info = model_core_configurable_squeezenet(X, mode, params, info)
 
     # YOLO head: predicts bounding boxes around airplanes

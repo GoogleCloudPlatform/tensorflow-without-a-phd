@@ -16,5 +16,5 @@ Global settings for YOLO (You Look Only Once) detection model"""
 # ROI = Region of Interest
 
 TILE_SIZE = 256  # size of training and inference images
-MAX_DETECTED_ROIS_PER_TILE = 60  # max number of ROIs in inference images. The max possible is GRID_N * GRID_N * CELL_B.
-MAX_TARGET_ROIS_PER_TILE = 50  # max number of ROIs in training or test images
+MAX_DETECTED_ROIS_PER_TILE = 60  # max number of ROIs detected in images. The max possible is GRID_N * GRID_N * CELL_B.
+MAX_TARGET_ROIS_PER_TILE = 50  # max number of ground truth ROIs in training or test images
