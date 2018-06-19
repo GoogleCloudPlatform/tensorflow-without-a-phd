@@ -42,3 +42,4 @@ gcloud ml-engine jobs submit training airplane$N \
     --hp-depth-increment 5 \
     --hp-spatial-dropout True \
     --hp-dropout 0.0
+

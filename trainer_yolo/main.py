@@ -68,6 +68,7 @@ def start_training(output_dir, hparams, data, tiledata, **kwargs):
                                                                               hparams["shuffle_buf"],
                                                                               yolo_cfg,
                                                                               hparams["data_rnd_hue"],
+                                                                              hparams["data_tiles_per_gt_roi"],
                                                                               hparams["data_rnd_distmax"])
         img_filelist_eval, roi_filelist_eval = datagen.load_file_list(data + "_eval")
         eval_data_input_fn = lambda: datagen.eval_data_input_fn_from_images(img_filelist_eval, roi_filelist_eval,
@@ -86,7 +87,7 @@ def start_training(output_dir, hparams, data, tiledata, **kwargs):
                                         max_steps=hparams["iterations"])
 
     eval_spec = tf.estimator.EvalSpec(input_fn=eval_data_input_fn,
-                                      steps=99999, # evals until Dataset is exhausted (bug: steps=None works but disables evaluation logs)
+                                      steps=hparams['eval_iterations'],
                                       exporters=export_latest,
                                       start_delay_secs=1,  # Confirmed: this does not work (plane533 for ex.)
                                       throttle_secs=1)
@@ -114,6 +115,7 @@ def main(argv):
     parser.add_argument('--hp-iterations', default=25000, type=int, help='Hyperparameter: number of training iterations')
     parser.add_argument('--hp-batch-size', default=10, type=int, help='Hyperparameter: training batch size')
     parser.add_argument('--hp-eval-batch-size', default=32, type=int, help='Hyperparameter: evaluation batch size')
+    parser.add_argument('--hp-eval-iterations', default=262, type=int, help='Hyperparameter: eval iterations')  # eval dataset is 8380 tiles (262 batches of 32) - larger batch will OOM.
     parser.add_argument('--hp-shuffle-buf', default=50000, type=int, help='Hyperparameter: data shuffle buffer size')
     parser.add_argument('--hp-layers', default=11, type=int, help='Hyperparameter: number of layers')
     parser.add_argument('--hp-first-layer-filter-size', default=3, type=int, help='Hyperparameter: filter size in first layer')
