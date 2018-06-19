@@ -98,6 +98,8 @@ def gcsload(filename):
 # Tensorflow 1.4.1 does not yet have this. Tracking: https://github.com/tensorflow/tensorflow/issues/8926
 def batch_random_hue(images):
     return tf.map_fn(lambda img: tf.image.random_hue(img, 0.5), images)
+def single_random_hue(image):
+    return tf.image.random_hue(image, 0.5)
 
 
 def yolo_roi_attribution(tiles, rois, yolo_cfg):
@@ -254,14 +256,14 @@ def generate(pixels, rois, fname, repeat_slice, repeat_tiles, yolo_cfg, rnd_hue,
     return tf.data.Dataset.range(repeat_slice).flat_map(lambda i: generate_slice(pixels, rois, fname, yolo_cfg, rnd_hue, repeat_tiles, rnd_distmax, i))
 
 
-#TODO: rename shuffle_buf to shuffle_bf_size for clarity
-def dataset_from_tfrecords(tfrec_filelist, batch_size, shuffle_buf, yolo_cfg):
+#TODO: rename shuffle_buf to shuffle_buf_size for clarity
+def dataset_from_tfrecords(tfrec_filelist, batch_size, shuffle_buf, yolo_cfg, rnd_hue):
     fileset = np.array(tfrec_filelist)
     np.random.shuffle(fileset)
     dataset = tf.data.TFRecordDataset(fileset, buffer_size=10*1024*1024)
     if shuffle_buf > 0:
         dataset = dataset.shuffle(shuffle_buf)
-    dataset = dataset.apply(tf.contrib.data.map_and_batch(lambda tfrec: read_tfrecord_features(tfrec, yolo_cfg),
+    dataset = dataset.apply(tf.contrib.data.map_and_batch(lambda tfrec: read_tfrecord_features(tfrec, yolo_cfg, rnd_hue),
                                                           batch_size,
                                                           num_parallel_batches=4))
     return dataset
@@ -329,8 +331,8 @@ def train_data_input_fn_from_images(img_filelist, roi_filelist, batch_size, shuf
     return features, labels
 
 
-def train_data_input_fn_from_tfrecords(tfrec_filelist, batch_size, shuffle_buf, yolo_cfg):
-    dataset = dataset_from_tfrecords(tfrec_filelist, batch_size, shuffle_buf, yolo_cfg)
+def train_data_input_fn_from_tfrecords(tfrec_filelist, batch_size, shuffle_buf, yolo_cfg, rnd_hue):
+    dataset = dataset_from_tfrecords(tfrec_filelist, batch_size, shuffle_buf, yolo_cfg, rnd_hue)
     dataset = train_dataset_finalize(dataset)
     features, labels = dataset_finalize(dataset)
     return features, labels
@@ -344,7 +346,7 @@ def eval_data_input_fn_from_images(img_filelist, roi_filelist, eval_batch_size, 
 
 
 def eval_data_input_fn_from_tfrecords(tfrec_filelist, eval_batch_size, yolo_cfg):
-    dataset = dataset_from_tfrecords(tfrec_filelist, eval_batch_size, 0, yolo_cfg)  # 0 = no shuffling
+    dataset = dataset_from_tfrecords(tfrec_filelist, eval_batch_size, 0, yolo_cfg, False)  # 0 = no shuffling, False = no random hue shift
     dataset = eval_dataset_finalize(dataset)
     features, labels = dataset_finalize(dataset)
     return features, labels
@@ -361,7 +363,7 @@ def write_tfrecord_features(tfrec_filewriter, img_bytes, json_bytes, name_bytes)
         "name": _bytes_feature(name_bytes)})).SerializeToString())
 
 
-def read_tfrecord_features(example, yolo_cfg):
+def read_tfrecord_features(example, yolo_cfg, rnd_hue):
     features = {
         "img": tf.FixedLenFeature((), tf.string),
         "rois": tf.FixedLenFeature((), tf.string),
@@ -370,6 +372,12 @@ def read_tfrecord_features(example, yolo_cfg):
     parsed_example = tf.parse_single_example(example, features)
     pixels, rois = decode_image_and_json_bytes(parsed_example["img"], parsed_example["rois"])
     airport_name = parsed_example["name"]
+
+    if rnd_hue:  # random hue shift for all training images
+        pixels = single_random_hue(pixels)
+
+    # TODO: data augmentation here: hue shift, orientation shift, ...
+    # rois format: x1, y1, x2, y2 in [0..TILE_SIZE]
 
     # TODO: refactor coordinate formats so that target_rois and yolo_target_rois use the same format
     pixels = tf.reshape(pixels, [settings.TILE_SIZE, settings.TILE_SIZE, 3])  # 3 for r, g, b

@@ -51,17 +51,18 @@ def start_training(output_dir, hparams, data, tiledata, **kwargs):
     eval_yolo_cfg = datagen.YOLOConfig(hparams["grid_nn"], hparams["cell_n"], hparams["cell_swarm"], 1.0)
 
     # data source selection: full aerial imagery of TFRecords containing individual 256x256 tiles
-    if tiledata != "" and  data == "":  # training from tfrecords
+    if tiledata != "" and data == "":  # training from tfrecords
         tfrec_filelist = gcsfile.get_matching_files(tiledata + "/*.tfrecord")
         train_data_input_fn = lambda: datagen.train_data_input_fn_from_tfrecords(tfrec_filelist,
                                                                                  hparams["batch_size"],
                                                                                  hparams["shuffle_buf"],
-                                                                                 yolo_cfg)
+                                                                                 yolo_cfg,
+                                                                                 hparams["data_rnd_hue"])
         tfrec_filelist_eval = gcsfile.get_matching_files(tiledata + "_eval" + "/*.tfrecord")
         eval_data_input_fn = lambda: datagen.eval_data_input_fn_from_tfrecords(tfrec_filelist_eval,
                                                                                hparams["eval_batch_size"],
                                                                                eval_yolo_cfg)
-    elif data != "" and  tiledata == "":  # training from aerial imagery directly
+    elif data != "" and tiledata == "":  # training from aerial imagery directly
         img_filelist, roi_filelist = datagen.load_file_list(data)
         train_data_input_fn = lambda: datagen.train_data_input_fn_from_images(img_filelist, roi_filelist,
                                                                               hparams["batch_size"],
@@ -90,7 +91,7 @@ def start_training(output_dir, hparams, data, tiledata, **kwargs):
                                       steps=hparams['eval_iterations'],
                                       exporters=export_latest,
                                       start_delay_secs=1,  # Confirmed: this does not work (plane533 for ex.)
-                                      throttle_secs=1)
+                                      throttle_secs=60)
 
     training_config = tf.estimator.RunConfig(model_dir=output_dir,
                                              save_summary_steps=100,

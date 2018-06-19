@@ -31,7 +31,7 @@ gcloud ml-engine jobs submit training airplane$N \
     --package-path trainer_yolo \
     --runtime-version 1.8 \
     -- \
-    --data "${DATA}" \
+    --tiledata "${TILEDATA}" \
     --hp-shuffle-buf 4000 \
     --hp-iterations 25000 \
     --hp-lr2 5000 \
@@ -41,5 +41,6 @@ gcloud ml-engine jobs submit training airplane$N \
     --hp-first-layer-filter-stride 2 \
     --hp-depth-increment 5 \
     --hp-spatial-dropout True \
-    --hp-dropout 0.0
+    --hp-dropout 0.0 \
+    --hp-data-rnd-hue True
 
