@@ -50,6 +50,66 @@ class BoxRoiUtilsTest(unittest.TestCase):
              [[[[0],[0],[0]],[[0.1],[0.1],[0.1]]],[[[0],[0],[0]],[[0],[0],[0]]],[[[0.1],[-0.1],[0.1]],[[-0.1],[0],[0.1]]]]]  # batch 2
         ], dtype=tf.float32)
 
+    def test_box_rot90(self):
+        rotated_rois_anticlockwise = rot90(self.rois, 6.0)
+        rotated_rois_clockwise = rot90(self.rois, 6.0, k=-1)
+        rotated_rois_180_1 = rot90(self.rois, 6.0, k=-2)
+        rotated_rois_180_2 = rot90(self.rois, 6.0, k=2)
+        rotated_rois_id_1 = rot90(self.rois, 6.0, k=0)
+        rotated_rois_id_2 = rot90(self.rois, 6.0, k=4)
+        flipped_rois_lr = flip_left_right(self.rois, 6.0)
+        flipped_rois_ud = flip_up_down(self.rois, 6.0)
+        correct1 = np.array([[4.5, 3.1, 3.3, 4.3],
+                            [4.0, 3.0, 3.0, 4.0],
+                            [1.0, 6.0, 0.0, 7.0],
+                            [1.0, 6.0, 0.1, 6.9],
+                            [2.9, 4.5, 2.5, 4.9],
+                            [0.9, 6.1, 0.0, 7.0]])
+        correct2 = np.array([[1.5, 2.9, 2.7, 1.7],
+                             [2.0, 3.0, 3.0, 2.0],
+                             [5.0, 0.0, 6.0, -1.0],
+                             [5.0, 0.0, 5.9, -0.9],
+                             [3.1, 1.5, 3.5, 1.1],
+                             [5.1, -0.1, 6.0, -1.0]])
+        correct3 = np.array([[2.9, 4.5, 1.7, 3.3],
+                             [3.0, 4.0, 2.0, 3.0],
+                             [0.0, 1.0, -1.0, 0.0],
+                             [0.0, 1.0, -0.9, 0.1],
+                             [1.5, 2.9, 1.1, 2.5],
+                             [-0.1, 0.9, -1.0, 0.0]])
+        correct4 = np.array([[3.1, 4.5, 4.3, 3.3],
+                             [3.0, 4.0, 4.0, 3.0],
+                             [6.0, 1.0, 7.0, 0.0],
+                             [6.0, 1.0, 6.9, 0.1],
+                             [4.5, 2.9, 4.9, 2.5],
+                             [6.1, 0.9, 7.0, 0.0]])
+        correct5 = np.array([[2.9, 1.5, 1.7, 2.7],
+                             [3.0, 2.0, 2.0, 3.0],
+                             [0.0, 5.0, -1.0, 6.0],
+                             [0.0, 5.0, -0.9, 5.9],
+                             [1.5, 3.1, 1.1, 3.5],
+                             [-0.1, 5.1, -1.0, 6.0]])
+        with tf.Session() as sess:
+            rotated_rois_anticlockwise_ = sess.run(rotated_rois_anticlockwise)
+            rotated_rois_clockwise_ = sess.run(rotated_rois_clockwise)
+            rotated_rois_180_1_ = sess.run(rotated_rois_180_1)
+            rotated_rois_180_2_ = sess.run(rotated_rois_180_2)
+            rotated_rois_id_1_ = sess.run(rotated_rois_id_1)
+            rotated_rois_id_2_ = sess.run(rotated_rois_id_2)
+            unchanged_rois_ = sess.run(self.rois)
+            flipped_rois_lr_ = sess.run(flipped_rois_lr)
+            flipped_rois_ud_ = sess.run(flipped_rois_ud)
+        #print(flipped_rois_ud_)
+        d = np.linalg.norm(rotated_rois_anticlockwise_ - correct1) + \
+            np.linalg.norm(rotated_rois_clockwise_ - correct2) + \
+            np.linalg.norm(rotated_rois_180_1_ - correct3) + \
+            np.linalg.norm(rotated_rois_180_2_ - correct3) + \
+            np.linalg.norm(rotated_rois_id_1_ - unchanged_rois_) + \
+            np.linalg.norm(rotated_rois_id_2_ - unchanged_rois_) + \
+            np.linalg.norm(flipped_rois_lr_ - correct4) + \
+            np.linalg.norm(flipped_rois_ud_ - correct5)
+        print(d)
+        self.assertTrue(d<1e-5, "test_box_rot90 test failed")
 
     def test_remove_non_intersecting_rois(self):
         tiles = tf.constant([[0.0, 0.0, 3.0, 3.0],  # tile0
@@ -157,7 +217,7 @@ class BoxRoiUtilsTest(unittest.TestCase):
             res2 = sess.run(mean2)
             res3 = sess.run(mean3)
             res4 = sess.run(mean4)
-            print(res4)
+            #print(res4)
         correct1 = 0.5
         correct2 = 0
         correct3 = 1.0

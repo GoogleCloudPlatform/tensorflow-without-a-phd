@@ -562,6 +562,47 @@ def compute_mistakes(box_x, box_y, box_w, box_c_sim, target_x, target_y, target_
     return mistakes, size_correct, position_correct, all_correct
 
 
+def rotate(rois, tile_size, rot_matrix):
+    # rois: shape [batch, 4] 4 numbers for x1, y1, x2, y2
+    translation = tf.constant([tile_size/2.0, tile_size/2.0], tf.float32)
+    translation = tf.expand_dims(translation, axis=0)  # to be applied to a batch of points
+
+    batch = tf.shape(rois)[0]
+    rois = tf.reshape(rois, [-1, 2])  # batch of points
+
+    # standard trick to apply a rotation matrix to a batch of vectors:
+    # do vectors * matrix instead of the usual matrix * vector
+
+    rois = rois - translation
+    rois = tf.matmul(rois, rot_matrix)
+    rois = rois + translation
+
+    rois = tf.reshape(rois, [batch, 4])
+    return rois
+
+
+def rot90(rois, tile_size, k=1):
+    rotation = tf.constant([[0.0, 1.0], [-1.0, 0.0]], tf.float32)
+    rot_mat = tf.constant([[1.0, 0.0], [0.0, 1.0]], tf.float32)
+    k = k % 4  # always a positive number in python
+    for _ in range(k):
+        rot_mat = tf.matmul(rot_mat, rotation)
+    return rotate(rois, tile_size, rot_mat)
+
+
+def flip_left_right(rois, tile_size):
+    transformation = tf.constant([[1.0, 0.0], [0.0, -1.0]], tf.float32)
+    return rotate(rois, tile_size, transformation)
+
+
+def flip_up_down(rois, tile_size):
+    transformation = tf.constant([[-1.0, 0.0], [0.0, 1.0]], tf.float32)
+    return rotate(rois, tile_size, transformation)
+
+
+
+
+
 
 
 
