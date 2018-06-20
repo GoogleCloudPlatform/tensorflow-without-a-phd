@@ -57,7 +57,8 @@ def start_training(output_dir, hparams, data, tiledata, **kwargs):
                                                                                  hparams["batch_size"],
                                                                                  hparams["shuffle_buf"],
                                                                                  yolo_cfg,
-                                                                                 hparams["data_rnd_hue"])
+                                                                                 hparams["data_rnd_hue"],
+                                                                                 hparams["data_rnd_orientation"])
         tfrec_filelist_eval = gcsfile.get_matching_files(tiledata + "_eval" + "/*.tfrecord")
         eval_data_input_fn = lambda: datagen.eval_data_input_fn_from_tfrecords(tfrec_filelist_eval,
                                                                                hparams["eval_batch_size"],
@@ -69,6 +70,7 @@ def start_training(output_dir, hparams, data, tiledata, **kwargs):
                                                                               hparams["shuffle_buf"],
                                                                               yolo_cfg,
                                                                               hparams["data_rnd_hue"],
+                                                                              hparams["data_rnd_orientation"],
                                                                               hparams["data_tiles_per_gt_roi"],
                                                                               hparams["data_rnd_distmax"])
         img_filelist_eval, roi_filelist_eval = datagen.load_file_list(data + "_eval")

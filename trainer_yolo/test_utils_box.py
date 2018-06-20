@@ -21,6 +21,7 @@ import numpy as np
 import unittest
 from trainer_yolo.utils_box import *
 from trainer_yolo.utils_imgdbg import *
+from trainer_yolo.datagen import log_tensor
 
 class BoxRoiUtilsTest(unittest.TestCase):
 
@@ -31,6 +32,7 @@ class BoxRoiUtilsTest(unittest.TestCase):
         self.roi2 = tf.constant([3.1, 2.1, 3.2, 2.2], dtype=tf.float32)
         self.roi3 = tf.constant([3.0, 2.1, 3.2, 2.2], dtype=tf.float32)
         self.roi4 = tf.constant([5.0, 2.5, 6.5, 6.0], dtype=tf.float32)
+        self.roi256 = tf.constant([120.0, 10.0, 130.0, 20.0], dtype=tf.float32)
         self.rois = tf.constant([[3.1, 1.5, 4.3, 2.7],
                                  [3.0, 2.0, 4.0, 3.0],
                                  [6.0, 5.0, 7.0, 6.0],
@@ -99,16 +101,16 @@ class BoxRoiUtilsTest(unittest.TestCase):
             unchanged_rois_ = sess.run(self.rois)
             flipped_rois_lr_ = sess.run(flipped_rois_lr)
             flipped_rois_ud_ = sess.run(flipped_rois_ud)
-        #print(flipped_rois_ud_)
-        d = np.linalg.norm(rotated_rois_anticlockwise_ - correct1) + \
-            np.linalg.norm(rotated_rois_clockwise_ - correct2) + \
+        #print(rotated_rois_anticlockwise_)
+        d = np.linalg.norm(rotated_rois_anticlockwise_ - correct2) + \
+            np.linalg.norm(rotated_rois_clockwise_ - correct1) + \
             np.linalg.norm(rotated_rois_180_1_ - correct3) + \
             np.linalg.norm(rotated_rois_180_2_ - correct3) + \
             np.linalg.norm(rotated_rois_id_1_ - unchanged_rois_) + \
             np.linalg.norm(rotated_rois_id_2_ - unchanged_rois_) + \
-            np.linalg.norm(flipped_rois_lr_ - correct4) + \
-            np.linalg.norm(flipped_rois_ud_ - correct5)
-        print(d)
+            np.linalg.norm(flipped_rois_lr_ - correct5) + \
+            np.linalg.norm(flipped_rois_ud_ - correct4)
+        #print(d)
         self.assertTrue(d<1e-5, "test_box_rot90 test failed")
 
     def test_remove_non_intersecting_rois(self):
@@ -147,8 +149,8 @@ class BoxRoiUtilsTest(unittest.TestCase):
         correct2 = np.array([[[0.0, 0.0, 1.0, 1.0], [-1, -1, 5, 5]],  # tile0 rois
                             [[-2, 0, 4, 6], [0, 0, 0, 0]],           # tile1 rois
                             [[-5, -4, 1, 2], [-2, -1, 1, 5]]])   / 3.0       # tile2 rois
-        filtered_rois = rois_in_tile_relative(tiles, rois, tile_size=3.0, max_per_tile=3)
-        filtered_rois2 = rois_in_tile_relative(tiles, rois, tile_size=3.0, max_per_tile=2, assert_on_overflow=False)  # this overflows max_per_tile
+        filtered_rois = rois_in_tiles_relative(tiles, rois, tile_size=3.0, max_per_tile=3)
+        filtered_rois2 = rois_in_tiles_relative(tiles, rois, tile_size=3.0, max_per_tile=2, assert_on_overflow=False)  # this overflows max_per_tile
         with tf.Session() as sess:
             res1 = sess.run(filtered_rois)
             res2 = sess.run(filtered_rois2)

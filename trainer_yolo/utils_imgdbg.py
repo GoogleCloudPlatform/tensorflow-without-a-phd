@@ -105,30 +105,36 @@ def digits_bottom_left(w, h):
     padded_d = np.pad(d, [(0, 0), (w - RAW_DIGIT_W, 0), (0, h - RAW_DIGIT_H)], 'edge')
     return tf.expand_dims(tf.constant(padded_d, tf.float32), -1)
 
+
 def digits_bottom_right(w, h):
     d = raw_digits()
     padded_d = np.pad(d, [(0, 0), (w - RAW_DIGIT_W, 0), (h - RAW_DIGIT_H, 0)], 'edge')
     return tf.expand_dims(tf.constant(padded_d, tf.float32), -1)
+
 
 def digits_top_left(w, h):
     d = raw_digits()
     padded_d = np.pad(d, [(0, 0), (0, w - RAW_DIGIT_W), (0, h - RAW_DIGIT_H)], 'edge')
     return tf.expand_dims(tf.constant(padded_d, tf.float32), -1)
 
+
 def digits_top_right(w, h):
     d = raw_digits()
     padded_d = np.pad(d, [(0, 0), (0, w - RAW_DIGIT_W), (h - RAW_DIGIT_H, 0)], 'edge')
     return tf.expand_dims(tf.constant(padded_d, tf.float32), -1)
+
 
 def get_bottom_left_digits(classes, tile_size):
     digits = tf.image.grayscale_to_rgb(digits_bottom_left(tile_size//8, tile_size//8))
     digits = tf.image.resize_bilinear(digits, [tile_size, tile_size])
     return tf.gather(digits, tf.minimum(classes, 9))  # correct digits to be printed on the images
 
+
 def get_bottom_right_digits(classes, tile_size):
     digits = tf.image.grayscale_to_rgb(digits_bottom_right(tile_size//8, tile_size//8))
     digits = tf.image.resize_bilinear(digits, [tile_size, tile_size])
     return tf.gather(digits, tf.minimum(classes, 9))  # correct digits to be printed on the images
+
 
 def get_top_right_red_white_digits(classes, tile_size):
     digits = digits_top_right(tile_size//8, tile_size//8)
@@ -142,6 +148,7 @@ def get_top_right_red_white_digits(classes, tile_size):
     digits = tf.image.resize_bilinear(digits, [tile_size, tile_size])
     return tf.gather(digits, tf.minimum(classes,9))  # correct digits to be printed on the images
 
+
 def image_compose(img1, img2):
     # img1 has the real image
     # img2 has markings on a black background
@@ -150,6 +157,7 @@ def image_compose(img1, img2):
     alpha = tf.maximum(pix_b, alpha)
     alpha = tf.concat([alpha, alpha, alpha], axis=3)
     return (img1*(1-alpha)+img2*alpha)
+
 
 def draw_color_boxes(img, boxes, r, g, b):
     pix_r, _, _ = tf.split(img, 3, axis=3)

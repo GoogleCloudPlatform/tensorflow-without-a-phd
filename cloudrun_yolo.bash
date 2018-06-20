@@ -32,8 +32,8 @@ gcloud ml-engine jobs submit training airplane$N \
     --runtime-version 1.8 \
     -- \
     --tiledata "${TILEDATA}" \
-    --hp-shuffle-buf 4000 \
-    --hp-iterations 25000 \
+    --hp-shuffle-buf 5000 \
+    --hp-iterations 30000 \
     --hp-lr2 5000 \
     --hp-layers 12 \
     --hp-first-layer-filter-depth 32 \
@@ -41,6 +41,5 @@ gcloud ml-engine jobs submit training airplane$N \
     --hp-first-layer-filter-stride 2 \
     --hp-depth-increment 5 \
     --hp-spatial-dropout True \
-    --hp-dropout 0.0 \
-    --hp-data-rnd-hue True
+    --hp-dropout 0.0
 

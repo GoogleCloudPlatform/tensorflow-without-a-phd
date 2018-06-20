@@ -183,7 +183,8 @@ def n_largest_rois_in_cell(tile, rois, rois_n, grid_n, n, comparator="largest_w"
         zero_mask = tf.logical_not(tf.cast(tf.one_hot(largest_indices, rois_n), dtype=tf.bool))
         has_center = tf.logical_and(has_center, zero_mask)
     n_largest = tf.stack(n_largest, axis=2)  # shape [grid_n, grid_n, n, 3]
-    return n_largest # shape [grid_n, grid_n, n, 3]
+    return n_largest  # shape [grid_n, grid_n, n, 3]
+
 
 def make_rois_tile_cell_relative(tile, tiled_rois, grid_n):
     grid, cell_w = gen_grid_for_tile(tile, grid_n)
@@ -341,14 +342,6 @@ def filter_by_bool(rois, mask, max_n):
     # make sure we have enough space in the tensor for all ROIs.
     # If not, pad to max_n and return a boolean to signal the overflow.
     pad_n = tf.maximum(max_n-n, 0)
-
-    #def log_overflow():
-    #    tf.logging.info("ROI per tile overflow.")
-    #    tf.Print(rois, [n-max_n], "ROI per tile overflow. The result will be incorrect as some ROIs have been discarded: ")
-    #    #tf_logten("ROI per tile overflow. The result will be incorrect as some ROIs have been discarded: ", n-max_n )
-    #    return 0
-    #tf.cond(tf.greater(n, max_n), log_overflow, lambda: 0)
-
     rois = tf.pad(rois, [[0, pad_n], [0, 0]])  # pad to max_n elements
     rois = tf.slice(rois, [0,0], [max_n, 4])  # truncate to max_n elements
     return rois
@@ -390,9 +383,10 @@ def remove_empty_rois(rois, max_per_tile):
 # tiles shape [n_tiles, 4] coordinates (x1, y1, x2, y2) in aerial image coordinates
 # rois shape [n_rois, 4] coordinates (x1, y1, x2, y2) in aerial image coordinates
 # max_per_tile: max number of possible rois in one tile
-# output: shape [max_per_tile, 4] coordinates (x1, y1, x2, y2) in tile relative coordinates in which tile width = 1.0
+# output: shape [n_tiles, max_per_tile, 4] coordinates (x1, y1, x2, y2) in tile
+#         relative coordinates in which tile width = 1.0
 # Assumes all tiles have the same size tile_size
-def rois_in_tile_relative(tiles, rois, tile_size, max_per_tile, assert_on_overflow=True):
+def rois_in_tiles_relative(tiles, rois, tile_size, max_per_tile, assert_on_overflow=True):
     rois, overflow = remove_non_intersecting_rois(tiles, rois, max_per_tile)  # [n_tiles, max_per_tile, 4]
     if assert_on_overflow:
         with tf.control_dependencies([tf.assert_non_positive(overflow,
@@ -566,23 +560,19 @@ def rotate(rois, tile_size, rot_matrix):
     # rois: shape [batch, 4] 4 numbers for x1, y1, x2, y2
     translation = tf.constant([tile_size/2.0, tile_size/2.0], tf.float32)
     translation = tf.expand_dims(translation, axis=0)  # to be applied to a batch of points
-
     batch = tf.shape(rois)[0]
     rois = tf.reshape(rois, [-1, 2])  # batch of points
-
     # standard trick to apply a rotation matrix to a batch of vectors:
     # do vectors * matrix instead of the usual matrix * vector
-
     rois = rois - translation
     rois = tf.matmul(rois, rot_matrix)
     rois = rois + translation
-
     rois = tf.reshape(rois, [batch, 4])
     return rois
 
 
 def rot90(rois, tile_size, k=1):
-    rotation = tf.constant([[0.0, 1.0], [-1.0, 0.0]], tf.float32)
+    rotation = tf.constant([[0.0, -1.0], [1.0, 0.0]], tf.float32)
     rot_mat = tf.constant([[1.0, 0.0], [0.0, 1.0]], tf.float32)
     k = k % 4  # always a positive number in python
     for _ in range(k):
@@ -591,20 +581,49 @@ def rot90(rois, tile_size, k=1):
 
 
 def flip_left_right(rois, tile_size):
-    transformation = tf.constant([[1.0, 0.0], [0.0, -1.0]], tf.float32)
-    return rotate(rois, tile_size, transformation)
-
-
-def flip_up_down(rois, tile_size):
     transformation = tf.constant([[-1.0, 0.0], [0.0, 1.0]], tf.float32)
     return rotate(rois, tile_size, transformation)
 
 
+def flip_up_down(rois, tile_size):
+    transformation = tf.constant([[1.0, 0.0], [0.0, -1.0]], tf.float32)
+    return rotate(rois, tile_size, transformation)
 
 
+def random_orientation(image_tile, rois, tile_size):
+    # This function will output boxes x1, y1, x2, y2 in the standard orientation where x1 <= x2 and y1 <= y2
+    rnd = tf.random_uniform([], 0, 8, tf.int32)
+    img = image_tile
+
+    def f0(): return tf.image.rot90(img, k=0), rot90(rois, tile_size, k=0)
+    def f1(): return tf.image.rot90(img, k=1), rot90(rois, tile_size, k=1)
+    def f2(): return tf.image.rot90(img, k=2), rot90(rois, tile_size, k=2)
+    def f3(): return tf.image.rot90(img, k=3), rot90(rois, tile_size, k=3)
+    def f4(): return tf.image.rot90(tf.image.flip_left_right(img), k=0), rot90(flip_left_right(rois, tile_size), tile_size, k=0)
+    def f5(): return tf.image.rot90(tf.image.flip_left_right(img), k=1), rot90(flip_left_right(rois, tile_size), tile_size, k=1)
+    def f6(): return tf.image.rot90(tf.image.flip_left_right(img), k=2), rot90(flip_left_right(rois, tile_size), tile_size, k=2)
+    def f7(): return tf.image.rot90(tf.image.flip_left_right(img), k=3), rot90(flip_left_right(rois, tile_size), tile_size, k=3)
+
+    image_tile, rois = tf.case({tf.equal(rnd, 0): f0,
+                                tf.equal(rnd, 1): f1,
+                                tf.equal(rnd, 2): f2,
+                                tf.equal(rnd, 3): f3,
+                                tf.equal(rnd, 4): f4,
+                                tf.equal(rnd, 5): f5,
+                                tf.equal(rnd, 6): f6,
+                                tf.equal(rnd, 7): f7})
+
+    return image_tile, standardize(rois)
 
 
-
-
-
+def standardize(rois):
+    # rois: shape [batch, 4] 4 numbers for x1, y1, x2, y2
+    # put the boxes in the standard orientation where x1 <= x2 and y1 <= y2
+    # boxintersect assumes boxes are in the standard format
+    x1, y1, x2, y2 = tf.unstack(rois, axis=-1)
+    stdx1 = tf.minimum(x1, x2)
+    stdy1 = tf.minimum(y1, y2)
+    stdx2 = tf.maximum(x1, x2)
+    stdy2 = tf.maximum(y1, y2)
+    return tf.stack([stdx1, stdy1, stdx2, stdy2], axis=-1)
 
