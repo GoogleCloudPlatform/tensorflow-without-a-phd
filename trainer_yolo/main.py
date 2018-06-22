@@ -58,7 +58,8 @@ def start_training(output_dir, hparams, data, tiledata, **kwargs):
                                                                                  hparams["shuffle_buf"],
                                                                                  yolo_cfg,
                                                                                  hparams["data_rnd_hue"],
-                                                                                 hparams["data_rnd_orientation"])
+                                                                                 hparams["data_rnd_orientation"],
+                                                                                 hparams["data_cache_n_epochs"])
         tfrec_filelist_eval = gcsfile.get_matching_files(tiledata + "_eval" + "/*.tfrecord")
         eval_data_input_fn = lambda: datagen.eval_data_input_fn_from_tfrecords(tfrec_filelist_eval,
                                                                                hparams["eval_batch_size"],
@@ -72,7 +73,8 @@ def start_training(output_dir, hparams, data, tiledata, **kwargs):
                                                                               hparams["data_rnd_hue"],
                                                                               hparams["data_rnd_orientation"],
                                                                               hparams["data_tiles_per_gt_roi"],
-                                                                              hparams["data_rnd_distmax"])
+                                                                              hparams["data_rnd_distmax"],
+                                                                              hparams["data_cache_n_epochs"])
         img_filelist_eval, roi_filelist_eval = datagen.load_file_list(data + "_eval")
         eval_data_input_fn = lambda: datagen.eval_data_input_fn_from_images(img_filelist_eval, roi_filelist_eval,
                                                                             hparams["eval_batch_size"],
@@ -100,10 +102,10 @@ def start_training(output_dir, hparams, data, tiledata, **kwargs):
                                              save_checkpoints_steps=2000,
                                              keep_checkpoint_max=1)
 
-    estimator=tf.estimator.Estimator(model_fn=model.model_fn,
-                                     model_dir=output_dir,
-                                     config=training_config,
-                                     params=hparams)
+    estimator = tf.estimator.Estimator(model_fn=model.model_fn,
+                                       model_dir=output_dir,
+                                       config=training_config,
+                                       params=hparams)
 
     tf.estimator.train_and_evaluate(estimator, train_spec, eval_spec)
 
@@ -133,7 +135,7 @@ def main(argv):
     parser.add_argument('--hp-lr1', default=0.0001, type=float, help='Hyperparameter: target (min) learning rate')
     parser.add_argument('--hp-lr2', default=3000, type=float, help='Hyperparameter: learning rate decay speed in steps. Learning rate decays by exp(-1) every N steps.')
     parser.add_argument('--hp-dropout', default=0.0, type=float, help='Hyperparameter: dropout rate. It should be between 0.0 and 0.5. 0.0 for no dropout.')
-    parser.add_argument('--hp-spatial-dropout', default=False, type=str2bool, help='Hyperparameter: dropout type, spatial or ordinary. Spatial works better.')
+    parser.add_argument('--hp-spatial-dropout', default=True, type=str2bool, help='Hyperparameter: dropout type, spatial or ordinary. Spatial works better in convolutional networks.')
     parser.add_argument('--hp-bnexp', default=0.993, type=float, help='Hyperparameter: exponential decay for batch norm moving averages.')
     parser.add_argument('--hp-lw1', default=1, type=float, help='Hyperparameter: loss weight LW1')
     parser.add_argument('--hp-lw2', default=3, type=float, help='Hyperparameter: loss weight LW2')
@@ -143,13 +145,10 @@ def main(argv):
     parser.add_argument('--hp-data-rnd-distmax', default=2.0, type=float, help='Data generation hyperparameter: training tiles selection max random distance from ground truth ROI (always 2.0 for eval tiles)')
     parser.add_argument('--hp-data-rnd-hue', default=True, type=str2bool, help='Data generation hyperparameter: data augmentation with random hue on training images')
     parser.add_argument('--hp-data-rnd-orientation', default=True, type=str2bool, help='Data generation hyperparameter: data augmentation by rotating and flipping tiles.')
+    parser.add_argument('--hp-data-cache-n-epochs', default=0, type=int, help='Generate random data variations for n epochs then cache and reuse.')
 
     args = parser.parse_args()
     arguments = args.__dict__
-
-    # TODO: spatial dropout should be true by default
-    # TODO: split data generation of images and ROIs on one side, assignment of ROIs into YOLO grid cells
-    # to the other. Keep YOLO assignments during training but put the rest into a data generation script or option.
 
     hparams = {k[3:]: v for k, v in arguments.items() if k.startswith('hp_')}
     otherargs = {k: v for k, v in arguments.items() if not k.startswith('hp_')}
@@ -159,6 +158,7 @@ def main(argv):
 
     output_dir = otherargs.pop('job_dir')
     start_training(output_dir, hparams, **otherargs)
+
 
 if __name__ == '__main__':
     main(sys.argv)

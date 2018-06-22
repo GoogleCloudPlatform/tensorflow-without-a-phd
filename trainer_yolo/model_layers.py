@@ -16,7 +16,6 @@ in this model."""
 
 import tensorflow as tf
 
-
 def dropout(x, mode, params):
     """Dropout configured from command-line parameters "dropout" and "spatial_dropout".
     In "spatial_dropout" mode, the dropout mask stays constant when scanning the image
@@ -24,7 +23,7 @@ def dropout(x, mode, params):
 
     noiseshape = None
     if params["spatial_dropout"]:
-        noiseshape = tf.shape(x) # shape [batch, x, y, filter]
+        noiseshape = tf.shape(x)  # shape [batch, x, y, filter]
         # in the noise_shape parameter, 1 means "keep the dropout mask the same when this dimension changes"
         noiseshape = noiseshape * tf.constant([1, 0, 0, 1]) + tf.constant([0, 1, 1, 0])
     return tf.layers.dropout(x, params["dropout"],

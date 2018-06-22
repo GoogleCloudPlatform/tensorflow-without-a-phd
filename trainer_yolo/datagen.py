@@ -26,11 +26,55 @@ from tensorflow.python.platform import tf_logging as logging
 
 from trainer_yolo import settings
 from trainer_yolo import utils_box as box
+
 from collections import namedtuple
 
 YOLOConfig = namedtuple('yolocfg', 'grid_nn cell_n cell_swarm cell_grow')
 
 tf.logging.set_verbosity(tf.logging.INFO)
+
+
+def random_hue(images):
+    """
+    A better random hue algorithm that can also change the color
+    of white surfaces.
+    :param images:
+    :return:
+    """
+    mask = tf.constant([[1, 0, 0],
+                        [0, 1, 0],
+                        [0, 0, 1],
+                        [1, 1, 0],
+                        [1, 0, 1],
+                        [0, 1, 1],
+                        [1, 1, 1],
+                        [1, 1, 1],
+                        [1, 1, 1],
+                        [1, 1, 1],
+                        [1, 1, 1],
+                        [1, 1, 1],
+                        [1, 1, 1],
+                        [1, 1, 1],
+                        [1, 1, 1],
+                        [1, 1, 1],
+                        [1, 1, 1],
+                        [1, 1, 1]], tf.float32)
+    batch_size = tf.shape(images)[0]
+    rnd_mask = tf.random_uniform([batch_size], 0, 18, dtype=tf.int32)
+    mask = tf.gather(mask, rnd_mask)
+    strength = tf.random_uniform([batch_size, 3], 0.5, 1.0, dtype=tf.float32)
+    inverse_mask = (1 - mask) * strength
+    # put masks in image format [batch, 1, 1, 3] the 1-dimensions will broadcast
+    mask = tf.expand_dims(mask, axis=1)
+    mask = tf.expand_dims(mask, axis=2)
+    inverse_mask = tf.expand_dims(inverse_mask, axis=1)
+    inverse_mask = tf.expand_dims(inverse_mask, axis=2)
+    # partially drop color channels
+    images = tf.to_float(images)
+    images = images * mask + images * inverse_mask
+    image = tf.cast(images, tf.uint8)
+    return tf.image.random_hue(image, 0.5)  # rotate the color channels too
+
 
 def almost_sqrt_factors(x):
     """Returns two integers that are close to each other and 
@@ -94,45 +138,8 @@ def gcsload(filename):
     return gcsfile.read_file_to_string(filename, binary_mode=True)
 
 
-# This should no longer be necessary when a batch version of random_hue ships in Tensorflow 1.5
-# Tensorflow 1.4.1 does not yet have this. Tracking: https://github.com/tensorflow/tensorflow/issues/8926
-def batch_random_hue(images):
-    return tf.map_fn(lambda img: tf.image.random_hue(img, 0.5), images)
-
-
-def single_random_hue(image):
-    return tf.image.random_hue(image, 0.5)
-
-
 def batch_random_orientation(images, rois, tile_size):
     return tf.map_fn(lambda a: box.random_orientation(*a, tile_size=tile_size), (images, rois))
-
-
-# def yolo_roi_attribution_batch_of_tiles(tiles, rois, yolo_cfg):
-#     # Tile divided in grid_nn x grid_nn grid
-#     # Recognizing cell_n boxes per grid cell
-#     # For each tile, for each grid cell, determine the cell_n largest ROIs centered in that cell
-#     # Output shape [tiles_n, grid_nn, grid_nn, cell_n, 3] 3 for x, y, w
-#
-#     grid_nn = yolo_cfg.grid_nn
-#     cell_n = yolo_cfg.cell_n
-#     cell_swarm = yolo_cfg.cell_swarm
-#     cell_grow = yolo_cfg.cell_grow
-#
-#     # dynamic number of rois
-#     rois = tf.reshape(rois, [-1, 4])  # I know the shape but Tensorflow does not
-#     rois_n = tf.shape(rois)[0]  # known shape [n, 4]
-#
-#     if cell_n == 2 and cell_swarm:
-#         yolo_target_rois = tf.map_fn(lambda tile: box.n_experimental_roi_selection_strategy(tile, rois, rois_n, grid_nn, cell_n, cell_grow), tiles)
-#     elif not cell_swarm:
-#         yolo_target_rois = tf.map_fn(lambda tile: box.n_largest_rois_in_cell_relative(tile, rois, rois_n, grid_nn, cell_n), tiles)
-#     else:
-#         raise ValueError('Ground truth ROI selection strategy cell_swarm is only implemented for cell_n=2')
-#
-#     yolo_target_rois = tf.reshape(yolo_target_rois, [-1, grid_nn, grid_nn, cell_n, 3])  # 3 for x, y, w
-#
-#     return yolo_target_rois
 
 
 def batch_yolo_roi_attribution(tiles, target_rois, yolo_cfg):
@@ -234,7 +241,7 @@ def generate_slice(pixels, rois, fname, yolo_cfg, rnd_hue, rnd_orientation, repe
     # Vocabulary:
     # "tile": a 256x256 region under consideration
     # "cell": tiles are evenly divided into 4 x 4 = 16 cells
-    # "roi": a plane bounding box (gorund truth)
+    # "roi": a plane bounding box (ground truth)
 
     # Compute ground truth ROIs
     target_rois = box.rois_in_tiles_relative(tiles, rois, settings.TILE_SIZE, settings.MAX_TARGET_ROIS_PER_TILE)  # shape [n_tiles, MAX_TARGET_ROIS_PER_TILE, 4]
@@ -263,7 +270,7 @@ def generate_slice(pixels, rois, fname, yolo_cfg, rnd_hue, rnd_orientation, repe
     yolo_target_rois = batch_yolo_roi_attribution(tiles, target_rois, yolo_cfg)
 
     if rnd_hue:  # random hue shift for all training images
-        image_tiles = batch_random_hue(image_tiles)
+        image_tiles = random_hue(image_tiles)
 
     # filename containing the airport name for logging and debugging
     filenames = tf.tile([fname], [tiles_n])
@@ -306,13 +313,13 @@ def generate(pixels, rois, fname, repeat_slice, repeat_tiles, yolo_cfg, rnd_hue,
 #TODO: rename shuffle_buf to shuffle_buf_size for clarity
 def dataset_from_tfrecords(tfrec_filelist, batch_size, shuffle_buf, yolo_cfg, rnd_hue, rnd_orientation):
     fileset = np.array(tfrec_filelist)
-    np.random.shuffle(fileset)
-    dataset = tf.data.TFRecordDataset(fileset, buffer_size=10*1024*1024)
+    np.random.shuffle(fileset)  # shuffle filenames
+    dataset = tf.data.TFRecordDataset(fileset, buffer_size=10*1024*1024, num_parallel_reads=16)
     if shuffle_buf > 0:
         dataset = dataset.shuffle(shuffle_buf)
     dataset = dataset.apply(tf.contrib.data.map_and_batch(lambda tfrec: read_tfrecord_features(tfrec, yolo_cfg, rnd_hue, rnd_orientation),
                                                           batch_size,
-                                                          num_parallel_batches=4))
+                                                          num_parallel_batches=16))
     return dataset
 
 
@@ -323,7 +330,6 @@ def train_dataset_from_images(img_filelist, roi_filelist, batch_size, shuffle_bu
     repeat_slice, repeat_tiles = almost_sqrt_factors(tiles_per_gt_roi)
     fileset = tf.data.Dataset.from_tensor_slices((tf.constant(img_filelist), tf.constant(roi_filelist)))
     fileset = fileset.shuffle(1000)  # shuffle filenames
-    #fileset.repeat(6)
     dataset = fileset.map(load_img_and_json_files)
     dataset = dataset.flat_map(lambda pix, rois, fname: generate(pix, rois, fname,
                                                                  repeat_slice=repeat_slice,
@@ -352,14 +358,17 @@ def eval_dataset_from_images(img_filelist, roi_filelist, eval_batch_size, yolo_c
     return dataset
 
 
-def train_dataset_finalize(dataset):
-    dataset = dataset.cache(tempfile.mkdtemp(prefix="datacache") + "/datacache")
+def train_dataset_finalize(dataset, cache_after_n_epochs):
+    if cache_after_n_epochs > 0:
+        dataset = dataset.repeat(cache_after_n_epochs)
+        dataset = dataset.cache(tempfile.mkdtemp(prefix="datacache") + "/datacache")
     dataset = dataset.repeat()  # indefinitely
     dataset = dataset.prefetch(1)
     return dataset
 
 def eval_dataset_finalize(dataset):
-    dataset = dataset.cache(tempfile.mkdtemp(prefix="evaldatacache") + "/evaldatacache")
+    # caching does not work for the eval dataset
+    #dataset = dataset.cache(tempfile.mkdtemp(prefix="evaldatacache") + "/evaldatacache")
     dataset = dataset.repeat(1)
     dataset = dataset.prefetch(1)
     return dataset
@@ -373,16 +382,16 @@ def dataset_finalize(dataset):
     return features, labels
 
 
-def train_data_input_fn_from_images(img_filelist, roi_filelist, batch_size, shuffle_buf, yolo_cfg, rnd_hue, rnd_orientation, tiles_per_gt_roi, rnd_distmax):
+def train_data_input_fn_from_images(img_filelist, roi_filelist, batch_size, shuffle_buf, yolo_cfg, rnd_hue, rnd_orientation, tiles_per_gt_roi, rnd_distmax, cache_after_n_epochs=0):
     dataset = train_dataset_from_images(img_filelist, roi_filelist, batch_size, shuffle_buf, yolo_cfg, rnd_hue, rnd_orientation, tiles_per_gt_roi, rnd_distmax)
-    dataset = train_dataset_finalize(dataset)
+    dataset = train_dataset_finalize(dataset, cache_after_n_epochs)
     features, labels = dataset_finalize(dataset)
     return features, labels
 
 
-def train_data_input_fn_from_tfrecords(tfrec_filelist, batch_size, shuffle_buf, yolo_cfg, rnd_hue, rnd_orientation):
+def train_data_input_fn_from_tfrecords(tfrec_filelist, batch_size, shuffle_buf, yolo_cfg, rnd_hue, rnd_orientation, cache_after_n_epochs=0):
     dataset = dataset_from_tfrecords(tfrec_filelist, batch_size, shuffle_buf, yolo_cfg, rnd_hue, rnd_orientation)
-    dataset = train_dataset_finalize(dataset)
+    dataset = train_dataset_finalize(dataset, cache_after_n_epochs)
     features, labels = dataset_finalize(dataset)
     return features, labels
 
@@ -425,8 +434,8 @@ def read_tfrecord_features(example, yolo_cfg, rnd_hue, rnd_orientation):
     if rnd_orientation:
         pixels, rois = box.random_orientation(pixels, rois, settings.TILE_SIZE)
 
-    if rnd_hue:  # random hue shift for all training images
-        pixels = single_random_hue(pixels)
+    if rnd_hue:
+        pixels = random_hue(tf.expand_dims(pixels, axis=0))
 
     # TODO: data augmentation here: hue shift, orientation shift, ...
     # rois format: x1, y1, x2, y2 in [0..TILE_SIZE]
@@ -446,7 +455,7 @@ def read_tfrecord_features(example, yolo_cfg, rnd_hue, rnd_orientation):
     return pixels, tf.constant(0), airport_name, yolo_target_rois, target_rois
 
 
-def run_data_generation(data, output_dir, record_batch_size, shuffle_buf, tiles_per_gt_roi, rnd_distmax, is_eval):
+def run_data_generation(data, output_dir, record_batch_size, shuffle_buf, tiles_per_gt_roi, rnd_distmax, rnd_orientation, is_eval):
 
     img_filelist, roi_filelist = load_file_list(data)
 
@@ -465,7 +474,7 @@ def run_data_generation(data, output_dir, record_batch_size, shuffle_buf, tiles_
         dataset = eval_dataset_from_images(img_filelist, roi_filelist, record_batch_size, yolo_cfg)
     else:
         dataset = train_dataset_from_images(img_filelist, roi_filelist, record_batch_size, shuffle_buf, yolo_cfg,
-                                            False, False, tiles_per_gt_roi, rnd_distmax)  # False = no data augmentation
+                                            False, rnd_orientation, tiles_per_gt_roi, rnd_distmax)  # False = no rnd hue
 
     dataset = dataset.repeat(1)
 
@@ -520,6 +529,7 @@ def datagen_main(argv):
     parser.add_argument('--shuffle-buf', default=10000, type=int, help='Size of the shuffle buffer for shuffling tiles. 0 to disable shuffling.')
     parser.add_argument('--hp-data-tiles-per-gt-roi', default=100, type=int, help='Data generation hyperparameter: number of training tiles generated around each ground truth ROI')
     parser.add_argument('--hp-data-rnd-distmax', default=2.0, type=float, help='Data generation hyperparameter: training tiles selection max random distance from ground truth ROI (always 2.0 for eval tiles)')
+    parser.add_argument('--hp-data-rnd-orientation', default=True, type=str2bool, help='Data generation hyperparameter: data augmentation by rotating and flipping tiles.')
     args = parser.parse_args()
 
     data_eval = args.data + "_eval"
@@ -538,10 +548,11 @@ def datagen_main(argv):
 
     rnd_distmax = args.hp_data_rnd_distmax
     tiles_per_gt_roi = args.hp_data_tiles_per_gt_roi
+    rnd_orientation = args.hp_data_rnd_orientation
 
     # training and eval data generation
-    run_data_generation(args.data, args.output_dir, args.record_batch_size, args.shuffle_buf, tiles_per_gt_roi, rnd_distmax, is_eval=False)
-    run_data_generation(data_eval, output_dir_eval, args.record_batch_size, args.shuffle_buf, tiles_per_gt_roi, rnd_distmax, is_eval=True)
+    run_data_generation(args.data, args.output_dir, args.record_batch_size, args.shuffle_buf, tiles_per_gt_roi, rnd_distmax, rnd_orientation, is_eval=False)
+    run_data_generation(data_eval, output_dir_eval, args.record_batch_size, args.shuffle_buf, tiles_per_gt_roi, rnd_distmax, rnd_orientation, is_eval=True)
 
 
 if __name__ == '__main__':

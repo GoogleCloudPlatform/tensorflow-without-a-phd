@@ -1,17 +1,15 @@
 #!/usr/bin/env bash
 
+#CONFIG="config.yaml"
 #CONFIG="config-distributed.yaml"
 #CONFIG="config-master-worker.yaml"
-CONFIG="config.yaml"
 #CONFIG="config-hptune-yolo1.yaml"
 BUCKET="gs://ml1-demo-martin"
 DATA="gs://ml1-demo-martin/data/USGS_public_domain_airports"
 TILEDATA="gs://ml1-demo-martin/data/USGS_public_domain_tiles100_airports_tfrecords"
 #DATA="gs://ml1-demo-martin/data/USGS_public_domainTINY_airports"
 PROJECT="cloudml-demo-martin"
-#REGION="us-central1"
 REGION="us-central1"
-#REGION="europe-west1"
 
 # auto-incrementing run number padded with zeros to 3 digits
 NFILE="cloudrunN.txt"
@@ -24,7 +22,7 @@ printf -v N "%03d" $N
 set -x
 gcloud ml-engine jobs submit training airplane$N \
     --job-dir "${BUCKET}/jobs/airplane$N" \
-    --config ${CONFIG} \
+    --scale-tier BASIC_GPU \
     --project ${PROJECT} \
     --region ${REGION} \
     --module-name trainer_yolo.main \
@@ -33,13 +31,13 @@ gcloud ml-engine jobs submit training airplane$N \
     -- \
     --tiledata "${TILEDATA}" \
     --hp-shuffle-buf 5000 \
-    --hp-iterations 30000 \
-    --hp-lr2 5000 \
-    --hp-layers 12 \
-    --hp-first-layer-filter-depth 32 \
-    --hp-first-layer-filter-size 6 \
-    --hp-first-layer-filter-stride 2 \
-    --hp-depth-increment 5 \
-    --hp-spatial-dropout True \
+    --hp-iterations 120000 \
+    --hp-lr2 15000 \
+    --hp-layers 17 \
+    --hp-first-layer-filter-depth 128 \
+    --hp-first-layer-filter-size 3 \
+    --hp-first-layer-filter-stride 1 \
+    --hp-depth-increment 8 \
     --hp-dropout 0.0
+# The parameters above were used on the best training run: airplane806
 
