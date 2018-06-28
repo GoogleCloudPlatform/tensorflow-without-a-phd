@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-#CONFIG="config.yaml"
+CONFIG="config.yaml"
 #CONFIG="config-distributed.yaml"
 #CONFIG="config-master-worker.yaml"
 #CONFIG="config-hptune-yolo1.yaml"
@@ -23,7 +23,7 @@ printf -v N "%03d" $N
 set -x
 gcloud ml-engine jobs submit training airplane$N \
     --job-dir "${BUCKET}/jobs/airplane$N" \
-    --scale-tier BASIC_GPU \
+    --config ${CONFIG} \
     --project ${PROJECT} \
     --region ${REGION} \
     --module-name trainer_yolo.main \
@@ -39,7 +39,12 @@ gcloud ml-engine jobs submit training airplane$N \
     --hp-first-layer-filter-size 3 \
     --hp-first-layer-filter-stride 1 \
     --hp-depth-increment 8 \
-    --hp-dropout 0.0
+    --hp-dropout 0.0 \
+    --hp-data-cache-n-epochs 2
+
+#    --hp-decay-type cosine-restarts \
+#    --hp-decay-restarts 5 \
+#    --hp-decay-restart-height 0.99 \
 
 
 # Model with fewest false positives: airplane806 (v806b). Training time: 24h, inference time: 2.8s

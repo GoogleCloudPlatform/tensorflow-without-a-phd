@@ -15,6 +15,7 @@ import sys
 import json
 import argparse
 import tensorflow as tf
+from tensorflow.python.client import device_lib as tf_devices
 from tensorflow.python.lib.io import file_io as gcsfile
 from tensorflow.python.platform import tf_logging as logging
 
@@ -23,6 +24,11 @@ from trainer_yolo import datagen
 
 logging.set_verbosity(logging.INFO)
 logging.log(logging.INFO, "Tensorflow version " + tf.__version__)
+
+
+def get_available_gpus():
+    local_device_protos = tf_devices.list_local_devices()
+    return [x.name for x in local_device_protos if x.device_type == 'GPU']
 
 
 # input function for base64 encoded JPEG in JSON
@@ -55,32 +61,32 @@ def start_training(output_dir, hparams, data, tiledata, **kwargs):
     # data source selection: full aerial imagery of TFRecords containing individual 256x256 tiles
     if tiledata != "" and data == "":  # training from tfrecords
         tfrec_filelist = gcsfile.get_matching_files(tiledata + "/*.tfrecord")
-        train_data_input_fn = lambda: datagen.train_data_input_fn_from_tfrecords(tfrec_filelist,
-                                                                                 hparams["batch_size"],
-                                                                                 hparams["shuffle_buf"],
-                                                                                 yolo_cfg,
-                                                                                 hparams["data_rnd_hue"],
-                                                                                 hparams["data_rnd_orientation"],
-                                                                                 hparams["data_cache_n_epochs"])
+        train_data_input_fn = lambda: datagen.train_dataset_from_tfrecords(tfrec_filelist,
+                                                                           hparams["batch_size"],
+                                                                           hparams["shuffle_buf"],
+                                                                           yolo_cfg,
+                                                                           hparams["data_rnd_hue"],
+                                                                           hparams["data_rnd_orientation"],
+                                                                           hparams["data_cache_n_epochs"])
         tfrec_filelist_eval = gcsfile.get_matching_files(tiledata + "_eval" + "/*.tfrecord")
-        eval_data_input_fn = lambda: datagen.eval_data_input_fn_from_tfrecords(tfrec_filelist_eval,
-                                                                               hparams["eval_batch_size"],
-                                                                               eval_yolo_cfg)
+        eval_data_input_fn = lambda: datagen.eval_dataset_from_tfrecords(tfrec_filelist_eval,
+                                                                         hparams["eval_batch_size"],
+                                                                         eval_yolo_cfg)
     elif data != "" and tiledata == "":  # training from aerial imagery directly
         img_filelist, roi_filelist = datagen.load_file_list(data)
-        train_data_input_fn = lambda: datagen.train_data_input_fn_from_images(img_filelist, roi_filelist,
-                                                                              hparams["batch_size"],
-                                                                              hparams["shuffle_buf"],
-                                                                              yolo_cfg,
-                                                                              hparams["data_rnd_hue"],
-                                                                              hparams["data_rnd_orientation"],
-                                                                              hparams["data_tiles_per_gt_roi"],
-                                                                              hparams["data_rnd_distmax"],
-                                                                              hparams["data_cache_n_epochs"])
+        train_data_input_fn = lambda: datagen.train_dataset_from_images(img_filelist, roi_filelist,
+                                                                        hparams["batch_size"],
+                                                                        hparams["shuffle_buf"],
+                                                                        yolo_cfg,
+                                                                        hparams["data_rnd_hue"],
+                                                                        hparams["data_rnd_orientation"],
+                                                                        hparams["data_tiles_per_gt_roi"],
+                                                                        hparams["data_rnd_distmax"],
+                                                                        hparams["data_cache_n_epochs"])
         img_filelist_eval, roi_filelist_eval = datagen.load_file_list(data + "_eval")
-        eval_data_input_fn = lambda: datagen.eval_data_input_fn_from_images(img_filelist_eval, roi_filelist_eval,
-                                                                            hparams["eval_batch_size"],
-                                                                            eval_yolo_cfg)
+        eval_data_input_fn = lambda: datagen.eval_dataset_from_images(img_filelist_eval, roi_filelist_eval,
+                                                                      hparams["eval_batch_size"],
+                                                                      eval_yolo_cfg)
     else:
         logging.log(logging.ERROR, "One and only one of parameters 'data' and 'tiledata' must be supplied.")
         return
@@ -114,10 +120,14 @@ def start_training(output_dir, hparams, data, tiledata, **kwargs):
         config = tf.ConfigProto(device_filters=['/job:ps', '/job:worker/task:%d' % tf_config['task']['index']])
     # end of temporary fix code for distributed training on ML Engine
 
+    # Experimental distribution strategy if running on a machine with multiple GPUs
+    distribution = tf.contrib.distribute.MirroredStrategy() if len(get_available_gpus()) > 1 else None
+
     training_config = tf.estimator.RunConfig(model_dir=output_dir,
                                              save_summary_steps=100,
                                              save_checkpoints_steps=2000,
                                              keep_checkpoint_max=1,
+                                             train_distribute=distribution,
                                              session_config=config)  # device filters set here
 
     estimator = tf.estimator.Estimator(model_fn=model.model_fn,

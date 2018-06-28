@@ -19,13 +19,13 @@ logging.log(logging.INFO, "Tensorflow version " + tf.__version__)
 def main():
     tfrec_filelist = gcsfile.get_matching_files("sample_data/tilecache" + "/*.tfrecord")
     yolo_cfg = datagen.YOLOConfig(16, 2, True, 1.3)
-    features, labels = datagen.train_data_input_fn_from_tfrecords(tfrec_filelist, 10, 200, yolo_cfg, True, False)
+    dataset = datagen.train_dataset_from_tfrecords(tfrec_filelist, 10, 200, yolo_cfg, True, False)
+    features, labels = dataset.make_one_shot_iterator().get_next()
 
     target_rois = labels["target_rois"]
     image = tf.to_float(features["image"]) / 255.0
     image = utils_imgdbg.draw_color_boxes(image, target_rois, 0.0, 1.0, 1.0)
     jpegs = tf.map_fn(tf.image.encode_jpeg, tf.cast(image*255, tf.uint8), dtype=tf.string)
-
 
     with tf.Session() as sess:
         n = 0
@@ -36,21 +36,20 @@ def main():
                 n=0
             n += 1
             try:
-                #features_, target_rois_, jpegs_ = sess.run([features, target_rois, jpegs])
-                features_, labels_ = sess.run([features, labels])
+                features_, target_rois_, jpegs_ = sess.run([features, target_rois, jpegs])
 
                 # write the image out
-                #for k, jpeg in enumerate(jpegs_):
-                #    with open("sample_data/tilecache2/extractedIMG_" + str(n*100+k) + ".jpg", "wb") as f:
-                #        f.write(jpeg)
+                for k, jpeg in enumerate(jpegs_):
+                    with open("sample_data/tilecache2/extractedIMG_" + str(n*100+k) + ".jpg", "wb") as f:
+                        f.write(jpeg)
 
-                #print(target_rois_)
+                # print(target_rois_)
 
                 batch_size = features_['image'].shape[0]
                 duration = time.time() - start_time
                 time_per_image = duration / (n * batch_size)
                 time_per_batch = duration
-                #print(str(n) + ": " + str(1.0/time_per_batch) + " batches/s")
+                # print(str(n) + ": " + str(1.0/time_per_batch) + " batches/s")
                 print(str(n) + ": " + str(1.0/time_per_image) + " images/s")
             except tf.errors.OutOfRangeError:
                 break

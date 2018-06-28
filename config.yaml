@@ -12,13 +12,13 @@
 
 trainingInput:
   #scaleTier: BASIC
-  scaleTier: BASIC_GPU
+  #scaleTier: BASIC_GPU
   #scaleTier: BASIC_TPU
   #scaleTier: STANDARD_1
   #scaleTier: PREMIUM_1
 
-  #scaleTier: CUSTOM
-  #masterType: standard
+  scaleTier: CUSTOM
+  masterType: complex_model_m_gpu
   #parameterServerType: standard_gpu
   #workerType: standard_gpu
 

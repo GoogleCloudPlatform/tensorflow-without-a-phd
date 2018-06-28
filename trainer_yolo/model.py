@@ -226,9 +226,6 @@ def model_fn(features, labels, mode, params):
         target_is_plane_onehot = tf.one_hot(tf.cast(target_is_plane, tf.int32), 2, dtype=tf.float32)
         target_is_plane_float = tf.cast(target_is_plane, tf.float32) # shape [batch, 4,4,3] = [batch, GRID_N, GRID_N, CELL_B]
 
-        # IOU (Intersection Over Union) accuracy
-        iou_accuracy = box.compute_safe_IOU(target_rois, detected_rois, detected_rois_overflow, settings.TILE_SIZE)
-
         # Mistakes and correct detections for visualisation and debugging.
         # This is computed against the ground truth boxes assigned to YOLO grid cells.
         mistakes, size_correct, position_correct, all_correct = box.compute_mistakes(box_x, box_y,
@@ -239,6 +236,11 @@ def model_fn(features, labels, mode, params):
         debug_img = imgdbg.debug_image(X, mistakes, target_rois, predicted_rois, predicted_c,
                                        size_correct, position_correct, all_correct,
                                        grid_nn, cell_n, settings.TILE_SIZE)
+
+        # IOU (Intersection Over Union) accuracy
+        # IOU computation removed from training mode because it used an op not yet supported with MirroredStrategy
+        if mode == tf.estimator.ModeKeys.EVAL:
+            iou_accuracy = box.compute_safe_IOU(target_rois, detected_rois, detected_rois_overflow, settings.TILE_SIZE)
 
         # Improvement ideas and experiment results
         # 1) YOLO trick: take square root of predicted size for loss so as not to drown errors on small boxes: tested, no benefit
@@ -268,11 +270,17 @@ def model_fn(features, labels, mode, params):
         lr = learn_rate_decay(tf.train.get_or_create_global_step(), params)
         optimizer = tf.train.AdamOptimizer(lr)
         train_op = tf.contrib.training.create_train_op(loss, optimizer)
-        eval_metrics = {"position_error": tf.metrics.mean(w_position_loss),
-                        "size_error": tf.metrics.mean(w_size_loss),
-                        "plane_cross_entropy_error": tf.metrics.mean(w_obj_loss),
-                        "mistakes": tf.metrics.mean(nb_mistakes),
-                        'IOU': tf.metrics.mean(iou_accuracy)}
+
+        if mode == tf.estimator.ModeKeys.EVAL:
+            # metrics removed from training mode because they are not yet supported with MirroredStrategy
+            eval_metrics = {"position_error": tf.metrics.mean(w_position_loss),
+                            "size_error": tf.metrics.mean(w_size_loss),
+                            "plane_cross_entropy_error": tf.metrics.mean(w_obj_loss),
+                            "mistakes": tf.metrics.mean(nb_mistakes),
+                            'IOU': tf.metrics.mean(iou_accuracy)}
+        else:
+            eval_metrics = None
+
 
         # Tensorboard summaries for debugging
         tf.summary.scalar("position_error", w_position_loss)
