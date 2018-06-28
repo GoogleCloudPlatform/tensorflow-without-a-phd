@@ -24,7 +24,18 @@ from tensorflow.python.platform import tf_logging as logging
 def learn_rate_decay(step, params):
     """ Model building utility function. Learning rate decay parametrized from
     command-line parameters lr0, lr1 and lr2."""
-    return params['lr1'] + tf.train.exponential_decay(params['lr0'], step, params['lr2'], 1/math.e)
+    if params['decay_type'] == "exponential":
+        lr = params['lr1'] + tf.train.exponential_decay(params['lr0'], step, params['lr2'], 1/math.e)
+    elif params['decay_type'] == "cosine-restarts":
+        # empirically  determined t_mul rates for cosine_restarts. With these rates, learning rate is
+        # guaranteed to decay to its min value by the end of "iterations" with "decay-restarts" restarts
+        # and a first restart at "iterations" / 8.
+        t_muls = [7.0, 2.1926, 1.48831, 1.23692, 1.11434, 1.04422]
+        t_mul = t_muls[params["decay_restarts"]]
+        m_mul = params["decay_restart_height"]
+        first_decay_steps = params["iterations"] // 8
+        lr = params['lr1'] + tf.train.cosine_decay_restarts(params['lr0'], step, first_decay_steps, t_mul, m_mul)
+    return lr
 
 
 def model_core_squeezenet(x, mode, params, info):

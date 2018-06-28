@@ -6,7 +6,7 @@ CONFIG="config.yaml"
 BUCKET="gs://ml1-demo-martin"
 DATA="gs://ml1-demo-martin/data/USGS_public_domain_airports"
 # Destination directory of the data. The folder as well as the <samename>_eval folder must exist.
-TILEDATA="gs://ml1-demo-martin/data/USGS_public_domain_tiled_airports_tfrecords3"
+TILEDATA="gs://ml1-demo-martin/data/USGS_public_domain_tiled_airports_tfrecords5"
 PROJECT="cloudml-demo-martin"
 REGION="us-central1"
 #REGION="europe-west1"
@@ -30,4 +30,6 @@ gcloud ml-engine jobs submit training airplane_datagen$N \
     --runtime-version 1.8 \
     -- \
     --data "${DATA}" \
-    --output-dir "${TILEDATA}"
+    --output-dir "${TILEDATA}" \
+    --hp-data-rnd-orientation True \
+    --hp-data-tiles-per-gt-roi 100
