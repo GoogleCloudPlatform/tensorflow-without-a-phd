@@ -38,47 +38,49 @@ def learn_rate_decay(step, params):
     return lr
 
 
-def model_core_squeezenet(x, mode, params, info):
-    y, info = layer.conv2d_batch_norm_relu_dropout_l(x, mode, params, info, filters=32, kernel_size=3, strides=1)
-    y, info = layer.sqnet_expand(y, mode, params, info, 2*16)
-    y, info = layer.maxpool_l(y, info)  # output 128x128
-    y, info = layer.sqnet_squeeze(y, mode, params, info, 28)
-    y, info = layer.sqnet_expand(y, mode, params, info, 2*40)
+def model_core_squeezenet12(x, mode, params, info):
+    y, info = layer.conv2d_batch_norm_relu_dropout_l(x, mode, params, info, filters=32, kernel_size=6, strides=2)  # output 128x128
     y, info = layer.maxpool_l(y, info)  # output 64x64
-    y, info = layer.sqnet_squeeze(y, mode, params, info, 52)
-    y, info = layer.sqnet_expand(y, mode, params, info, 2*64)
+    y, info = layer.sqnet_squeeze(y, mode, params, info, 21)
+    y, info = layer.sqnet_expand(y, mode, params, info, 2*26)
+    y, info = layer.sqnet_squeeze(y, mode, params, info, 36)
+    y, info = layer.sqnet_expand(y, mode, params, info, 2*46)
     y, info = layer.maxpool_l(y, info)  # output 32x32
-    y, info = layer.sqnet_squeeze(y, mode, params, info, 52)
-    y, info = layer.sqnet_expand(y, mode, params, info, 2*40)
+    y, info = layer.sqnet_squeeze(y, mode, params, info, 41)
+    y, info = layer.sqnet_expand(y, mode, params, info, 2*36)
+    y, info = layer.sqnet_squeeze(y, mode, params, info, 31)
+    y, info = layer.sqnet_expand(y, mode, params, info, 2*26)
     y, info = layer.maxpool_l(y, info)  # output 16x16
-    y, info = layer.sqnet_squeeze(y, mode, params, info, 28)
-    y, info = layer.sqnet_expand(y, mode, params, info, 2*17, last=True)
+    y, info = layer.sqnet_squeeze(y, mode, params, info, 21)
+    y, info = layer.sqnet_expand(y, mode, params, info, 2*16, last=True)
     return y, info
 
 
-def model_core_squeezenet2(x, mode, params, info):
-    y, info = layer.conv2d_batch_norm_relu_dropout_l(x, mode, params, info, filters=35, kernel_size=3, strides=1)
-    y, info = layer.sqnet_expand(y, mode, params, info, 2*35)
-    #y, info = layer.maxpool_l(y, info)  # output 128x128
-    y, info = layer.sqnet_squeeze_pool(y, mode, params, info, 40)
-    y, info = layer.sqnet_expand(y, mode, params, info, 2*45)
-    y, info = layer.sqnet_squeeze(y, mode, params, info, 50)
-    y, info = layer.sqnet_expand(y, mode, params, info, 2*55)
-    #y, info = layer.maxpool_l(y, info)  # output 64x64
-    y, info = layer.sqnet_squeeze_pool(y, mode, params, info, 60)
-    y, info = layer.sqnet_expand(y, mode, params, info, 2*65)
-    y, info = layer.sqnet_squeeze(y, mode, params, info, 70)
-    y, info = layer.sqnet_expand(y, mode, params, info, 2*75)
-    #y, info = layer.maxpool_l(y, info)  # output 32x32
-    y, info = layer.sqnet_squeeze_pool(y, mode, params, info, 70)
-    y, info = layer.sqnet_expand(y, mode, params, info, 2*65)
-    y, info = layer.sqnet_squeeze(y, mode, params, info, 60)
-    y, info = layer.sqnet_expand(y, mode, params, info, 2*55)
-    #y, info = layer.maxpool_l(y, info)  # output 16x16
-    y, info = layer.sqnet_squeeze_pool(y, mode, params, info, 50)
-    y, info = layer.sqnet_expand(y, mode, params, info, 2*45)
-    y, info = layer.sqnet_squeeze(y, mode, params, info, 40)
-    y, info = layer.sqnet_expand(y, mode, params, info, 2*35, last=True)
+def model_core_squeezenet17(x, mode, params, info):
+    y, info = layer.conv2d_batch_norm_relu_dropout_l(x, mode, params, info, filters=128, kernel_size=3, strides=1)
+    y, info = layer.sqnet_expand(y, mode, params, info, 2*64)
+    y, info = layer.maxpool_l(y, info)  # output 128x128
+    #y, info = layer.sqnet_squeeze_pool(y, mode, params, info, 80)
+    y, info = layer.sqnet_squeeze(y, mode, params, info, 80)
+    y, info = layer.sqnet_expand(y, mode, params, info, 2*96)
+    y, info = layer.maxpool_l(y, info)  # output 64x64
+    #y, info = layer.sqnet_squeeze_pool(y, mode, params, info, 104)
+    y, info = layer.sqnet_squeeze(y, mode, params, info, 104)
+    y, info = layer.sqnet_expand(y, mode, params, info, 2*112)
+    y, info = layer.sqnet_squeeze(y, mode, params, info, 120)
+    y, info = layer.sqnet_expand(y, mode, params, info, 2*128)
+    y, info = layer.maxpool_l(y, info)  # output 32x32
+    #y, info = layer.sqnet_squeeze_pool(y, mode, params, info, 120)
+    y, info = layer.sqnet_squeeze(y, mode, params, info, 120)
+    y, info = layer.sqnet_expand(y, mode, params, info, 2*112)
+    y, info = layer.sqnet_squeeze(y, mode, params, info, 104)
+    y, info = layer.sqnet_expand(y, mode, params, info, 2*96)
+    y, info = layer.maxpool_l(y, info)  # output 16x16
+    #y, info = layer.sqnet_squeeze_pool(y, mode, params, info, 88)
+    y, info = layer.sqnet_squeeze(y, mode, params, info, 88)
+    y, info = layer.sqnet_expand(y, mode, params, info, 2*80)
+    y, info = layer.sqnet_squeeze(y, mode, params, info, 72)
+    y, info = layer.sqnet_expand(y, mode, params, info, 2*65, last=True)
     return y, info
 
 
@@ -179,8 +181,8 @@ def model_fn(features, labels, mode, params):
     X = tf.to_float(features["image"]) / 255.0 # input image format is uint8 with range 0 to 255
 
     # The model itself is here
-    #Y, info = model_core_squeezenet(X, mode, params, info)
-    #Y, info = model_core_squeezenet2(X, mode, params, info)
+    #Y, info = model_core_squeezenet12(X, mode, params, info)
+    #Y, info = model_core_squeezenet17(X, mode, params, info)
     #Y, info = model_core_darknet(X, mode, params, info)
     #Y, info = model_core_darknet17(X, mode, params, info)
     Y, info = model_core_configurable_squeezenet(X, mode, params, info)
