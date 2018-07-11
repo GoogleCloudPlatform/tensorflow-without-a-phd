@@ -331,6 +331,7 @@ def init_dataset_from_tfrecords(tfrec_filelist, batch_size, shuffle_buf, yolo_cf
         dataset = dataset.shuffle(shuffle_buf)
     dataset = dataset.apply(tf.contrib.data.map_and_batch(lambda tfrec: read_tfrecord_features(tfrec, yolo_cfg, rnd_hue, rnd_orientation),
                                                           batch_size,
+                                                          drop_remainder=True,  # necessary for TPU
                                                           num_parallel_batches=16))
     return dataset
 
@@ -386,9 +387,9 @@ def eval_dataset_finalize(dataset):
     return dataset
 
 
-def features_and_labels(image, yolo_target_rois, target_rois, count, fnames):
-    features = {'image': image}
-    labels = {'yolo_target_rois': yolo_target_rois, 'target_rois': target_rois, 'count': count, 'fnames': fnames}
+def features_and_labels(image, yolo_target_rois, target_rois):
+    features = {'image': tf.cast(image, tf.int32)}
+    labels = {'yolo_target_rois': yolo_target_rois, 'target_rois': target_rois}
     return features, labels
 
 
@@ -458,7 +459,7 @@ def read_tfrecord_features(example, yolo_cfg, rnd_hue, rnd_orientation):
     yolo_target_rois = yolo_roi_attribution(tile, rois, yolo_cfg)
     yolo_target_rois = tf.reshape(yolo_target_rois, [yolo_cfg.grid_nn, yolo_cfg.grid_nn, yolo_cfg.cell_n, 3])  # 3 for x, y, w
     # TODO: remove plane_counts entirely from the model (dummy 0 for the time being)
-    return features_and_labels(pixels, yolo_target_rois, target_rois, tf.constant(0), airport_name)
+    return features_and_labels(pixels, yolo_target_rois, target_rois)
 
 
 def run_data_generation(data, output_dir, record_batch_size, shuffle_buf, tiles_per_gt_roi, rnd_distmax, rnd_orientation, is_eval):

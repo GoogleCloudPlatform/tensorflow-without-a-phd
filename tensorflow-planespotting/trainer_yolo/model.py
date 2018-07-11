@@ -172,6 +172,26 @@ def model_core_configurable_squeezenet(x, mode, params, info):
 
     return y, info
 
+def no_model_fn(features, labels, mode, params):
+    X = tf.to_float(features["image"]) / 255.0 # input image format is uint8 with range 0 to 255
+    Y = tf.reduce_mean(X, axis=(1, 2))
+    Y = tf.reduce_mean(Y, axis=1, keep_dims=True)
+    smth = tf.layers.dense(Y, 1)
+    loss = tf.reduce_sum((smth - 0.5)**2)
+
+    optimizer = tf.train.GradientDescentOptimizer(0.01)
+    if params['use_tpu']:
+        optimizer = tf.contrib.tpu.CrossShardOptimizer(optimizer)
+    train_op = optimizer.minimize(loss, tf.train.get_or_create_global_step())
+
+    return tf.contrib.tpu.TPUEstimatorSpec(
+        mode=mode,
+        predictions={"smth": smth},
+        loss=loss,
+        train_op=train_op,
+        export_outputs={'smth': tf.estimator.export.PredictOutput({"smth": smth})}
+    )
+
 def model_fn(features, labels, mode, params):
     """The model, with loss, metrics and debug summaries"""
 
@@ -218,9 +238,9 @@ def model_fn(features, labels, mode, params):
     if mode != tf.estimator.ModeKeys.PREDICT:
 
         # Target labels
-        target_count = labels["count"]  # not used
+        # target_count = labels["count"]  # not used
         # Ground truth boxes. Used to compute IOU accuracy and display debug ground truth boxes.
-        target_rois = labels["target_rois"] # shape [batch, MAX_TARGET_ROIS_PER_TILE, x1y1x2y2]
+        target_rois = labels["target_rois"]  # shape [batch, MAX_TARGET_ROIS_PER_TILE, x1y1x2y2]
         # Ground truth boxes assigned to YOLO grid cells. Used to compute loss.
         target_rois_yolo = labels["yolo_target_rois"]  # shape [4,4,3,3] = [batch, GRID_N, GRID_N, CEL_B, xyw]
         target_x, target_y, target_w = tf.unstack(target_rois_yolo, 3, axis=-1) # shape 3 x [batch, 4,4,3] = [batch, GRID_N, GRID_N, CELL_B]
@@ -231,14 +251,17 @@ def model_fn(features, labels, mode, params):
 
         # Mistakes and correct detections for visualisation and debugging.
         # This is computed against the ground truth boxes assigned to YOLO grid cells.
-        mistakes, size_correct, position_correct, all_correct = box.compute_mistakes(box_x, box_y,
-                                                                                     box_w, box_c_sim,
-                                                                                     target_x, target_y,
-                                                                                     target_w, target_is_plane, grid_nn)
+        # Disabled for TPU
+        # mistakes, size_correct, position_correct, all_correct = box.compute_mistakes(box_x, box_y,
+        #                                                                              box_w, box_c_sim,
+        #                                                                              target_x, target_y,
+        #                                                                              target_w, target_is_plane, grid_nn)
+
         # Debug image for logging in Tensorboad.
-        debug_img = imgdbg.debug_image(X, mistakes, target_rois, predicted_rois, predicted_c,
-                                       size_correct, position_correct, all_correct,
-                                       grid_nn, cell_n, settings.TILE_SIZE)
+        # Disabled for TPU
+        # debug_img = imgdbg.debug_image(X, mistakes, target_rois, predicted_rois, predicted_c,
+        #                                size_correct, position_correct, all_correct,
+        #                                grid_nn, cell_n, settings.TILE_SIZE)
 
         # IOU (Intersection Over Union) accuracy
         # IOU computation removed from training mode because it used an op not yet supported with MirroredStrategy
@@ -268,37 +291,55 @@ def model_fn(features, labels, mode, params):
         loss = w_position_loss + w_size_loss + w_obj_loss
 
         # average number of mistakes per image
-        nb_mistakes = tf.reduce_sum(mistakes)
+        # Disabled for TPU
+        # nb_mistakes = tf.reduce_sum(mistakes)
 
         lr = learn_rate_decay(tf.train.get_or_create_global_step(), params)
-        optimizer = tf.train.AdamOptimizer(lr)
-        train_op = tf.contrib.training.create_train_op(loss, optimizer)
+        # optimizer = tf.train.AdamOptimizer(lr)
+        # train_op = tf.contrib.training.create_train_op(loss, optimizer)
+        # TPU removed AdamOptimizer - see why, try MomentumOptimizer
+        # TPU removed create_train_op - see how to make batch norm and UPDATE_OPS work again
+        optimizer = tf.train.GradientDescentOptimizer(lr)
+        if params['use_tpu']:
+            optimizer = tf.contrib.tpu.CrossShardOptimizer(optimizer)
+        train_op = optimizer.minimize(loss, tf.train.get_or_create_global_step())
 
         if mode == tf.estimator.ModeKeys.EVAL:
             # metrics removed from training mode because they are not yet supported with MirroredStrategy
             eval_metrics = {"position_error": tf.metrics.mean(w_position_loss),
                             "size_error": tf.metrics.mean(w_size_loss),
                             "plane_cross_entropy_error": tf.metrics.mean(w_obj_loss),
-                            "mistakes": tf.metrics.mean(nb_mistakes),
+        #                    "mistakes": tf.metrics.mean(nb_mistakes),  # disabled for TPU
                             'IOU': tf.metrics.mean(iou_accuracy)}
         else:
             eval_metrics = None
 
 
         # Tensorboard summaries for debugging
-        tf.summary.scalar("position_error", w_position_loss)
-        tf.summary.scalar("size_error", w_size_loss)
-        tf.summary.scalar("plane_cross_entropy_error", w_obj_loss)
-        tf.summary.scalar("loss", loss)
-        tf.summary.scalar("mistakes", nb_mistakes)
-        tf.summary.scalar("learning_rate", lr)
-        tf.summary.image("input_image", debug_img, max_outputs=20)
+        # disabled for TPU
+        # tf.summary.scalar("position_error", w_position_loss)
+        # tf.summary.scalar("size_error", w_size_loss)
+        # tf.summary.scalar("plane_cross_entropy_error", w_obj_loss)
+        # tf.summary.scalar("loss", loss)
+        # tf.summary.scalar("mistakes", nb_mistakes)
+        # tf.summary.scalar("learning_rate", lr)
+        # tf.summary.image("input_image", debug_img, max_outputs=20)
         # a summary on iou_accuracy would be nice but it goes Out Of Memory
 
-    return tf.estimator.EstimatorSpec(
+    return tf.contrib.tpu.TPUEstimatorSpec(
         mode=mode,
         predictions={"rois":predicted_rois, "rois_confidence": predicted_c},  # name these fields as you like
-        loss=loss, train_op=train_op, eval_metric_ops=eval_metrics,
+        loss=loss,
+        train_op=train_op,
+        eval_metrics=eval_metrics,
         export_outputs={'classes': tf.estimator.export.PredictOutput({"rois": box.swap_xy(predicted_rois), # TODO: the visualisation GUI was coded for swapped coordinates y1 x1 y2 x2
                                                                       "rois_confidence": predicted_c})}  # TODO: remove legacy C
     )
+
+    # return tf.estimator.EstimatorSpec(
+    #     mode=mode,
+    #     predictions={"rois":predicted_rois, "rois_confidence": predicted_c},  # name these fields as you like
+    #     loss=loss, train_op=train_op, eval_metric_ops=eval_metrics,
+    #     export_outputs={'classes': tf.estimator.export.PredictOutput({"rois": box.swap_xy(predicted_rois), # TODO: the visualisation GUI was coded for swapped coordinates y1 x1 y2 x2
+    #                                                                   "rois_confidence": predicted_c})}  # TODO: remove legacy C
+    # )
