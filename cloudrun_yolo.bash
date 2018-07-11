@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-CONFIG="config.yaml"
-#CONFIG="config-distributed.yaml"
+#CONFIG="config.yaml"
+CONFIG="config-distributed.yaml"
 #CONFIG="config-master-worker.yaml"
 #CONFIG="config-hptune-yolo1.yaml"
 BUCKET="gs://ml1-demo-martin"
@@ -23,7 +23,7 @@ printf -v N "%03d" $N
 set -x
 gcloud ml-engine jobs submit training airplane$N \
     --job-dir "${BUCKET}/jobs/airplane$N" \
-    --config ${CONFIG} \
+    --scale-tier BASIC_GPU \
     --project ${PROJECT} \
     --region ${REGION} \
     --module-name trainer_yolo.main \
@@ -34,17 +34,22 @@ gcloud ml-engine jobs submit training airplane$N \
     --hp-shuffle-buf 5000 \
     --hp-iterations 120000 \
     --hp-lr2 15000 \
-    --hp-layers 17 \
-    --hp-first-layer-filter-depth 128 \
-    --hp-first-layer-filter-size 3 \
-    --hp-first-layer-filter-stride 1 \
-    --hp-depth-increment 8 \
-    --hp-dropout 0.0 \
-    --hp-data-cache-n-epochs 2
+    --hp-layers 12 \
+    --hp-first-layer-filter-depth 32 \
+    --hp-first-layer-filter-size 6 \
+    --hp-first-layer-filter-stride 2 \
+    --hp-depth-increment 5
 
+#    --hp-dropout 0.0 \
+#    --hp-data-cache-n-epochs 2 \
 #    --hp-decay-type cosine-restarts \
-#    --hp-decay-restarts 5 \
-#    --hp-decay-restart-height 0.99 \
+#    --hp-decay-restarts 0 \
+#    --hp-decay-restart-height 0.99
+
+#    --hp-first-layer-filter-depth 128 \
+#    --hp-first-layer-filter-size 3 \
+#    --hp-first-layer-filter-stride 1 \
+#    --hp-depth-increment 8 \
 
 
 # Model with fewest false positives: airplane806 (v806b). Training time: 24h, inference time: 2.8s

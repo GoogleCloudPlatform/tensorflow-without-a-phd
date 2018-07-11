@@ -30,10 +30,10 @@ def learn_rate_decay(step, params):
         # empirically  determined t_mul rates for cosine_restarts. With these rates, learning rate is
         # guaranteed to decay to its min value by the end of "iterations" with "decay-restarts" restarts
         # and a first restart at "iterations" / 8.
-        t_muls = [7.0, 2.1926, 1.48831, 1.23692, 1.11434, 1.04422]
+        t_muls = [1.0, 7.0, 2.1926, 1.48831, 1.23692, 1.11434, 1.04422]
         t_mul = t_muls[params["decay_restarts"]]
         m_mul = params["decay_restart_height"]
-        first_decay_steps = params["iterations"] // 8
+        first_decay_steps = params["iterations"] // 8 if params["decay_restarts"] > 0 else params["iterations"]
         lr = params['lr1'] + tf.train.cosine_decay_restarts(params['lr0'], step, first_decay_steps, t_mul, m_mul)
     return lr
 
