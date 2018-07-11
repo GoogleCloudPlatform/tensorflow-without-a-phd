@@ -67,82 +67,82 @@ def start_training(output_dir, hparams, data, tiledata, **kwargs):
     # data source selection: full aerial imagery of TFRecords containing individual 256x256 tiles
     if tiledata != "" and data == "":  # training from tfrecords
         tfrec_filelist = gcsfile.get_matching_files(tiledata + "/*.tfrecord")
-        train_data_input_fn = lambda: datagen.train_dataset_from_tfrecords(tfrec_filelist,
-                                                                           hparams["batch_size"],
-                                                                           hparams["shuffle_buf"],
-                                                                           yolo_cfg,
-                                                                           hparams["data_rnd_hue"],
-                                                                           hparams["data_rnd_orientation"],
-                                                                           hparams["data_cache_n_epochs"])
+        train_data_input_fn = lambda params: datagen.train_dataset_from_tfrecords(tfrec_filelist,
+                                                                                  params['batch_size'],
+                                                                                  hparams["shuffle_buf"],
+                                                                                  yolo_cfg,
+                                                                                  hparams["data_rnd_hue"],
+                                                                                  hparams["data_rnd_orientation"],
+                                                                                  hparams["data_cache_n_epochs"])
         tfrec_filelist_eval = gcsfile.get_matching_files(tiledata + "_eval" + "/*.tfrecord")
-        eval_data_input_fn = lambda: datagen.eval_dataset_from_tfrecords(tfrec_filelist_eval,
-                                                                         hparams["eval_batch_size"],
-                                                                         eval_yolo_cfg)
+        eval_data_input_fn = lambda params: datagen.eval_dataset_from_tfrecords(tfrec_filelist_eval,
+                                                                                params['batch_size'],
+                                                                                eval_yolo_cfg)
     elif data != "" and tiledata == "":  # training from aerial imagery directly
         img_filelist, roi_filelist = datagen.load_file_list(data)
-        train_data_input_fn = lambda: datagen.train_dataset_from_images(img_filelist, roi_filelist,
-                                                                        hparams["batch_size"],
-                                                                        hparams["shuffle_buf"],
-                                                                        yolo_cfg,
-                                                                        hparams["data_rnd_hue"],
-                                                                        hparams["data_rnd_orientation"],
-                                                                        hparams["data_tiles_per_gt_roi"],
-                                                                        hparams["data_rnd_distmax"],
-                                                                        hparams["data_cache_n_epochs"])
+        train_data_input_fn = lambda params: datagen.train_dataset_from_images(img_filelist, roi_filelist,
+                                                                               params['batch_size'],
+                                                                               hparams["shuffle_buf"],
+                                                                               yolo_cfg,
+                                                                               hparams["data_rnd_hue"],
+                                                                               hparams["data_rnd_orientation"],
+                                                                               hparams["data_tiles_per_gt_roi"],
+                                                                               hparams["data_rnd_distmax"],
+                                                                               hparams["data_cache_n_epochs"])
         img_filelist_eval, roi_filelist_eval = datagen.load_file_list(data + "_eval")
-        eval_data_input_fn = lambda: datagen.eval_dataset_from_images(img_filelist_eval, roi_filelist_eval,
-                                                                      hparams["eval_batch_size"],
-                                                                      eval_yolo_cfg)
+        eval_data_input_fn = lambda params: datagen.eval_dataset_from_images(img_filelist_eval, roi_filelist_eval,
+                                                                             params['batch_size'],
+                                                                             eval_yolo_cfg)
     else:
         logging.log(logging.ERROR, "One and only one of parameters 'data' and 'tiledata' must be supplied.")
         return
 
     # Estimator configuration
-    export_latest = tf.estimator.LatestExporter(name="planespotting",
-                                                serving_input_receiver_fn=serving_input_fn,
-                                                exports_to_keep=1)
+    # export_latest = tf.estimator.LatestExporter(name="planesnet",
+    #                                             serving_input_receiver_fn=serving_input_fn,
+    #                                             exports_to_keep=1)
 
-    train_spec = tf.estimator.TrainSpec(input_fn=train_data_input_fn,
-                                        max_steps=hparams["iterations"])
+    # train_spec = tf.estimator.TrainSpec(input_fn=train_data_input_fn,
+    #                                     max_steps=hparams["iterations"])
 
-    eval_spec = tf.estimator.EvalSpec(input_fn=eval_data_input_fn,
-                                      steps=hparams['eval_iterations'],
-                                      exporters=export_latest,
-                                      start_delay_secs=1,  # Confirmed: this does not work (plane533 for ex.)
-                                      throttle_secs=60)
+    # eval_spec = tf.estimator.EvalSpec(input_fn=eval_data_input_fn,
+    #                                   steps=hparams['eval_iterations'],
+    #                                   exporters=export_latest,
+    #                                   start_delay_secs=1,  # Confirmed: this does not work (plane533 for ex.)
+    #                                   throttle_secs=60)
 
-    # Device filters to prevent unwanted communications between nodes
-    # This is necessary for now for running distributed jobs on ML Engine
-    # If running long evaluations, workers can be done before master and in that case ML Engine crashes.
-    # These device filters prevent unwanted communications from happening and will prevent the crash.
-    # This code should be folded into Estimator in Tensorflow v1.9
-    tf_config = json.loads(os.environ.get('TF_CONFIG', '{}'))
-    config = None
-    if 'task' not in tf_config:
-        config = None
-    elif tf_config['task']['type'] == 'master':
-        config = tf.ConfigProto(device_filters=['/job:ps', '/job:master'])
-    elif tf_config['task']['type'] == 'worker':
-        config = tf.ConfigProto(device_filters=['/job:ps', '/job:worker/task:%d' % tf_config['task']['index']])
-    # end of temporary fix code for distributed training on ML Engine
+    training_config = tf.contrib.tpu.RunConfig(
+        model_dir=output_dir,
+        session_config=tf.ConfigProto(allow_soft_placement=True, log_device_placement=False),
+        tpu_config=tf.contrib.tpu.TPUConfig(hparams['tpu_iterations'], 8),  # 8 cores in a TPU board
+        cluster=tf.contrib.cluster_resolver.TPUClusterResolver(kwargs['tpu'],
+                                                               kwargs['tpu_zone'],
+                                                               kwargs['gcp_project']) if hparams['use_tpu'] else None)
 
     # Experimental distribution strategy if running on a machine with multiple GPUs
     logging.log(logging.INFO, "GPUs found: " + str(get_available_gpus()))
     distribution = tf.contrib.distribute.MirroredStrategy() if len(get_available_gpus()) > 1 else None
+    # training_config = tf.estimator.RunConfig(model_dir=output_dir,
+    #                                          save_summary_steps=100,
+    #                                          save_checkpoints_steps=2000,
+    #                                          keep_checkpoint_max=1)
 
-    training_config = tf.estimator.RunConfig(model_dir=output_dir,
-                                             save_summary_steps=100,
-                                             save_checkpoints_steps=2000,
-                                             keep_checkpoint_max=1,
-                                             train_distribute=distribution,
-                                             session_config=config)  # device filters set here
+    estimator = tf.contrib.tpu.TPUEstimator(model_fn=model.no_model_fn, model_dir=output_dir, params=hparams,
+                                            train_batch_size=hparams['batch'],
+                                            eval_batch_size=hparams['batch'],  # TPU constraint: batch sizes must be the same (?)
+                                            config=training_config, use_tpu=hparams['use_tpu'])
 
-    estimator = tf.estimator.Estimator(model_fn=model.model_fn,
-                                       model_dir=output_dir,
-                                       config=training_config,
-                                       params=hparams)
+    # estimator = tf.estimator.Estimator(model_fn=model.model_fn,
+    #                                    model_dir=output_dir,
+    #                                    config=training_config,
+    #                                    params=hparams)
 
-    tf.estimator.train_and_evaluate(estimator, train_spec, eval_spec)
+    # tf.estimator.train_and_evaluate(estimator, train_spec, eval_spec)
+
+    estimator.train(train_data_input_fn, max_steps=hparams["iterations"])
+    estimator.evaluate(input_fn=eval_data_input_fn, steps=hparams['eval_iterations'])
+    estimator.export_savedmodel(os.path.join(output_dir, "planesnet"), serving_input_fn)
+
 
 def main(argv):
     parser = argparse.ArgumentParser()
@@ -153,7 +153,7 @@ def main(argv):
     parser.add_argument('--data', default="", help='Path to training data folder containing full-scale aerial imagery (can be on Google cloud storage gs://...). Eval data should be in a folder with the same name and and _eval suffix.')
     parser.add_argument('--tiledata', default="", help='Path to training data folder containing image tiles (can be on Google cloud storage gs://...). Eval data should be in a folder with the same name and and _eval suffix.')
     parser.add_argument('--hp-iterations', default=25000, type=int, help='Hyperparameter: number of training iterations')
-    parser.add_argument('--hp-batch-size', default=10, type=int, help='Hyperparameter: training batch size')
+    parser.add_argument('--hp-batch', default=10, type=int, help='Hyperparameter: training batch size. 1/8th of this is the real batch size on one TPU.')
     parser.add_argument('--hp-eval-batch-size', default=32, type=int, help='Hyperparameter: evaluation batch size')
     parser.add_argument('--hp-eval-iterations', default=262, type=int, help='Hyperparameter: eval iterations')  # eval dataset is 8380 tiles (262 batches of 32) - larger batch will OOM.
     parser.add_argument('--hp-shuffle-buf', default=10000, type=int, help='Hyperparameter: data shuffle buffer size')
@@ -184,6 +184,13 @@ def main(argv):
     parser.add_argument('--hp-data-rnd-hue', default=True, type=str2bool, help='Data generation hyperparameter: data augmentation with random hue on training images')
     parser.add_argument('--hp-data-rnd-orientation', default=True, type=str2bool, help='Data generation hyperparameter: data augmentation by rotating and flipping tiles.')
     parser.add_argument('--hp-data-cache-n-epochs', default=0, type=int, help='Generate random data variations for n epochs then cache and reuse.')
+    # switch for training on TPUs
+    parser.add_argument('--hp-use-tpu', default=False, type=str2bool, help='Enable training on TPUs')
+    parser.add_argument('--hp-tpu-iterations', default=1000, type=int, help='Iterations per call to the TPU')
+    # TPUEstimator uses the following parameters internally - do not use them
+    parser.add_argument('--tpu', default=None, help='(internal) ML Engine uses this argument to pass the IP address of the TPU')
+    parser.add_argument('--tpu-zone', default=None, help='(internal) GCP zone where to provision the TPUs')
+    parser.add_argument('--gcp-project', default=None, help='(internal) GCP project where to provision the TPUs')
 
     args = parser.parse_args()
     arguments = args.__dict__

@@ -201,7 +201,7 @@ def YOLO_head(x, mode, params, info, grid_nn, cell_n):
     # Leave some breathing room to the roi sizes so that rois from adjacent cells can reach into this one.
     # This prevents training from punishing cells that do see an airplane but are not assigned any because
     # the plane is centered in an adjacent cell very close to the limit. A ground truth box that is slightly
-    # off could change cell ownership of a plane while not changing anyhting about the underlying pixels.
+    # off could change cell ownership of a plane while not changing anything about the underlying pixels.
     box_x = box_x * 1.0 * params["cell_grow"]
     box_y = box_y * 1.0 * params["cell_grow"]
 
