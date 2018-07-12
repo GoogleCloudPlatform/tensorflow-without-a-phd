@@ -121,6 +121,7 @@ def start_training(output_dir, hparams, data, tiledata, **kwargs):
     # end of temporary fix code for distributed training on ML Engine
 
     # Experimental distribution strategy if running on a machine with multiple GPUs
+    logging.log(logging.INFO, "GPUs found: " + str(get_available_gpus()))
     distribution = tf.contrib.distribute.MirroredStrategy() if len(get_available_gpus()) > 1 else None
 
     training_config = tf.estimator.RunConfig(model_dir=output_dir,
