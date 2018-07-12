@@ -100,7 +100,7 @@ def log_tensor(message, tensor):
         message: Prefix message string
         tensor: The tensor to evaluate
     """
-    tf.Print(tensor, [tensor], message)
+    tf.Print(tensor, [tensor], message, summarize=10)
 
 
 def extract_filename_without_extension(filename):
@@ -285,10 +285,14 @@ def decode_json_py(str):
     return rois
 
 
+def decode_image(img_bytes):
+    pixels = tf.image.decode_image(img_bytes, channels=3)
+    return tf.cast(pixels, tf.uint8)
+
+
 def decode_image_and_json_bytes(img_bytes, json_bytes):
     # decode jpeg
-    pixels = tf.image.decode_image(img_bytes, channels=3)
-    pixels = tf.cast(pixels, tf.uint8)
+    pixels = decode_image(img_bytes)
     # parse json
     rois = tf.py_func(decode_json_py, [json_bytes], [tf.float32])
     rois = tf.reshape(rois[0], [-1, 4])
@@ -402,35 +406,38 @@ def eval_dataset_from_tfrecords(tfrec_filelist, eval_batch_size, yolo_cfg):
     return eval_dataset_finalize(dataset)
 
 
-def write_tfrecord_features(tfrec_filewriter, img_bytes, json_bytes, name_bytes):
+def write_tfrecord_features(tfrec_filewriter, img_bytes, roi_floats, name_bytes):
     # helper function for TFRecords generation
     def _bytes_feature(value):
-        return tf.train.Feature(bytes_list=tf.train.BytesList(value=[value]))
+        return tf.train.Feature(bytes_list=tf.train.BytesList(value=[value]))  # [value] for inputs of type 'bytes'
+    def _float_feature(value):
+        return tf.train.Feature(float_list=tf.train.FloatList(value=value))  # value for inputs if type 'list'
 
     tfrec_filewriter.write(tf.train.Example(features=tf.train.Features(feature={
         "img": _bytes_feature(img_bytes),
-        "rois": _bytes_feature(json_bytes),
+        "rois": _float_feature(roi_floats),
         "name": _bytes_feature(name_bytes)})).SerializeToString())
 
 
 def read_tfrecord_features(example, yolo_cfg, rnd_hue, rnd_orientation):
     features = {
         "img": tf.FixedLenFeature((), tf.string),
-        "rois": tf.FixedLenFeature((), tf.string),
+        "rois": tf.VarLenFeature(tf.float32),
         "name": tf.FixedLenFeature((), tf.string)
     }
     parsed_example = tf.parse_single_example(example, features)
-    pixels, rois = decode_image_and_json_bytes(parsed_example["img"], parsed_example["rois"])
+    pixels = decode_image(parsed_example["img"])
+    rois = tf.sparse_tensor_to_dense(parsed_example["rois"])
+    rois = tf.reshape(rois * settings.TILE_SIZE, [-1, 4])
     airport_name = parsed_example["name"]
+
+    # rois format: x1, y1, x2, y2 in [0..TILE_SIZE]
 
     if rnd_orientation:
         pixels, rois = box.random_orientation(pixels, rois, settings.TILE_SIZE)
 
     if rnd_hue:
         pixels = random_hue(tf.expand_dims(pixels, axis=0))
-
-    # TODO: data augmentation here: hue shift, orientation shift, ...
-    # rois format: x1, y1, x2, y2 in [0..TILE_SIZE]
 
     # TODO: refactor coordinate formats so that target_rois and yolo_target_rois use the same format
     pixels = tf.reshape(pixels, [settings.TILE_SIZE, settings.TILE_SIZE, 3])  # 3 for r, g, b
@@ -470,15 +477,17 @@ def run_data_generation(data, output_dir, record_batch_size, shuffle_buf, tiles_
 
     dataset = dataset.repeat(1)
 
+    ###
     # TF graph for JPEG image encoding
     features, labels = dataset.make_one_shot_iterator().get_next()
     image_tiles = features['image']
     fname = labels['fnames']
-    target_rois = labels['target_rois']
+    target_rois = labels['target_rois']  # shape [n_tiles, MAX_TARGET_ROIS_PER_TILE, 4]
     encoded_jpegs = tf.map_fn(lambda image_bytes:
                               tf.image.encode_jpeg(image_bytes, optimize_size=True, chroma_downsampling=False),
                               image_tiles, dtype=tf.string)
     # end of TF graph for image encoding
+    ###
 
     i = 0
     with tf.Session() as sess:
@@ -495,23 +504,12 @@ def run_data_generation(data, output_dir, record_batch_size, shuffle_buf, tiles_
             basename, _ = os.path.splitext(basename)
             filename = os.path.join(output_dir, "{}tiles{:06}_{}.tfrecord".format(record_batch_size, i, basename))
             with tf.python_io.TFRecordWriter(filename) as file:
-                # TODO: it's a bit silly to write the rois to TFRecords in JSON format. See if there is a better way.
                 for one_image_jpeg, per_image_target_rois in zip(image_jpegs_r, target_rois_r):
-                    markers = []
-                    for roi in per_image_target_rois:
-                        box_x1 = roi[0]
-                        box_y1 = roi[1]
-                        box_x2 = roi[2]
-                        box_y2 = roi[3]
-                        box_x = box_x1 * settings.TILE_SIZE
-                        box_y = box_y1 * settings.TILE_SIZE
-                        box_w = (box_x2 - box_x1) * settings.TILE_SIZE
-                        if box_w > 0:
-                            markers.append({"x": int(round(box_x)), "y": int(round(box_y)), "w": int(round(box_w))})
-                    json_rois = {"markers": markers}
-                    json_roi_string = json.dumps(json_rois)
-                    # write to TFRecord file
-                    write_tfrecord_features(file, one_image_jpeg, json_roi_string.encode("utf-8"), fname_r[0])
+                    nonempty_target_rois = filter(lambda roi: abs(roi[2]-roi[0]) > 0 and  # roi format is x1y1x2y2
+                                                              abs(roi[3]-roi[1]) > 0, per_image_target_rois)
+                    nonempty_target_rois = np.array(list(nonempty_target_rois), np.float32)
+                    nonempty_target_rois = np.reshape(nonempty_target_rois, [-1]).tolist()
+                    write_tfrecord_features(file, one_image_jpeg, nonempty_target_rois, fname_r[0])  # write TFRecord
 
 
 def datagen_main(argv):

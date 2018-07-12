@@ -17,7 +17,7 @@ logging.log(logging.INFO, "Tensorflow version " + tf.__version__)
 # This can be deleted before release.
 
 def main():
-    tfrec_filelist = gcsfile.get_matching_files("sample_data/tilecache" + "/*.tfrecord")
+    tfrec_filelist = gcsfile.get_matching_files("sample_data/tilecache2" + "/*.tfrecord")
     yolo_cfg = datagen.YOLOConfig(16, 2, True, 1.3)
     dataset = datagen.train_dataset_from_tfrecords(tfrec_filelist, 10, 200, yolo_cfg, True, False)
     features, labels = dataset.make_one_shot_iterator().get_next()
