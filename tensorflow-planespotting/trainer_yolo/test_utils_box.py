@@ -311,20 +311,19 @@ class BoxRoiUtilsTest(unittest.TestCase):
         batch_roisBb = tf.stack([rois2b, rois2b, norois1b, norois2b, partroisb, noroisb], axis=0)
         iou1 = IOUCalculator.batch_intersection_over_union(batch_roisA, batch_roisB, tile_size=5)
         iou2 = IOUCalculator.batch_intersection_over_union(batch_roisA, batch_roisBb, tile_size=5)
-        #iou3 = IOUCalculator.batch_intersection_over_union(batch_roisA, batch_roisBb, tile_size=5, iou_batch=3)
-        #iou4 = IOUCalculator.batch_intersection_over_union(batch_roisA, batch_roisB, tile_size=5, iou_batch=2)
+        iou3 = IOUCalculator.batch_intersection_over_union(batch_roisA, batch_roisBb, tile_size=5, iou_batch=3)
+        iou4 = IOUCalculator.batch_intersection_over_union(batch_roisA, batch_roisB, tile_size=5, iou_batch=2)
         correct = np.array([1.0, 10.0/12.0, 0.0, 1.0, 4.0/10.0, 1.0])
         with tf.Session() as sess:
             res1 = sess.run(iou1)
             res2 = sess.run(iou2)
-            #res3 = sess.run(iou3)
-            #res4 = sess.run(iou4)
+            res3 = sess.run(iou3)
+            res4 = sess.run(iou3)
         d1 = np.linalg.norm(res1-correct)
         d2 = np.linalg.norm(res2-correct)
-        #d3 = np.linalg.norm(res3-correct)
-        #d4 = np.linalg.norm(res4-correct)
-        #self.assertTrue((d1+d2+d3+d4)<1e-6, "IOUCalculator.batch_iou test failed")
-        self.assertTrue((d1+d2)<1e-6, "IOUCalculator.batch_iou test failed")
+        d3 = np.linalg.norm(res3-correct)
+        d4 = np.linalg.norm(res4-correct)
+        self.assertTrue((d1+d2+d3+d4)<1e-6, "IOUCalculator.batch_iou test failed")
 
     def test_batch_iou_mean(self):
         ious1 = tf.constant([0, 1, 0.3, 0.9, 0.8], dtype=tf.float32)  # 1s are ignored in the average
