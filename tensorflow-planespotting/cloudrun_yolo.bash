@@ -45,7 +45,6 @@ gcloud ml-engine jobs submit training airplane_tpu$N \
     -- \
     --tiledata "${TILEDATA}" \
     --hp-shuffle-buf 5000 \
-    --hp-iterations 300 \
     --hp-lr2 15000 \
     --hp-layers 17 \
     --hp-first-layer-filter-depth 128 \
@@ -54,8 +53,13 @@ gcloud ml-engine jobs submit training airplane_tpu$N \
     --hp-depth-increment 8 \
     --hp-use-tpu True \
     --hp-batch 16 \
+    --hp-iterations 30 \
     --hp-eval-iterations 3 \
     --hp-tpu-iterations 3
+#    --hp-batch 128 \
+#    --hp-iterations 9400 \
+#    --hp-eval-iterations 522 \
+#    --hp-tpu-iterations 200
 
 # Model with fewest false positives: airplane806 (v806b). Training time: 24h, inference time: 2.8s
 #gcloud ml-engine jobs submit training airplane$N \

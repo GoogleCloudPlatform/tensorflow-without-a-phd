@@ -18,6 +18,7 @@ Main file for training the YOLO (You Look Only Once) detection model"""
 
 import os
 import sys
+import math
 import json
 import argparse
 import tensorflow as tf
@@ -120,14 +121,15 @@ def start_training(output_dir, hparams, data, tiledata, **kwargs):
                                                                kwargs['gcp_project']) if hparams['use_tpu'] else None)
 
     # Experimental distribution strategy if running on a machine with multiple GPUs
-    logging.log(logging.INFO, "GPUs found: " + str(get_available_gpus()))
-    distribution = tf.contrib.distribute.MirroredStrategy() if len(get_available_gpus()) > 1 else None
+    # logging.log(logging.INFO, "GPUs found: " + str(get_available_gpus()))
+    # distribution = tf.contrib.distribute.MirroredStrategy() if len(get_available_gpus()) > 1 else None
+
     # training_config = tf.estimator.RunConfig(model_dir=output_dir,
     #                                          save_summary_steps=100,
     #                                          save_checkpoints_steps=2000,
     #                                          keep_checkpoint_max=1)
 
-    estimator = tf.contrib.tpu.TPUEstimator(model_fn=model.no_model_fn, model_dir=output_dir, params=hparams,
+    estimator = tf.contrib.tpu.TPUEstimator(model_fn=model.model_fn, model_dir=output_dir, params=hparams,
                                             train_batch_size=hparams['batch'],
                                             eval_batch_size=hparams['batch'],  # TPU constraint: batch sizes must be the same (?)
                                             config=training_config, use_tpu=hparams['use_tpu'])
@@ -139,9 +141,11 @@ def start_training(output_dir, hparams, data, tiledata, **kwargs):
 
     # tf.estimator.train_and_evaluate(estimator, train_spec, eval_spec)
 
-    estimator.train(train_data_input_fn, max_steps=hparams["iterations"])
-    estimator.evaluate(input_fn=eval_data_input_fn, steps=hparams['eval_iterations'])
-    estimator.export_savedmodel(os.path.join(output_dir, "planesnet"), serving_input_fn)
+    TPU_EVAL_EVERY_STEPS = 1000
+    for i in range(int(math.ceil(hparams["iterations"]*1.0/TPU_EVAL_EVERY_STEPS))):
+        estimator.train(train_data_input_fn, steps=min(TPU_EVAL_EVERY_STEPS, hparams["iterations"]-TPU_EVAL_EVERY_STEPS*i))
+        estimator.evaluate(input_fn=eval_data_input_fn, steps=hparams['eval_iterations'])
+        estimator.export_savedmodel(os.path.join(output_dir, "planesnet"), serving_input_fn)
 
 
 def main(argv):

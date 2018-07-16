@@ -116,7 +116,7 @@ class BoxRoiUtilsTest(unittest.TestCase):
         #print(d)
         self.assertTrue(d<1e-5, "test_box_rot90 test failed")
 
-    def test_remove_non_intersecting_rois(self):
+    def test_assign_rois_to_intersecting_tiles(self):
         tiles = tf.constant([[0.0, 0.0, 3.0, 3.0],  # tile0
                  [1, -1, 3, 1],         # tile1
                  [4, 3, 7, 8]])          # tile2
@@ -127,15 +127,74 @@ class BoxRoiUtilsTest(unittest.TestCase):
         correct = np.array([[[0.0, 0.0, 1.0, 1.0], [-1, -1, 5, 5], [2, 2, 5, 8]],  # tile0 rois
                    [[-1, -1, 5, 5], [0, 0, 0, 0], [0, 0, 0, 0]],           # tile1 rois
                    [[-1, -1, 5, 5], [2, 2, 5, 8], [0, 0, 0, 0]]])          # tile2 rois
-        filtered_rois = remove_non_intersecting_rois(tiles, rois, max_per_tile=3)
+        filtered_rois = assign_rois_to_intersecting_tiles(tiles, rois, max_per_tile=3)
+        init = tf.global_variables_initializer()
         with tf.Session() as sess:
+            sess.run(init)
             res1, overflow = sess.run(filtered_rois)
             #print(overflow)
         d = np.linalg.norm(res1-correct)
         ovf = np.sum(overflow)
-        self.assertTrue(d<1e-6, "remove_non_intersecting_rois test failed")
-        self.assertTrue(ovf==0, "remove_non_intersecting_rois overflow test failed")
+        self.assertTrue(d<1e-6, "assign_rois_to_intersecting_tiles test failed")
+        self.assertTrue(ovf==0, "assign_rois_to_intersecting_tiles overflow test failed")
 
+
+    def test_compact_non_empty_rois(self):
+        rois = tf.constant([[[0.0, 0.0, 1.0, 1.0],
+                             [-1, -1, 5, 5],
+                             [5, -1, 5, 5],  # empty
+                             [1, 2, 2, 2],  # empty
+                             [-1, -5, 0, 0],
+                             [2, 2, 5, 8],
+                             [-1, 3, 0, 7],
+                             [-1, 3, -1, 6],  # empty
+                             [0, 3, 1, 4],
+                             [1, 3.5, 2, 3.5],  # empty
+                             [1, 3, 2, 5],
+                             [0, 0, 0, 0]],  # empty
+                            [[0.1, 0.1, 1.0, 2.0],
+                             [-1, -1, 4, 5],
+                             [5, 5, 5, 5],  # empty
+                             [2, 1, 5, 7],
+                             [1, 2, 1, 2],  # empty
+                             [-1, -4, 1, 0],
+                             [-1, 3, 1, 7],
+                             [0.5, 3, 1, 4.5],
+                             [-2, 3, -2, 5],  # empty
+                             [0, 4.4, 2, 4.4],  # empty
+                             [0, 0, 0, 0],  # empty
+                             [0, 0, 0, 0]]])  # empty
+
+        filtered_rois1 = box.compact_non_empty_rois(rois, max_per_tile=4)  # overflows by 3,2
+        filtered_rois2 = box.compact_non_empty_rois(rois, max_per_tile=6)  # overflows by 1,0
+        filtered_rois3 = box.compact_non_empty_rois(rois, max_per_tile=7)  # does not overflow 0,0
+        filtered_rois4 = box.compact_non_empty_rois(rois, max_per_tile=8)  # does not overflow 0,0
+        filtered_rois5 = box.compact_non_empty_rois(rois, max_per_tile=10)  # does not overflow 0,0
+        init = tf.global_variables_initializer()
+        with tf.Session() as sess:
+            sess.run(init)
+            res = sess.run(rois)
+            res1, overflow1 = sess.run(filtered_rois1)
+            res2, overflow2 = sess.run(filtered_rois2)
+            res3, overflow3 = sess.run(filtered_rois3)
+            res4, overflow4 = sess.run(filtered_rois4)
+            res5, overflow5 = sess.run(filtered_rois5)
+            self.assertTrue(np.all(overflow1 == (3, 2)), "compact_non_empty_rois overflow test failed")
+            self.assertTrue(np.all(overflow2 == (1, 0)), "compact_non_empty_rois overflow test failed")
+            self.assertTrue(np.all(overflow3 == (0, 0)), "compact_non_empty_rois overflow test failed")
+            self.assertTrue(np.all(overflow4 == (0, 0)), "compact_non_empty_rois overflow test failed")
+            self.assertTrue(np.all(overflow5 == (0, 0)), "compact_non_empty_rois overflow test failed")
+            self.assertTrue(np.all(res1[0] == res[0, (0, 1, 4, 5)]), "compact_non_empty_rois test failed")
+            self.assertTrue(np.all(res1[1] == res[1, (0, 1, 3, 5)]), "compact_non_empty_rois test failed")
+            self.assertTrue(np.all(res2[0] == res[0, (0, 1, 4, 5, 6, 8)]), "compact_non_empty_rois test failed")
+            self.assertTrue(np.all(res2[1] == res[1, (0, 1, 3, 5, 6, 7)]), "compact_non_empty_rois test failed")
+            self.assertTrue(np.all(res3[0] == res[0, (0, 1, 4, 5, 6, 8, 10)]), "compact_non_empty_rois test failed")
+            self.assertTrue(np.all(res3[1] == res[1, (0, 1, 3, 5, 6, 7, 11)]), "compact_non_empty_rois test failed")
+            self.assertTrue(np.all(res4[0] == res[0, (0, 1, 4, 5, 6, 8, 10, 11)]), "compact_non_empty_rois test failed")
+            self.assertTrue(np.all(res4[1] == res[1, (0, 1, 3, 5, 6, 7, 11, 11)]), "compact_non_empty_rois test failed")
+            self.assertTrue(np.all(res5[0] == res[0, (0, 1, 4, 5, 6, 8, 10, 11, 11, 11)]), "compact_non_empty_rois test failed")
+            self.assertTrue(np.all(res5[1] == res[1, (0, 1, 3, 5, 6, 7, 11, 11, 11, 11)]), "compact_non_empty_rois test failed")
+            # the function pads with [0,0,0,0], referenced above as res[0,11] or res[1,11]
 
     def test_rois_in_tile_relative(self):
         tiles = tf.constant([[0.0, 0.0, 3.0, 3.0],  # tile0
@@ -154,7 +213,9 @@ class BoxRoiUtilsTest(unittest.TestCase):
                             [[-5, -4, 1, 2], [-2, -1, 1, 5]]])   / 3.0       # tile2 rois
         filtered_rois = rois_in_tiles_relative(tiles, rois, tile_size=3.0, max_per_tile=3)
         filtered_rois2 = rois_in_tiles_relative(tiles, rois, tile_size=3.0, max_per_tile=2, assert_on_overflow=False)  # this overflows max_per_tile
+        init = tf.global_variables_initializer()
         with tf.Session() as sess:
+            sess.run(init)
             res1 = sess.run(filtered_rois)
             res2 = sess.run(filtered_rois2)
             #print(res1)
@@ -193,20 +254,29 @@ class BoxRoiUtilsTest(unittest.TestCase):
                                [-3, -4, -2, -3]], dtype=tf.float32)
         partroisb = tf.constant([[1, 1, 3, 3],
                                 [2, 3, 2, 3]], dtype=tf.float32)
-        batch_roisA = tf.stack([rois1, rois3, rois1, norois1, rois3], axis=0)
-        batch_roisB = tf.stack([rois2, rois2, norois1, norois2, partrois], axis=0)
-        batch_roisBb = tf.stack([rois2b, rois2b, norois1b, norois2b, partroisb], axis=0)
+        noroisb = tf.constant([[0, 0, 0, 0],
+                               [0, 0, 0, 0]], dtype=tf.float32)
+        norois = tf.constant([[0, 0, 0, 0],
+                              [0, 0, 0, 0],
+                              [0, 0, 0, 0]], dtype=tf.float32)
+        batch_roisA = tf.stack([rois1, rois3, rois1, norois1, rois3, norois], axis=0)
+        batch_roisB = tf.stack([rois2, rois2, norois1, norois2, partrois, norois], axis=0)
+        batch_roisBb = tf.stack([rois2b, rois2b, norois1b, norois2b, partroisb, noroisb], axis=0)
         iou1 = IOUCalculator.batch_intersection_over_union(batch_roisA, batch_roisB, tile_size=5)
         iou2 = IOUCalculator.batch_intersection_over_union(batch_roisA, batch_roisBb, tile_size=5)
-        correct1 = np.array([1.0, 10.0/12.0, 0.0, 1.0, 4.0/10.0])
-        correct2 = np.array([1.0, 10.0/12.0, 0.0, 1.0, 4.0/10.0])
+        iou3 = IOUCalculator.batch_intersection_over_union(batch_roisA, batch_roisBb, tile_size=5, iou_batch=3)
+        iou4 = IOUCalculator.batch_intersection_over_union(batch_roisA, batch_roisB, tile_size=5, iou_batch=2)
+        correct = np.array([1.0, 10.0/12.0, 0.0, 1.0, 4.0/10.0, 1.0])
         with tf.Session() as sess:
             res1 = sess.run(iou1)
             res2 = sess.run(iou2)
-            #print(res2)
-        d1 = np.linalg.norm(res1-correct1)
-        d2 = np.linalg.norm(res2-correct2)
-        self.assertTrue((d1+d2)<1e-6, "IOUCalculator.batch_iou test failed")
+            res3 = sess.run(iou3)
+            res4 = sess.run(iou3)
+        d1 = np.linalg.norm(res1-correct)
+        d2 = np.linalg.norm(res2-correct)
+        d3 = np.linalg.norm(res3-correct)
+        d4 = np.linalg.norm(res4-correct)
+        self.assertTrue((d1+d2+d3+d4)<1e-6, "IOUCalculator.batch_iou test failed")
 
     def test_batch_iou_mean(self):
         ious1 = tf.constant([0, 1, 0.3, 0.9, 0.8], dtype=tf.float32)  # 1s are ignored in the average

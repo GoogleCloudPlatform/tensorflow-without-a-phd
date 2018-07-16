@@ -335,51 +335,89 @@ def find_empty_rois(rois):
     return empty
 
 
-# Selects items from rois acccording to boolean mask. Pads the result to max_n items.
-# rois: shape [n, 4]
-# mask: shape [n]
-# output: shape [max_n, 4]
-def filter_by_bool(rois, mask, max_n):
-    rois = tf.boolean_mask(rois, mask)
-    n = tf.shape(rois)[0]
-    # make sure we have enough space in the tensor for all ROIs.
-    # If not, pad to max_n and return a boolean to signal the overflow.
-    pad_n = tf.maximum(max_n-n, 0)
-    rois = tf.pad(rois, [[0, pad_n], [0, 0]])  # pad to max_n elements
-    rois = tf.slice(rois, [0,0], [max_n, 4])  # truncate to max_n elements
-    return rois
-
-
-# Selects items from rois acccording to boolean mask. Pads the result to max_n items.
-# rois: shape [batch, n, 4]
-# mask: shape [batch, n]
-# output: shape [batch, max_n, 4]
-def batch_filter_by_bool(rois, mask, max_n):
-    rois_n = tf.count_nonzero(mask, axis=1)
+# Filters ROIs to a fixed shape, truncating if too many elements, padding if too few
+# Tnput rois shape [batch, rois_n, 4]
+# The number of rois in the output is min(rois_n, max_n) so this function never "pads up" unnecessarily
+# TODO: TF 1.10
+# This function ues tf.top_k which will be available for TPUs in TF 1.10 only. Until then, use filter_rois_by_bool2
+def filter_rois_by_bool(rois, mask, max_n):
+    max_n = tf.minimum(max_n, tf.shape(rois)[1])  # make sure we do not pad unnecessarily
+    rois_n = tf.count_nonzero(mask, axis=1, dtype=tf.int32)
     overflow = tf.maximum(rois_n - max_n, 0)
-    rois = tf.map_fn(lambda rois__mask: filter_by_bool(*rois__mask, max_n=max_n), (rois, mask), dtype=tf.float32)  # shape [batch, max_n, 4]
-    rois = tf.reshape(rois, [-1, max_n, 4])  # Tensorflow needs a hint about the shape
-    return rois, overflow
+    _, indices = tf.nn.top_k(tf.cast(mask, tf.int32), max_n)
+
+    # returned indices are in this format:
+    # [ [ 1, 3, 5, 6, ...],
+    #   [ 2, 4, 8, 9, ...] ]
+    # but for gather_nd, we want them in this format:
+    # [ [ [0, 1], [0, 3], [0, 5], [0, 6], ...],
+    #   [ [1, 2], [1, 4], [1, 8], [1, 9], ...] ]
+    dim0 = tf.shape(indices)[0]
+    dim1 = tf.shape(indices)[1]
+    row_indices = tf.range(dim0)
+    row_indices = tf.tile(tf.expand_dims(row_indices, 1), [1, dim1])
+    # By stacking
+    # [ [ 0, 0, 0, 0, ...],
+    #   [ 1, 1, 1, 1, ...] ]
+    # and
+    # [ [ 1, 3, 5, 6, ...],
+    #   [ 2, 4, 8, 9, ...] ]
+    # we get what we want
+    indices = tf.stack([row_indices, indices], axis=-1)
+
+    # zero-out empty rois before gathering to make sure that any padding rois after the selected rois are [0,0,0,0]
+    mask4 = tf.stack([mask for _ in range(4)], axis=-1)  # same boolean filter for all coordinates of a roi x1 y1 x2 y2
+    rois = tf.where(mask4, rois, tf.zeros_like(rois))
+
+    filtered_rois = tf.gather_nd(rois, indices)
+    return filtered_rois, overflow
+
+
+# TODO: TF 1.10
+# Use filter_rois_by_bool2 until tf.top_k is made available for TPUs in TF 1.10.
+# Then switch the code to filter_rois_by_bool which is better.
+def filter_rois_by_bool2(rois, mask, max_n):
+    # max_n = tf.minimum(max_n, tf.shape(rois)[1])  # make sure we do not pad unnecessarily
+
+    def uni_filter_rois_by_bool2(rois, mask):
+        def next_idx(accum, v):
+            write_accum = accum[0] + tf.cast(v, tf.int32)
+            write_idx = tf.where(v, write_accum - 1, max_n)
+            write_idx = tf.where(write_idx>max_n, max_n, write_idx)
+            res = tf.stack([write_accum, write_idx, tf.cast(v, tf.int32)])
+            return res
+        write_accums = tf.scan(next_idx, mask, initializer=tf.zeros(shape=3, dtype=tf.int32))
+        write_idxs = write_accums[:, 1]
+        write_idxs = tf.expand_dims(write_idxs, -1)
+        filtered_roi = tf.scatter_nd(write_idxs, rois, [max_n+1, 4])
+
+        filtered_roi = tf.slice(filtered_roi, [0, 0], [max_n, 4])
+        return filtered_roi
+
+    rois_n = tf.reduce_sum(tf.cast(mask, tf.int32), axis=1)
+    overflow = tf.maximum(rois_n - max_n, 0)
+    filtered_rois = tf.map_fn(lambda rois__mask: uni_filter_rois_by_bool2(*rois__mask), (rois, mask), dtype=tf.float32)
+    return filtered_rois, overflow
 
 
 # tiles shape [n_tiles, 4] coordinates (x1, y1, x2, y2) in aerial image coordinates
 # rois shape [n_rois, 4] coordinates (x1, y1, x2, y2) in aerial image coordinates
 # output: shape [n_tiles, max_per_tile, 4] in aerial image coordinates. Roi list padded with empty ROIs.
-def remove_non_intersecting_rois(tiles, rois, max_per_tile):
+def assign_rois_to_intersecting_tiles(tiles, rois, max_per_tile):
     n_tiles = tf.shape(tiles)[0]
     # compute which rois are contained in which tiles
     rois = tf.expand_dims(rois, axis=0)  # shape [1, n_rois, 4]
     rois = tf.tile(rois, [n_tiles, 1, 1])  # shape [n_tiles, n_rois, 4]
     is_roi_in_tile = tf.map_fn(lambda tiles_rois: boxintersect(*tiles_rois), (tiles, rois), dtype=bool)  # shape [n_tiles, n_rois]
-    rois, overflow = batch_filter_by_bool(rois, is_roi_in_tile, max_per_tile)
+    rois, overflow = filter_rois_by_bool2(rois, is_roi_in_tile, max_per_tile)
     return rois, overflow
 
 
 # rois shape [batch, n_rois, 4] coordinates (x1, y1, x2, y2) in aerial image coordinates
 # output: shape [batch, max_per_tile, 4] in aerial image coordinates. Roi list padded with empty ROIs.
-def remove_empty_rois(rois, max_per_tile):
+def compact_non_empty_rois(rois, max_per_tile):
     is_non_empty_roi = tf.logical_not(find_empty_rois(rois))
-    rois, overflow = batch_filter_by_bool(rois, is_non_empty_roi, max_per_tile)
+    rois, overflow = filter_rois_by_bool2(rois, is_non_empty_roi, max_per_tile)
     return rois, overflow
 
 
@@ -390,7 +428,7 @@ def remove_empty_rois(rois, max_per_tile):
 #         relative coordinates in which tile width = 1.0
 # Assumes all tiles have the same size tile_size
 def rois_in_tiles_relative(tiles, rois, tile_size, max_per_tile, assert_on_overflow=True):
-    rois, overflow = remove_non_intersecting_rois(tiles, rois, max_per_tile)  # [n_tiles, max_per_tile, 4]
+    rois, overflow = assign_rois_to_intersecting_tiles(tiles, rois, max_per_tile)  # [n_tiles, n_rois, 4]
     if assert_on_overflow:
         with tf.control_dependencies([tf.assert_non_positive(overflow,
                                      message="ROI per tile overflow. Set MAX_TARGET_ROIS_PER_TILE to a larger value.")]):
@@ -399,14 +437,17 @@ def rois_in_tiles_relative(tiles, rois, tile_size, max_per_tile, assert_on_overf
     is_roi_empty = tf.stack([is_roi_empty, is_roi_empty, is_roi_empty, is_roi_empty], axis=-1)
     tiles = tf.expand_dims(tiles, axis=1)  # force broadcasting on correct axis
     tile_x1, tile_y1, tile_x2, tile_y2 = tf.unstack(tiles, axis=2)  # shape [n_tiles, 1]
-    roi_x1, roi_y1, roi_x2, roi_y2 = tf.unstack(rois, axis=2)  # shape [n_tiles, max_per_tile]
-    roi_x1 = (roi_x1 - tile_x1) / tile_size  # shapes [n_tiles, max_per_tile] x [n_tiles] broadcast
+    roi_x1, roi_y1, roi_x2, roi_y2 = tf.unstack(rois, axis=2)  # shape [n_tiles, n_rois]
+    roi_x1 = (roi_x1 - tile_x1) / tile_size  # shapes [n_tiles, n_rois] x [n_tiles] broadcast
     roi_x2 = (roi_x2 - tile_x1) / tile_size
     roi_y1 = (roi_y1 - tile_y1) / tile_size
     roi_y2 = (roi_y2 - tile_y1) / tile_size
-    rois = tf.stack([roi_x1, roi_y1, roi_x2, roi_y2], axis=-1)  # shape [n_tiles, max_per_tile, 4]
+    rois = tf.stack([roi_x1, roi_y1, roi_x2, roi_y2], axis=-1)  # shape [n_tiles, n_rois, 4]
     # replace empty ROIs by (0,0,0,0) for clarity
-    return tf.where(is_roi_empty, tf.zeros_like(rois), rois)
+    rois = tf.where(is_roi_empty, tf.zeros_like(rois), rois)
+    # since this function is used in Datasets, always pad the number of ROIs to max_per_tile so that ROIs can be batched
+    rois = tf.pad(rois, [[0, 0], [0, max_per_tile - tf.shape(rois)[1]], [0, 0]])  # shape [n_tiles, max_per_tile, 4]
+    return rois
 
 
 class IOUCalculator(object):
@@ -415,7 +456,7 @@ class IOUCalculator(object):
     def __iou_tile_coordinate(x, tile_size):
         """Replicate a number across a bitmap of size tile_size"""
 
-        xx = tf.cast(tf.round(x), dtype=tf.int16)
+        xx = tf.cast(tf.round(x), dtype=tf.int32)  # TPU change, used to be int16
         xx = tf.expand_dims(xx, axis=-1)
         xx = tf.tile(xx, [1, 1, tile_size])
         xx = tf.expand_dims(xx, axis=2)
@@ -425,9 +466,9 @@ class IOUCalculator(object):
     @staticmethod
     def __iou_gen_linmap(batch, n, tile_size):
         """Creates two bitmaps filled with numbers increasing in X and Y direction.
-        This trick makes it easier to draw filled rectangles usinf tf.less and tf.greater."""
+        This trick makes it easier to draw filled rectangles using tf.less and tf.greater."""
 
-        row = tf.cast(tf.linspace(0.0, (tile_size - 1) * 1.0, tile_size), dtype=tf.int16)
+        row = tf.range(tile_size, dtype=tf.int32)  # TPU change, used to be int16
         linmap = tf.tile([row], [tile_size, 1])
         linmap = tf.tile([linmap], [n, 1, 1])
         linmap = tf.tile([linmap], [batch, 1, 1, 1])  # shape [batch, n, SIZE, SIZE]
@@ -442,8 +483,8 @@ class IOUCalculator(object):
         x2tile = cls.__iou_tile_coordinate(x2, tile_size)
         y1tile = cls.__iou_tile_coordinate(y1, tile_size)
         y2tile = cls.__iou_tile_coordinate(y2, tile_size)
-        zeros = tf.zeros_like(linmap, dtype=tf.uint8)
-        ones = tf.ones_like(linmap, dtype=tf.uint8)
+        zeros = tf.zeros_like(linmap, dtype=tf.int32)  # TPU change, used to be uint8
+        ones = tf.ones_like(linmap, dtype=tf.int32)  # TPU change, used to be uint8
         mapx = tf.where(tf.greater_equal(linmap, x1tile), ones, zeros)
         mapx = tf.where(tf.less(linmap, x2tile), mapx, zeros)
         mapy = tf.where(tf.greater_equal(linmap, y1tile), ones, zeros)
@@ -454,7 +495,7 @@ class IOUCalculator(object):
 
 
     @classmethod
-    def batch_intersection_over_union(cls, rects1, rects2, tile_size):
+    def batch_intersection_over_union(cls, rects1, rects2, tile_size, iou_batch=None):
         """Computes the intersection over union of two sets of rectangles.
         The actual computation is:
             intersection_area(union(rects1), union(rects2)) / union_area(rects1, rects2)
@@ -466,29 +507,44 @@ class IOUCalculator(object):
             rects2: ground truth rectangles, shape [batch, n, 4] with coordinates x1, y1, x2, y2
                 The size of the rectangles is [x2-x1, y2-y1].
             tile_size: size of the images where the rectangles apply (also size of internal bitmaps)
+            iou_batch: this operation is memory intensive so it can automatically split batches into
+                       smaller batches of size iou_batch. Default None.
 
         Returns:
             An array of shape [batch]. Use batch_mean() to correctly average it.
             Returns 1 in cases in the batch where both rects1 and rects2 contain
             no rectangles (correctly detected nothing when there was nothing to detect).
         """
-        batch = tf.shape(rects1)[0]
-        n1 = tf.shape(rects1)[1]  # number of rectangles per batch element in rect1
-        n2 = tf.shape(rects2)[1]  # number of rectangles per batch element in rect2
-        linmap1 = cls.__iou_gen_linmap(batch, n1, tile_size)
-        linmap2 = cls.__iou_gen_linmap(batch, n2, tile_size)
-        map1 = cls.__iou_gen_rectmap(linmap1, rects1, tile_size)  # shape [batch, n, tile_size, tile_size]
-        map2 = cls.__iou_gen_rectmap(linmap2, rects2, tile_size)  # shape [batch, n, tile_size, tile_size]
-        union_all = tf.concat([map1, map2], axis=1)
-        union_all = tf.reduce_any(union_all, axis=1)
-        union1 = tf.reduce_any(map1, axis=1)  # shape [batch, SIZE, SIZE]
-        union2 = tf.reduce_any(map2, axis=1)  # shape [batch, SIZE, SIZE]
-        intersect = tf.logical_and(union1, union2)  # shape [batch, SIZE, SIZE]
-        union_area = tf.reduce_sum(tf.cast(union_all, tf.float32), axis=[1, 2])  #  can still be empty because of rectangle cropping
-        safe_union_area = tf.where(tf.equal(union_area, 0.0), tf.ones_like(union_area), union_area)
-        inter_area = tf.reduce_sum(tf.cast(intersect, tf.float32), axis=[1, 2])
-        safe_inter_area = tf.where(tf.equal(union_area, 0.0), tf.ones_like(inter_area), inter_area)
-        iou = safe_inter_area / safe_union_area  # returns 0 even if the union is null
+
+        def step(rects1, rects2):
+            batch = tf.shape(rects1)[0]
+            n1 = tf.shape(rects1)[1]  # number of rectangles per batch element in rect1
+            n2 = tf.shape(rects2)[1]  # number of rectangles per batch element in rect2
+            linmap1 = cls.__iou_gen_linmap(batch, n1, tile_size)
+            linmap2 = cls.__iou_gen_linmap(batch, n2, tile_size)
+            map1 = cls.__iou_gen_rectmap(linmap1, rects1, tile_size)  # shape [batch, n, tile_size, tile_size]
+            map2 = cls.__iou_gen_rectmap(linmap2, rects2, tile_size)  # shape [batch, n, tile_size, tile_size]
+            union_all = tf.concat([map1, map2], axis=1)
+            union_all = tf.reduce_any(union_all, axis=1)
+            union1 = tf.reduce_any(map1, axis=1)  # shape [batch, SIZE, SIZE]
+            union2 = tf.reduce_any(map2, axis=1)  # shape [batch, SIZE, SIZE]
+            intersect = tf.logical_and(union1, union2)  # shape [batch, SIZE, SIZE]
+            union_area = tf.reduce_sum(tf.cast(union_all, tf.float32), axis=[1, 2])  #  can still be empty because of rectangle cropping
+            safe_union_area = tf.where(tf.equal(union_area, 0.0), tf.ones_like(union_area), union_area)
+            inter_area = tf.reduce_sum(tf.cast(intersect, tf.float32), axis=[1, 2])
+            safe_inter_area = tf.where(tf.equal(union_area, 0.0), tf.ones_like(inter_area), inter_area)
+            iou = safe_inter_area / safe_union_area  # returns 0 even if the union is null
+            return iou
+
+        # If set, iou_batch must divide the batch size of rect1 and rect2
+        batch_size = rects1.get_shape()[0]  # Need the defined static shape here
+        if iou_batch is None:
+            iou_batch = batch_size  # normal batch size, no splitting
+        rects1 = tf.reshape(rects1, [-1, iou_batch, tf.shape(rects1)[1], 4])
+        rects2 = tf.reshape(rects2, [-1, iou_batch, tf.shape(rects2)[1], 4])
+        # special on TPU: parallel_iterations=1
+        iou = tf.map_fn(lambda rects1__rects2: step(*rects1__rects2), (rects1, rects2), parallel_iterations=1, dtype=tf.float32)
+        iou = tf.reshape(iou, [batch_size])
         return iou
 
 
@@ -501,6 +557,11 @@ class IOUCalculator(object):
         there was something to detect. In the rare case where the result would be 0/0,
         the return value is 1 which is not really correct but should be rare and offset
         a further average of batch_mean() results only a little.
+
+        The average is computed using only batch elements with ROIs (detected or ground truth).
+        Removing correct non-detections (tiles with no planes where nothing was detected) was
+        a deliberate decision to make this metric more precise. False detections will still
+        be taken into account and lower the average.
 
         Args:
             ious: shape[batch]
@@ -517,23 +578,25 @@ class IOUCalculator(object):
         return safe_m/safe_n
 
 
-def compute_safe_IOU(target_rois, detected_rois, detected_rois_overflow, tile_size):
+def compute_safe_IOU(target_rois, detected_rois, detected_rois_overflow, tile_size, iou_batch):
     """Computes the Intersection Over Union (IOU) of a batch of detected boxes
     against a batch of target boxes. Logs a message if a problem occurs."""
 
-    iou_accuracy = IOUCalculator.batch_intersection_over_union(detected_rois * tile_size, target_rois * tile_size, tile_size=tile_size)
-    iou_accuracy_overflow = tf.greater(tf.reduce_sum(detected_rois_overflow), 0)
+    iou_accuracy = IOUCalculator.batch_intersection_over_union(detected_rois * tile_size, target_rois * tile_size, tile_size, iou_batch)
+    iou_accuracy_overflow = tf.greater(detected_rois_overflow, 0)
     # check that we are not overflowing the tensor size. Issue a warning if we are. This should only happen at
     # the beginning of the training with a completely uninitialized network.
-    iou_accuracy = tf.cond(iou_accuracy_overflow,
-                           lambda: tf.Print(iou_accuracy, [detected_rois_overflow],
-                                            summarize=250, message="ROI tensor overflow in IOU computation. "
-                                                                   "The computed IOU is not correct and will "
-                                                                   "be reported as 0. This can be normal in initial "
-                                                                   "training iteration when all weights are random. "
-                                                                   "Increase MAX_DETECTED_ROIS_PER_TILE to avoid."),
-                           lambda: tf.identity(iou_accuracy))
-    iou_accuracy = IOUCalculator.batch_mean(iou_accuracy)
+
+    # disabled on TPU
+    # iou_accuracy = tf.cond(iou_accuracy_overflow,
+    #                        lambda: tf.Print(iou_accuracy, [detected_rois_overflow],
+    #                                         summarize=250, message="ROI tensor overflow in IOU computation. "
+    #                                                                "The computed IOU is not correct and will "
+    #                                                                "be reported as 0. This can be normal in initial "
+    #                                                                "training iteration when all weights are random. "
+    #                                                                "Increase MAX_DETECTED_ROIS_PER_TILE to avoid."),
+    #                        lambda: tf.identity(iou_accuracy))
+    # iou_accuracy = IOUCalculator.batch_mean(iou_accuracy)
     # set iou_accuracy to 0 if there has been any overflow in its computation
     iou_accuracy = tf.where(iou_accuracy_overflow, tf.zeros_like(iou_accuracy), iou_accuracy)
     return iou_accuracy

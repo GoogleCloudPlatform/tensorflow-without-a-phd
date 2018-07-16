@@ -62,23 +62,35 @@ def model_core_squeezenet12(x, mode, params, info):
 def model_core_squeezenet17(x, mode, params, info):
     y, info = layer.conv2d_batch_norm_relu_dropout_l(x, mode, params, info, filters=128, kernel_size=3, strides=1)
     y, info = layer.sqnet_expand(y, mode, params, info, 2*64)
-    y, info = layer.maxpool_l(y, info)  # output 128x128
+
+    # TEST DEBUG
+    #y, info = layer.maxpool_l(y, info)  # output 128x128
+
     #y, info = layer.sqnet_squeeze_pool(y, mode, params, info, 80)
     y, info = layer.sqnet_squeeze(y, mode, params, info, 80)
     y, info = layer.sqnet_expand(y, mode, params, info, 2*96)
-    y, info = layer.maxpool_l(y, info)  # output 64x64
+
+    # TEST DEBUG
+    #y, info = layer.maxpool_l(y, info)  # output 64x64
+
     #y, info = layer.sqnet_squeeze_pool(y, mode, params, info, 104)
     y, info = layer.sqnet_squeeze(y, mode, params, info, 104)
     y, info = layer.sqnet_expand(y, mode, params, info, 2*112)
     y, info = layer.sqnet_squeeze(y, mode, params, info, 120)
     y, info = layer.sqnet_expand(y, mode, params, info, 2*128)
-    y, info = layer.maxpool_l(y, info)  # output 32x32
+
+    # TEST DEBUG
+    #y, info = layer.maxpool_l(y, info)  # output 32x32
+
     #y, info = layer.sqnet_squeeze_pool(y, mode, params, info, 120)
     y, info = layer.sqnet_squeeze(y, mode, params, info, 120)
     y, info = layer.sqnet_expand(y, mode, params, info, 2*112)
     y, info = layer.sqnet_squeeze(y, mode, params, info, 104)
     y, info = layer.sqnet_expand(y, mode, params, info, 2*96)
-    y, info = layer.maxpool_l(y, info)  # output 16x16
+
+    # TEST DEBUG
+    #y, info = layer.maxpool_l(y, info)  # output 16x16
+
     #y, info = layer.sqnet_squeeze_pool(y, mode, params, info, 88)
     y, info = layer.sqnet_squeeze(y, mode, params, info, 88)
     y, info = layer.sqnet_expand(y, mode, params, info, 2*80)
@@ -172,6 +184,7 @@ def model_core_configurable_squeezenet(x, mode, params, info):
 
     return y, info
 
+
 def no_model_fn(features, labels, mode, params):
     X = tf.to_float(features["image"]) / 255.0 # input image format is uint8 with range 0 to 255
     Y = tf.reduce_mean(X, axis=(1, 2))
@@ -192,6 +205,18 @@ def no_model_fn(features, labels, mode, params):
         export_outputs={'smth': tf.estimator.export.PredictOutput({"smth": smth})}
     )
 
+
+def metrics_fn(position_loss, size_loss, obj_loss, mistakes, target_rois, detected_rois, detected_rois_overflow):
+    iou_accuracy = box.compute_safe_IOU(target_rois, detected_rois, detected_rois_overflow, settings.TILE_SIZE, settings.IOU_BATCH_SIZE)
+    eval_metrics = {"position_error": tf.metrics.mean(position_loss),
+                    "size_error": tf.metrics.mean(size_loss),
+                    "plane_cross_entropy_error": tf.metrics.mean(obj_loss),
+                    "YOLO_mistakes": tf.metrics.mean(mistakes),
+                    'IOU': tf.metrics.mean(iou_accuracy)
+    }
+    return eval_metrics
+
+
 def model_fn(features, labels, mode, params):
     """The model, with loss, metrics and debug summaries"""
 
@@ -205,10 +230,10 @@ def model_fn(features, labels, mode, params):
 
     # The model itself is here
     #Y, info = model_core_squeezenet12(X, mode, params, info)
-    #Y, info = model_core_squeezenet17(X, mode, params, info)
+    Y, info = model_core_squeezenet17(X, mode, params, info)
     #Y, info = model_core_darknet(X, mode, params, info)
     #Y, info = model_core_darknet17(X, mode, params, info)
-    Y, info = model_core_configurable_squeezenet(X, mode, params, info)
+    #Y, info = model_core_configurable_squeezenet(X, mode, params, info)
 
     # YOLO head: predicts bounding boxes around airplanes
     box_x, box_y, box_w, box_c, box_c_logits, info = layer.YOLO_head(Y, mode, params, info, grid_nn, cell_n)
@@ -232,7 +257,7 @@ def model_fn(features, labels, mode, params):
     detected_rois = tf.stack([box_x, box_y, detected_w], axis=-1)  # shape [batch, GRID_N, GRID_N, CELL_B, 3]
     detected_rois = box.grid_cell_to_tile_coords(detected_rois, grid_nn, settings.TILE_SIZE) / settings.TILE_SIZE
     detected_rois = tf.reshape(detected_rois, [-1, grid_nn*grid_nn*cell_n, 4])
-    detected_rois, detected_rois_overflow = box.remove_empty_rois(detected_rois, settings.MAX_DETECTED_ROIS_PER_TILE)
+    detected_rois, detected_rois_overflow = box.compact_non_empty_rois(detected_rois, settings.MAX_DETECTED_ROIS_PER_TILE)
 
     loss = train_op = eval_metrics = None
     if mode != tf.estimator.ModeKeys.PREDICT:
@@ -251,11 +276,10 @@ def model_fn(features, labels, mode, params):
 
         # Mistakes and correct detections for visualisation and debugging.
         # This is computed against the ground truth boxes assigned to YOLO grid cells.
-        # Disabled for TPU
-        # mistakes, size_correct, position_correct, all_correct = box.compute_mistakes(box_x, box_y,
-        #                                                                              box_w, box_c_sim,
-        #                                                                              target_x, target_y,
-        #                                                                              target_w, target_is_plane, grid_nn)
+        mistakes, size_correct, position_correct, all_correct = box.compute_mistakes(box_x, box_y,
+                                                                                     box_w, box_c_sim,
+                                                                                     target_x, target_y,
+                                                                                     target_w, target_is_plane, grid_nn)
 
         # Debug image for logging in Tensorboad.
         # Disabled for TPU
@@ -265,8 +289,9 @@ def model_fn(features, labels, mode, params):
 
         # IOU (Intersection Over Union) accuracy
         # IOU computation removed from training mode because it used an op not yet supported with MirroredStrategy
-        if mode == tf.estimator.ModeKeys.EVAL:
-            iou_accuracy = box.compute_safe_IOU(target_rois, detected_rois, detected_rois_overflow, settings.TILE_SIZE)
+        # TPU: moved this to metrics_fn
+        # if mode == tf.estimator.ModeKeys.EVAL:
+        #    iou_accuracy = box.compute_safe_IOU(target_rois, detected_rois, detected_rois_overflow, settings.TILE_SIZE, settings.IOU_BATCH_SIZE)
 
         # Improvement ideas and experiment results
         # 1) YOLO trick: take square root of predicted size for loss so as not to drown errors on small boxes: tested, no benefit
@@ -279,38 +304,35 @@ def model_fn(features, labels, mode, params):
         # 8) TODO: add tile rotations, tile color inversion (data augmentation)
 
         # Loss function
-        position_loss = tf.reduce_mean(target_is_plane_float * (tf.square(box_x - target_x) + tf.square(box_y - target_y)))
-        size_loss = tf.reduce_mean(target_is_plane_float * tf.square(box_w - target_w) * 2)
-        obj_loss = tf.losses.softmax_cross_entropy(target_is_plane_onehot, box_c_logits)
+        position_loss = target_is_plane_float * (tf.square(box_x - target_x) + tf.square(box_y - target_y))
+        size_loss = target_is_plane_float * tf.square(box_w - target_w) * 2
+        obj_loss = tf.losses.softmax_cross_entropy(target_is_plane_onehot, box_c_logits, reduction=tf.losses.Reduction.NONE)
 
         # YOLO trick: weights the different losses differently
         loss_weight_total = (params['lw1'] + params['lw2'] + params['lw3']) * 1.0  # 1.0 to force conversion to float
         w_obj_loss = obj_loss*(params['lw1'] / loss_weight_total)
         w_position_loss = position_loss*(params['lw2'] / loss_weight_total)
         w_size_loss = size_loss*(params['lw3'] / loss_weight_total)
-        loss = w_position_loss + w_size_loss + w_obj_loss
+        loss = tf.reduce_mean(w_position_loss + w_size_loss + w_obj_loss)
 
         # average number of mistakes per image
         # Disabled for TPU
         # nb_mistakes = tf.reduce_sum(mistakes)
 
         lr = learn_rate_decay(tf.train.get_or_create_global_step(), params)
-        # optimizer = tf.train.AdamOptimizer(lr)
-        # train_op = tf.contrib.training.create_train_op(loss, optimizer)
-        # TPU removed AdamOptimizer - see why, try MomentumOptimizer
-        # TPU removed create_train_op - see how to make batch norm and UPDATE_OPS work again
-        optimizer = tf.train.GradientDescentOptimizer(lr)
+        optimizer = tf.train.AdamOptimizer(lr)
         if params['use_tpu']:
             optimizer = tf.contrib.tpu.CrossShardOptimizer(optimizer)
-        train_op = optimizer.minimize(loss, tf.train.get_or_create_global_step())
+        train_op = tf.contrib.training.create_train_op(loss, optimizer)
+
+        #train_op = tf.Print(train_op, [w_obj_loss.get_shape(), w_size_loss.get_shape()], "DBG SHAPE OBJ_LOSS: ", summarize=10)
 
         if mode == tf.estimator.ModeKeys.EVAL:
             # metrics removed from training mode because they are not yet supported with MirroredStrategy
-            eval_metrics = {"position_error": tf.metrics.mean(w_position_loss),
-                            "size_error": tf.metrics.mean(w_size_loss),
-                            "plane_cross_entropy_error": tf.metrics.mean(w_obj_loss),
-        #                    "mistakes": tf.metrics.mean(nb_mistakes),  # disabled for TPU
-                            'IOU': tf.metrics.mean(iou_accuracy)}
+            # Different metrics for TPUs
+            eval_metrics = (metrics_fn, [w_position_loss, w_size_loss, w_obj_loss, mistakes,
+                                         target_rois, detected_rois, detected_rois_overflow])
+            #eval_metrics = metrics_fn(w_position_loss, w_size_loss, w_obj_loss, iou_accuracy, mistakes)
         else:
             eval_metrics = None
 
@@ -328,7 +350,7 @@ def model_fn(features, labels, mode, params):
 
     return tf.contrib.tpu.TPUEstimatorSpec(
         mode=mode,
-        predictions={"rois":predicted_rois, "rois_confidence": predicted_c},  # name these fields as you like
+        predictions={"rois": predicted_rois, "rois_confidence": predicted_c},  # name these fields as you like
         loss=loss,
         train_op=train_op,
         eval_metrics=eval_metrics,
