@@ -294,6 +294,11 @@ def decode_json_py(str):
 
 def decode_image(img_bytes):
     pixels = tf.image.decode_image(img_bytes, channels=3)
+
+    ### DEBUG TEST, cut small slice from image
+    pixels = tf.slice(pixels, [0, 0, 0], [settings.TILE_SIZE, settings.TILE_SIZE, -1])
+    pixels = tf.reshape(pixels, [settings.TILE_SIZE, settings.TILE_SIZE, 3])
+
     return tf.cast(pixels, tf.uint8)
 
 
@@ -435,6 +440,7 @@ def read_tfrecord_features(example, yolo_cfg, rnd_hue, rnd_orientation):
     }
     parsed_example = tf.parse_single_example(example, features)
     pixels = decode_image(parsed_example["img"])
+
     rois = tf.sparse_tensor_to_dense(parsed_example["rois"])
     rois = tf.reshape(rois * settings.TILE_SIZE, [-1, 4])
     airport_name = parsed_example["name"]
@@ -454,6 +460,7 @@ def read_tfrecord_features(example, yolo_cfg, rnd_hue, rnd_orientation):
     one_tile = tf.expand_dims(tile, axis=0)
     # Compute ground truth ROIs
     target_rois = box.rois_in_tiles_relative(one_tile, rois, settings.TILE_SIZE, settings.MAX_TARGET_ROIS_PER_TILE)  # shape [n_tiles, MAX_TARGET_ROIS_PER_TILE, 4]
+
     target_rois = tf.reshape(target_rois, [settings.MAX_TARGET_ROIS_PER_TILE, 4])  # 4 for x1, y1, x2, y2
     # Compute ground truth ROIs assigned to YOLO grid cells
     yolo_target_rois = yolo_roi_attribution(tile, rois, yolo_cfg)
