@@ -63,15 +63,13 @@ def model_core_squeezenet17(x, mode, params, info):
     y, info = layer.conv2d_batch_norm_relu_dropout_l(x, mode, params, info, filters=128, kernel_size=3, strides=1)
     y, info = layer.sqnet_expand(y, mode, params, info, 2*64)
 
-    # TEST DEBUG
-    #y, info = layer.maxpool_l(y, info)  # output 128x128
+    y, info = layer.maxpool_l(y, info)  # output 128x128
 
     #y, info = layer.sqnet_squeeze_pool(y, mode, params, info, 80)
     y, info = layer.sqnet_squeeze(y, mode, params, info, 80)
     y, info = layer.sqnet_expand(y, mode, params, info, 2*96)
 
-    # TEST DEBUG
-    #y, info = layer.maxpool_l(y, info)  # output 64x64
+    y, info = layer.maxpool_l(y, info)  # output 64x64
 
     #y, info = layer.sqnet_squeeze_pool(y, mode, params, info, 104)
     y, info = layer.sqnet_squeeze(y, mode, params, info, 104)
@@ -79,8 +77,7 @@ def model_core_squeezenet17(x, mode, params, info):
     y, info = layer.sqnet_squeeze(y, mode, params, info, 120)
     y, info = layer.sqnet_expand(y, mode, params, info, 2*128)
 
-    # TEST DEBUG
-    #y, info = layer.maxpool_l(y, info)  # output 32x32
+    y, info = layer.maxpool_l(y, info)  # output 32x32
 
     #y, info = layer.sqnet_squeeze_pool(y, mode, params, info, 120)
     y, info = layer.sqnet_squeeze(y, mode, params, info, 120)
@@ -88,8 +85,7 @@ def model_core_squeezenet17(x, mode, params, info):
     y, info = layer.sqnet_squeeze(y, mode, params, info, 104)
     y, info = layer.sqnet_expand(y, mode, params, info, 2*96)
 
-    # TEST DEBUG
-    #y, info = layer.maxpool_l(y, info)  # output 16x16
+    y, info = layer.maxpool_l(y, info)  # output 16x16
 
     #y, info = layer.sqnet_squeeze_pool(y, mode, params, info, 88)
     y, info = layer.sqnet_squeeze(y, mode, params, info, 88)
@@ -212,7 +208,7 @@ def metrics_fn(position_loss, size_loss, obj_loss, mistakes, target_rois, detect
                     "size_error": tf.metrics.mean(size_loss),
                     "plane_cross_entropy_error": tf.metrics.mean(obj_loss),
                     "YOLO_mistakes": tf.metrics.mean(mistakes),
-                    'IOU': tf.metrics.mean(iou_accuracy)
+                    "IOU": tf.metrics.mean(iou_accuracy)
     }
     return eval_metrics
 
@@ -230,10 +226,10 @@ def model_fn(features, labels, mode, params):
 
     # The model itself is here
     #Y, info = model_core_squeezenet12(X, mode, params, info)
-    Y, info = model_core_squeezenet17(X, mode, params, info)
+    #Y, info = model_core_squeezenet17(X, mode, params, info)
     #Y, info = model_core_darknet(X, mode, params, info)
     #Y, info = model_core_darknet17(X, mode, params, info)
-    #Y, info = model_core_configurable_squeezenet(X, mode, params, info)
+    Y, info = model_core_configurable_squeezenet(X, mode, params, info)
 
     # YOLO head: predicts bounding boxes around airplanes
     box_x, box_y, box_w, box_c, box_c_logits, info = layer.YOLO_head(Y, mode, params, info, grid_nn, cell_n)
@@ -246,6 +242,8 @@ def model_fn(features, labels, mode, params):
     # TODO: refactor predicted_rois and predicted_c (or keep it to keep the conde compatible with confidence factor implem?)
     # with the current softmax implementation, confidence factors are either 0 or 1.
     box_c_sim = tf.cast(tf.argmax(box_c, axis=-1), dtype=tf.float32)  # shape [batch, GRID_N,GRID_N,CELL_B]
+
+
     DETECTION_TRESHOLD = 0.5  # plane "detected" if predicted C>0.5
     detected_w = tf.where(tf.greater(box_c_sim, DETECTION_TRESHOLD), box_w, tf.zeros_like(box_w))
     # all rois with confidence factors
@@ -325,8 +323,6 @@ def model_fn(features, labels, mode, params):
             optimizer = tf.contrib.tpu.CrossShardOptimizer(optimizer)
         train_op = tf.contrib.training.create_train_op(loss, optimizer)
 
-        #train_op = tf.Print(train_op, [w_obj_loss.get_shape(), w_size_loss.get_shape()], "DBG SHAPE OBJ_LOSS: ", summarize=10)
-
         if mode == tf.estimator.ModeKeys.EVAL:
             # metrics removed from training mode because they are not yet supported with MirroredStrategy
             # Different metrics for TPUs
@@ -335,7 +331,6 @@ def model_fn(features, labels, mode, params):
             #eval_metrics = metrics_fn(w_position_loss, w_size_loss, w_obj_loss, iou_accuracy, mistakes)
         else:
             eval_metrics = None
-
 
         # Tensorboard summaries for debugging
         # disabled for TPU
