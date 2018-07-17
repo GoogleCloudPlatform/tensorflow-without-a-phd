@@ -294,11 +294,7 @@ def decode_json_py(str):
 
 def decode_image(img_bytes):
     pixels = tf.image.decode_image(img_bytes, channels=3)
-
-    ### DEBUG TEST, cut small slice from image
-    pixels = tf.slice(pixels, [0, 0, 0], [settings.TILE_SIZE, settings.TILE_SIZE, -1])
     pixels = tf.reshape(pixels, [settings.TILE_SIZE, settings.TILE_SIZE, 3])
-
     return tf.cast(pixels, tf.uint8)
 
 

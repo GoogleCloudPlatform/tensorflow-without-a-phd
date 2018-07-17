@@ -377,6 +377,10 @@ def filter_rois_by_bool(rois, mask, max_n):
 # Use filter_rois_by_bool2 until tf.top_k is made available for TPUs in TF 1.10.
 # Then switch the code to filter_rois_by_bool which is better.
 def filter_rois_by_bool2(rois, mask, max_n):
+    # TPU: it should be possible to make this work ...
+    # However, not having this line will only be slightly problematic for
+    # small GRID_N*GRIT_N*CELL_N settings where the filtered list will be padded unnecessarily.
+    # The normal setting is 16x16x2=512 which is much bigger than the typical max_n of 60 so truncation, not padding is applied.
     # max_n = tf.minimum(max_n, tf.shape(rois)[1])  # make sure we do not pad unnecessarily
 
     def uni_filter_rois_by_bool2(rois, mask):
@@ -538,6 +542,7 @@ class IOUCalculator(object):
 
         # If set, iou_batch must divide the batch size of rect1 and rect2
         batch_size = rects1.get_shape()[0]  # Need the defined static shape here
+
         if iou_batch is None:
             iou_batch = batch_size  # normal batch size, no splitting
         rects1 = tf.reshape(rects1, [-1, iou_batch, tf.shape(rects1)[1], 4])
