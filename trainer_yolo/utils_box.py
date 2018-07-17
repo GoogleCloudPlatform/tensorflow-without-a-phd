@@ -530,7 +530,7 @@ def compute_safe_IOU(target_rois, detected_rois, detected_rois_overflow, tile_si
                                                                    "training iteration when all weights are random. "
                                                                    "Increase MAX_DETECTED_ROIS_PER_TILE to avoid."),
                            lambda: tf.identity(iou_accuracy))
-    iou_accuracy = IOUCalculator.batch_mean(iou_accuracy)
+    #iou_accuracy = IOUCalculator.batch_mean(iou_accuracy)
     # set iou_accuracy to 0 if there has been any overflow in its computation
     iou_accuracy = tf.where(iou_accuracy_overflow, tf.zeros_like(iou_accuracy), iou_accuracy)
     return iou_accuracy

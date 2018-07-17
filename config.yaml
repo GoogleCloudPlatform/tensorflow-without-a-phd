@@ -18,5 +18,5 @@ trainingInput:
   #scaleTier: PREMIUM_1
 
   scaleTier: CUSTOM
-  masterType: complex_model_m_gpu
+  masterType: standard_p100
 
