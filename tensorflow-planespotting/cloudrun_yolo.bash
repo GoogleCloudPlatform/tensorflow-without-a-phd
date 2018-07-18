@@ -45,7 +45,7 @@ gcloud ml-engine jobs submit training airplane_tpu$N \
     -- \
     --tiledata "${TILEDATA}" \
     --hp-shuffle-buf 5000 \
-    --hp-lr2 2000 \
+    --hp-lr2 1000 \
     --hp-layers 17 \
     --hp-first-layer-filter-depth 128 \
     --hp-first-layer-filter-size 3 \

@@ -588,7 +588,7 @@ def compute_safe_IOU(target_rois, detected_rois, detected_rois_overflow, tile_si
     against a batch of target boxes. Logs a message if a problem occurs."""
 
     iou_accuracy = IOUCalculator.batch_intersection_over_union(detected_rois * tile_size, target_rois * tile_size, tile_size, iou_batch)
-    iou_accuracy_overflow = tf.greater(detected_rois_overflow, 0)
+    iou_accuracy_overflow = tf.greater(tf.reduce_sum(detected_rois_overflow), 0)
     # check that we are not overflowing the tensor size. Issue a warning if we are. This should only happen at
     # the beginning of the training with a completely uninitialized network.
 
@@ -601,9 +601,13 @@ def compute_safe_IOU(target_rois, detected_rois, detected_rois_overflow, tile_si
     #                                                                "training iteration when all weights are random. "
     #                                                                "Increase MAX_DETECTED_ROIS_PER_TILE to avoid."),
     #                        lambda: tf.identity(iou_accuracy))
-    # iou_accuracy = IOUCalculator.batch_mean(iou_accuracy)
+
+    batch_size = iou_accuracy.get_shape()[0]
+    iou_accuracy = IOUCalculator.batch_mean(iou_accuracy)
     # set iou_accuracy to 0 if there has been any overflow in its computation
     iou_accuracy = tf.where(iou_accuracy_overflow, tf.zeros_like(iou_accuracy), iou_accuracy)
+    # TPU special: must re-tile this number because batch size on TPU must be constant
+    iou_accuracy = tf.tile([iou_accuracy], [batch_size])
     return iou_accuracy
 
 
