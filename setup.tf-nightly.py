@@ -12,6 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# If you want to run training with tf-nightly on ML Engine
+# (or any other version not yet accessible through --runtime-version)
+# the config script is here. Rename this file from setup.tf-nightly.py
+# to setup.py and run your usual gcloud ml-engine command. ML Engine
+# will pip-install your requirements before starting your training code.
+
 import setuptools
 
 setuptools.setup(

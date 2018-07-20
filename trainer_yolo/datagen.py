@@ -1,4 +1,7 @@
-"""Licensed under the Apache License, Version 2.0 (the "License");
+"""
+Copyright 2018 Google LLC
+
+Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
@@ -11,7 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 _______________________________________________________________________
 
-Data generation for YOLO (You Look Only Once) detection model."""
+Data generation for YOLO (You Look Only Once) detection model.
+Utility data generation functions are here. You can also run this
+file directly as a script to convert large aerial pics with ROIs
+into 256x256 tiles with the ROIs adjusted accordingly. The resulting
+tiles will be stored in TFRecord format"""
 
 import os
 import sys

@@ -1,14 +1,27 @@
 #!/usr/bin/env bash
 
+# Copyright 2018 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
 CONFIG="config.yaml"
-#CONFIG="config-hptune-2.yaml"
+#CONFIG="config-hptune-classifier.yaml"
 BUCKET="gs://ml1-demo-martin"
-#BUCKET="gs://ml-eurowest1-martin"
 #DATA="gs://ml1-demo-martin/data/planesnet32K.bkg257K.pln88K.ppln88K.pklz2"
 DATA="gs://ml1-demo-martin/data/planesnet32K.pklz2"
 PROJECT="cloudml-demo-martin"
 REGION="us-central1"
-#REGION="euro-west1"
 
 # auto-incrementing run number padded with zeros to 3 digits
 NFILE="cloudrunN.txt"

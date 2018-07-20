@@ -1,14 +1,25 @@
 #!/usr/bin/env bash
 
-#CONFIG="config.yaml"
-CONFIG="config-distributed.yaml"
-#CONFIG="config-master-worker.yaml"
-#CONFIG="config-hptune-yolo1.yaml"
+# Copyright 2018 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+CONFIG="config.yaml"
+#CONFIG="config-distributed.yaml"
+#CONFIG="config-hptune-yolo.yaml"
 BUCKET="gs://ml1-demo-martin"
-DATA="gs://ml1-demo-martin/data/USGS_public_domain_airports"
-#TILEDATA="gs://ml1-demo-martin/data/USGS_public_domainTINY_airports2"
+#DATA="gs://ml1-demo-martin/data/USGS_public_domain_airports"
 TILEDATA="gs://ml1-demo-martin/data/USGS_public_domain_tiles100_x166_rnd_orient_airports_tfrecords2"
-#DATA="gs://ml1-demo-martin/data/USGS_public_domainTINY_airports"
 PROJECT="cloudml-demo-martin"
 REGION="us-central1"
 
@@ -41,7 +52,6 @@ gcloud ml-engine jobs submit training airplane$N \
     --hp-depth-increment 8 \
 
 #    --hp-dropout 0.0 \
-#    --hp-data-cache-n-epochs 2 \
 #    --hp-decay-type cosine-restarts \
 #    --hp-decay-restarts 0 \
 #    --hp-decay-restart-height 0.99
@@ -61,7 +71,7 @@ gcloud ml-engine jobs submit training airplane$N \
 #    --region ${REGION} \
 #    --module-name trainer_yolo.main \
 #    --package-path trainer_yolo \
-#    --runtime-version 1.8 \
+#    --runtime-version 1.9 \
 #    -- \
 #    --tiledata gs://ml1-demo-martin/data/USGS_public_domain_tiles100_airports_tfrecords \
 #    --hp-shuffle-buf 5000 \
@@ -82,7 +92,7 @@ gcloud ml-engine jobs submit training airplane$N \
 #    --region ${REGION} \
 #    --module-name trainer_yolo.main \
 #    --package-path trainer_yolo \
-#    --runtime-version 1.8 \
+#    --runtime-version 1.9 \
 #    -- \
 #    --tiledata gs://ml1-demo-martin/data/USGS_public_domain_tiles100_airports_tfrecords \
 #    --hp-shuffle-buf 5000 \
@@ -103,7 +113,7 @@ gcloud ml-engine jobs submit training airplane$N \
 #    --region ${REGION} \
 #    --module-name trainer_yolo.main \
 #    --package-path trainer_yolo \
-#    --runtime-version 1.8 \
+#    --runtime-version 1.9 \
 #    -- \
 #    --tiledata gs://ml1-demo-martin/data/USGS_public_domain_tiles100_airports_tfrecords \
 #    --hp-shuffle-buf 5000 \
