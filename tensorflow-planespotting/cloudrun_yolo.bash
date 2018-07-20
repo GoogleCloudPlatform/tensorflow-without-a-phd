@@ -19,7 +19,7 @@ BUCKET="gs://ml1-demo-martin"
 PROJECT="cloudml-demo-martin"
 REGION="us-central1"
 
-CONFIG="config.yaml"
+#CONFIG="config.yaml"
 #CONFIG="config-distributed.yaml"
 #CONFIG="config-hptune-yolo.yaml"
 #DATA="gs://planespotting-data-public/USGS_public_domain_photos"
