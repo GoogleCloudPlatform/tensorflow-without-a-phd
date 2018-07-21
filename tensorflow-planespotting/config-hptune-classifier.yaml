@@ -1,0 +1,111 @@
+# Copyright 2018 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+trainingInput:
+  scaleTier: BASIC-GPU
+  hyperparameters:
+    goal: MINIMIZE
+    hyperparameterMetricTag: loss
+    maxTrials: 50
+    maxParallelTrials: 10
+    params:
+      - parameterName: hp-lr2
+        type: INTEGER
+        minValue: 800
+        maxValue: 30000
+        scaleType: UNIT_LINEAR_SCALE
+      - parameterName: hp-filter-sizes
+        type: CATEGORICAL
+        categoricalValues: ['S', 'M']
+      - parameterName: hp-dense
+        type: INTEGER
+        minValue: 10
+        maxValue: 200
+        scaleType: UNIT_LINEAR_SCALE
+
+########
+# results with 3 convolutional layers (job plane64)
+#{
+#  "trialId": "50",
+#  "hyperparameters": {
+#    "hp-lr2": "832",
+#    "hp-filter-sizes": "S",
+#    "hp-dense": "72"
+#  },
+#  "finalMetric": {
+#    "trainingStep": "100000",
+#    "objectiveValue": 1.74609196186
+#  }
+#},
+#{
+#  "trialId": "28",
+#  "hyperparameters": {
+#    "hp-dense": "100",
+#    "hp-lr2": "879",
+#    "hp-filter-sizes": "S"
+#  },
+#  "finalMetric": {
+#    "trainingStep": "100000",
+#    "objectiveValue": 1.88658094406
+#  }
+#},
+#{
+#  "trialId": "30",
+#  "hyperparameters": {
+#    "hp-dense": "92",
+#    "hp-lr2": "902",
+#    "hp-filter-sizes": "S"
+#  },
+#  "finalMetric": {
+#    "trainingStep": "100000",
+#    "objectiveValue": 1.88950407505
+#  }
+#},
+#{
+#  "trialId": "1",
+#  "hyperparameters": {
+#    "hp-lr2": "6502",
+#    "hp-filter-sizes": "M",
+#    "hp-dense": "88"
+#  },
+#  "finalMetric": {
+#    "trainingStep": "100000",
+#    "objectiveValue": 1.89443397522
+#  }
+
+########
+# results with 4 convolutional layers (job plane65)
+#{
+#  "trialId": "39",
+#  "hyperparameters": {
+#    "hp-lr2": "849",
+#    "hp-filter-sizes": "S",
+#    "hp-dense": "169"
+#  },
+#  "finalMetric": {
+#    "trainingStep": "100000",
+#    "objectiveValue": 1.56040382385
+#  }
+#},
+#{
+#  "trialId": "36",
+#  "hyperparameters": {
+#    "hp-dense": "178",
+#    "hp-lr2": "804",
+#    "hp-filter-sizes": "S"
+#  },
+#  "finalMetric": {
+#    "trainingStep": "100000",
+#    "objectiveValue": 1.73306965828
+#  }

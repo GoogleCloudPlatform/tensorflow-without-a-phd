@@ -1,0 +1,54 @@
+# Copyright 2018 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+trainingInput:
+  scaleTier: BASIC-GPU
+  hyperparameters:
+    goal: MAXIMIZE
+    hyperparameterMetricTag: IOU
+    maxTrials: 72
+    maxParallelTrials: 9
+    params:
+      # layers = layers21 * 2 + 1
+      - parameterName: hp-layers21
+        type: INTEGER
+        minValue: 3
+        maxValue: 10
+        scaleType: UNIT_LINEAR_SCALE
+      # base_depth = base_depth5*5
+      - parameterName: hp-base-depth5
+        type: INTEGER
+        minValue: 3
+        maxValue: 15
+        scaleType: UNIT_LINEAR_SCALE
+      - parameterName: hp-dropout
+        type: DOUBLE
+        minValue: 0.0
+        maxValue: 0.5
+        scaleType: UNIT_LINEAR_SCALE
+      - parameterName: hp-lw3
+        type: DOUBLE
+        minValue: 1
+        maxValue: 100
+        scaleType: UNIT_LOG_SCALE
+      - parameterName: hp-lr0
+        type: DOUBLE
+        minValue: 0.001
+        maxValue: 0.01
+        scaleType: UNIT_LOG_SCALE
+      - parameterName: hp-lr2
+        type: DOUBLE
+        minValue: 1000
+        maxValue: 10000
+        scaleType: UNIT_LOG_SCALE

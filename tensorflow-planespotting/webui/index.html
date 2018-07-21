@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<!--
+ Copyright 2018 Google LLC
+
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+-->
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Plane spotting</title>
+    <link rel="stylesheet" href="style.css" />
+
+    <!-- application scripts, need DOM ready -->
+    <script defer src="globals.js"></script>
+    <script defer src="canvas.js"></script>
+    <script defer src="dash.js"></script>
+    <script defer src="dragscroll.js"></script>
+
+    <!-- Google API scripts -->
+    <script defer src="googleapiaccess.js"></script>
+    <script defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCS9dHO2mN7iHFnWCUQAQF5Oh_8rItiQoM&libraries=visualization,geometry&callback=initMap"></script>
+    <script defer src="https://apis.google.com/js/api.js?onload=handleClientLoad"></script>
+
+</head>
+
+<body>
+    <div id="container">
+        <div id="dashboard">
+            <div class="uiblock" >
+                <div class="title">ML Engine</div>
+                <button id="authorize-button" onclick="authorize()" style="display: none;">Authorize</button>
+                <button id="signout-button" onclick="signout()" style="display: none;">Sign Out</button>
+                <div class="msg" ng-bind="pubsub_status"></div>
+            </div>
+            <div class="uiblock">
+                <div class="title">Map capture</div>
+                <form name="airsel">
+                    <select name="sel" onchange="centerMapOnCode(document.airsel.sel.value)">
+                        <option value="">--> to airport on Google Maps</option>
+                        <option value="TLS">TLS Toulouse-Blagnac</option>
+                        <option value="LAX">LAX Los Angeles</option>
+                        <option value="SFO">SFO San Francisco</option>
+                        <option value="SFO2">SFO San Francisco 2</option>
+                        <option value="CDG">CDG Paris Roissy</option>
+                        <option value="LBG">LBG Paris Le Bourget</option>
+                        <option value="LBG2">LBG Paris Le Bourget 2</option>
+                        <option value="SEA">SEA Seattle Tacoma</option>
+                        <option value="SEA2">SEA Seattle Tacoma 2</option>
+                        <option value="NRT">NRT Tokyo Narita</option>
+                        <option value="ICN">ICN Seoul Incheon</option>
+                        <option value="DMA">DMA Davis Mothan Boneyard</option>
+
+                        <option value="">--> training pictures</option>
+                        <option value="train_ATL">ATL Atlanta</option>
+                        <option value="train_AUS">AUS Austin</option>
+                        <option value="train_BHM">BHM Birmingham, Alabama</option>
+                        <option value="train_BOS">BOS Boston</option>
+                        <option value="train_BWI">BWI Baltimore</option>
+                        <option value="train_CLT">CLT Charlotte</option>
+                        <option value="train_CVG">CVG Cincinnati</option>
+                        <option value="train_DSM">DSM Des Moines</option>
+                        <option value="train_EYW">EYW Key West, Florida</option>
+                        <option value="train_FAT">FAT Fresno</option>
+                        <option value="train_FLG">FLG Flagstaff</option>
+                        <option value="train_FLL">FLL Fort Lauderdale</option>
+                        <option value="train_FWA">FWA Fort Wayne</option>
+                        <option value="train_IAD">IAD Dulles</option>
+                        <option value="train_IAH">IAH Houston</option>
+                        <option value="train_IND">IND Indianapolis</option>
+                        <option value="train_MDW">MDW Chicago Midway</option>
+                        <option value="train_MIA">MIA Miami</option>
+                        <option value="train_OAK">OAK Oakland</option>
+                        <option value="train_OHR">OHR Chicago O'Hare</option>
+                        <option value="train_PHX">PHX Phoenix</option>
+                        <option value="train_SAN">SAN San Antonio</option>
+                        <option value="train_SEA">SEA Seattle</option>
+                        <option value="train_SFO">SFO San Francisco</option>
+                        <option value="train_SJC">SJC San Jose</option>
+
+                        <option value="">--> test pictures</option>
+                        <option value="test_DEN">DEN Denver</option>
+                        <option value="test_LAX">LAX Los Angeles</option>
+                        <option value="test_MSY">MSY New Orleans</option>
+                        <option value="test_TUC1l">TUC Tucson 1l</option>
+                        <option value="test_TUC1s">TUC Tucson 1s</option>
+                        <option value="test_TUC2s">TUC Tucson 2s</option>
+                        <option value="test_TUC3s">TUC Tucson 3s</option>
+                        <option value="test_TUC4s">TUC Tucson 4s</option>
+
+                        <option value="">--> boneyard pictures</option>
+                        <option value="train_DMA">DMA Davis Mothan Boneyard</option>
+                        <option value="train_DMA2">DMA Davis Mothan Boneyard 2</option>
+                    </select>
+                </form>
+                <canvas id="cap"></canvas>
+            </div>
+            <div class="uiblock">
+                <div class="title">ML Engine REST call</div>
+                <button id="analyze-button" onclick="analyze()" style="display:none;">Analyze</button>
+                <div class="console" id="sap"></div>
+                <form name="modsel">
+                    <select name="model">
+                        <option value="plane_jpeg_scan_100_200_300_400_600_900/versions/v00">20x20 tile classifier v0</option>
+                        <option value="plane_jpeg_scan_100_200_300_400_600_900/versions/v02">20x20 tile regularized accuracy 99.6%</option>
+                        <option value="plane_jpeg_scan_100_200_300_400_600_900/versions/v7_256x256">20x20 tile classifier best - more data</option>
+                        <option value="jpeg_yolo_256x256/versions/v5">YOLO detection 16x16x2 swarm optimized, 12 layers</option>
+                        <option value="jpeg_yolo_256x256/versions/v19">YOLO detection 16x16x2 swarm optimized, 12 layers, data augmentation</option>
+                        <option value="jpeg_yolo_256x256/versions/v20">YOLO detection 16x16x2, swarm optimized, 17 layers, data augmentation</option>
+                        <option value="jpeg_yolo_256x256/versions/v795">YOLO detection 16x16x2 swarm optimized, 12 layers, data augmentation+ v795</option>
+                        <option value="jpeg_yolo_256x256/versions/v874" selected>YOLO detection v874, best fast, 16x16x2 swarm optimized, 12 layers, data augmentation+, cosine restarts</option>
+                        <option value="jpeg_yolo_256x256/versions/v814">YOLO detection v814, best compromise, 16x16x2, swarm optimized, 17 layers, data augmentation+, light dropout</option>
+                        <option value="jpeg_yolo_256x256/versions/v806b">YOLO 17L least false positives, many missed planes v806b</option>
+                        <option value="jpeg_yolo_256x256/versions/v818dark">YOLO 17L best detection, many false positives v818dark</option>
+                        <option value="jpeg_yolo_256x256/versions/v875b">YOLO 17L v875b cosine restarts, good detection, quite a few false positives</option>
+                    </select>
+                </form>
+            </div>
+
+            <div class="uiblock">
+                <div class="title">JSON</div>
+                <div class="console" id="jap"></div>
+            </div>
+        </div>
+        <div id="map"></div>
+        <div id="imgmap" class="drag-scrollable"></div>
+        <div id="zoomctrl">
+            <div onclick="zoomIn()">+</div>
+            <div onclick="zoomOut()">-</div>
+        </div>
+        <div id="zone-container"><div id="zone"></div></div></div>
+    </div>
+</body>
+
+</html>

@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<!--
+ Copyright 2018 Google LLC
+
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+-->
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Planespotting Mark I</title>
+    <link rel="stylesheet" href="style.css" />
+    <script src="mark.js"></script>
+</head>
+<body>
+    <div id="container">
+        <img src="USGS_public_domain_airports/USGS_MIA.jpg" tabindex="0">
+        <a download="" href="" target="_blank" id="downloadlink"></a>
+        <div id="hud">
+            Click to add marker<br>
+            Click again to move marker<br>
+            Alt + Mouse wheel to resize<br>
+            Right click to delete<br>
+            Enter to save<br>
+            <br>
+            <form name="airsel">
+                Current: <select class="select" name="sel" id="sel" onchange="selectAirport(document.airsel.sel.value)"></select>
+            </form>
+            Markers: <span id="stats_nbmarkers"></span><br>
+            Min size: <span id="stats_minsz"></span><br>
+            Max size: <span id="stats_maxsz"></span><br>
+            <br>
+            On disk:<br>
+            Files: <span id="gstats_nbfiles"></span><br>
+            Markers: <span id="gstats_nbmarkers"></span><br>
+            Min size: <span id="gstats_minsz"></span><br>
+            Max size: <span id="gstats_maxsz"></span><br>
+        </div>
+    </div>
+</body>
+</html>
