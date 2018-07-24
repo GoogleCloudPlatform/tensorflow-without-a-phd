@@ -1,6 +1,10 @@
 ![flyer](img/flyer_lodern_convnets.jpg)
 # Airplane detection with Squeezenet and YOLO (You Look Only Once)
 
+**The planespotting model on this branch has been ported to train
+ on TPUs (Tensor Processing Units). To run it, follow the "prerequisites"
+ section below then run the [cloudrun_yolo.bash](cloudrun_yolo.bash) script.**
+
 ## Introduction
 
 This is a code sample for the talk "Tensorflow, deep learning and modern
