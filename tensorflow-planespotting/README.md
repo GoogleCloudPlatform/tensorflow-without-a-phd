@@ -50,7 +50,7 @@ This bucket is where your trained model will be stored.
 
 Now edit the cloudrun_yolo.bash file and fill in your bucket name, project name
 and region.  You are ready to train. The default training configuration uses a single
-NVIDIA P100 GPU. If you are looking for the TPU version, please switch to the "tpu" branch.
+8 core TPU. If you want to train on GPUs please switch to the "master" branch.
 
  ```bash
  # assuming the current directory is tensorflow-planespotting
