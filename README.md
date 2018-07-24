@@ -24,7 +24,7 @@ and engineering tips, tricks and best practices to build and train the neural ne
                      <a href="https://youtu.be/u4alGiomYP4">video</a> |
                      <a href="https://docs.google.com/presentation/d/1TVixw6ItiZ8igjp6U17tcgoFrLSaHWQmMOwjlgQY9co/pub?slide=id.p">slides</a> |
                      <a href="https://codelabs.developers.google.com/codelabs/cloud-tensorflow-mnist/#0">codelab</a> |
-                     <a href="tree/master/tensorflow-mnist-tutorial">code</a><br/><br/></div>
+                     <a href="tensorflow-mnist-tutorial">code</a><br/><br/></div>
                      <p>The basics of building neural networks for software engineers. Neural weights and biases, activation functions, supervised learning and gradient descent.
                      Tips and best practices for efficient training: learning rate decay, dropout regularisation and the intricacies of overfitting. Dense and convolutional neural networks. This session starts with low-level
                      Tensorflow and also has a sample of high-level Tensorflow code using layers and Datasets. Code sample: MNIST handwritten digit recognition with 99% accuracy. Duration: 55 min</p></td>
