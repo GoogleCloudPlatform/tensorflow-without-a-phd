@@ -150,7 +150,7 @@ def main(argv):
     # gcloud ml-engine jobs submit training jobXXX --job-dir=... --ml-engine-args -- --user-args
     def str2bool(v): return v=='True'
     parser.add_argument('--job-dir', default="checkpoints", help='GCS or local path where to store training checkpoints')
-    parser.add_argument('--data', default="gs://planespotting-data-public/USGS_public_domain_photos", help='Path to training data folder containing full-scale aerial imagery (can be on Google cloud storage gs://...). Eval data should be in a folder with the same name and and _eval suffix.')
+    parser.add_argument('--data', default="", help='Path to training data folder containing full-scale aerial imagery (can be on Google cloud storage gs://...). Eval data should be in a folder with the same name and and _eval suffix.')
     parser.add_argument('--tiledata', default="", help='Path to training data folder containing image tiles (can be on Google cloud storage gs://...). Eval data should be in a folder with the same name and and _eval suffix.')
     parser.add_argument('--hp-iterations', default=25000, type=int, help='Hyperparameter: number of training iterations')
     parser.add_argument('--hp-batch-size', default=10, type=int, help='Hyperparameter: training batch size')

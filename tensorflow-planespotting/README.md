@@ -60,7 +60,7 @@ using this command line. The training will be done using publicly available data
 
 ```bash
 # assuming the current directory is tensorflow-planespotting
-python -m trainer_yolo.main
+python -m trainer_yolo.main --data gs://planespotting-data-public/USGS_public_domain_photos
 
 ```
 
