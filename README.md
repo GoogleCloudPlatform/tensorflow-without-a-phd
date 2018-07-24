@@ -54,7 +54,7 @@ and engineering tips, tricks and best practices to build and train the neural ne
         <td width="50%"><div align="center">
                   <a href="https://youtu.be/vaL1I2BD_xY">video</a> |
                   <a href="https://docs.google.com/presentation/d/19u0Tm0JHL5tpzyarLILvy4qLSuDBFNNx2hwSvZsFPI0/pub">slides</a> |
-                  code: soon<br/><br/></div>
+                  <a href="tensorflow-planespotting">code</a><br/><br/></div>
                   <p>Convolutional neural network architectures for image processing. Convnet basics, convolution filters and how to stack them. 
                   Learnings from the Inception model: modules with parallel convolutions, 1x1 convolutions. A simple modern convnet architecture: Squeezenet.
                   Convenets for detection: the YOLO (You Look Only Once) architecture. Full-scale model training and serving with Tensorflow's Estimator API on Google Cloud ML Engine.
@@ -92,17 +92,21 @@ and engineering tips, tricks and best practices to build and train the neural ne
 <table width="75%">
     <tr><td colspan="3">Quick access to all code samples:</td></tr>
     <tr>
-        <td width="33%">
+        <td width="25%">
                     <b><a href="tensorflow-mnist-tutorial">tensorflow-mnist-tutorial</a></b><br/>
                     dense and convolutional neural network tutorial
                 </td>
-        <td width="33%">
+        <td width="25%">
             <b><a href="tensorflow-rnn-tutorial">tensorflow-rnn-tutorial</a></b><br/>
             recurrent neural network tutorial
         </td>
-        <td width="33%">
+        <td width="25%">
             <b><a href="tensorflow-rl-pong">tensorflow-rl-pong</a></b><br/>
             "pong" with reinforcement learning
+        </td>
+        <td width="25%">
+            <b><a href="tensorflow-planespotting">tensorflow-planespotting</a></b><br/>
+            Airplane detection model
         </td>
     </tr>
 </table>
