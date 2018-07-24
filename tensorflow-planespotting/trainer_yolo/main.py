@@ -98,7 +98,7 @@ def start_training(output_dir, hparams, data, tiledata, **kwargs):
         return
 
     # Estimator configuration
-    export_latest = tf.estimator.LatestExporter(name="planesnet",
+    export_latest = tf.estimator.LatestExporter(name="planespotting",
                                                 serving_input_receiver_fn=serving_input_fn,
                                                 exports_to_keep=1)
 
@@ -150,17 +150,17 @@ def main(argv):
     # gcloud ml-engine jobs submit training jobXXX --job-dir=... --ml-engine-args -- --user-args
     def str2bool(v): return v=='True'
     parser.add_argument('--job-dir', default="checkpoints", help='GCS or local path where to store training checkpoints')
-    parser.add_argument('--data', default="", help='Path to training data folder containing full-scale aerial imagery (can be on Google cloud storage gs://...). Eval data should be in a folder with the same name and and _eval suffix.')
+    parser.add_argument('--data', default="gs://planespotting-data-public/USGS_public_domain_photos", help='Path to training data folder containing full-scale aerial imagery (can be on Google cloud storage gs://...). Eval data should be in a folder with the same name and and _eval suffix.')
     parser.add_argument('--tiledata', default="", help='Path to training data folder containing image tiles (can be on Google cloud storage gs://...). Eval data should be in a folder with the same name and and _eval suffix.')
     parser.add_argument('--hp-iterations', default=25000, type=int, help='Hyperparameter: number of training iterations')
     parser.add_argument('--hp-batch-size', default=10, type=int, help='Hyperparameter: training batch size')
     parser.add_argument('--hp-eval-batch-size', default=32, type=int, help='Hyperparameter: evaluation batch size')
     parser.add_argument('--hp-eval-iterations', default=262, type=int, help='Hyperparameter: eval iterations')  # eval dataset is 8380 tiles (262 batches of 32) - larger batch will OOM.
-    parser.add_argument('--hp-shuffle-buf', default=50000, type=int, help='Hyperparameter: data shuffle buffer size')
-    parser.add_argument('--hp-layers', default=11, type=int, help='Hyperparameter: number of layers')
-    parser.add_argument('--hp-first-layer-filter-size', default=3, type=int, help='Hyperparameter: filter size in first layer')
-    parser.add_argument('--hp-first-layer-filter-stride', default=1, type=int, help='Hyperparameter: filter stride in first layer')
-    parser.add_argument('--hp-first-layer-filter-depth', default=50, type=int, help='Hyperparameter: the number of filters in the first and last layers')
+    parser.add_argument('--hp-shuffle-buf', default=10000, type=int, help='Hyperparameter: data shuffle buffer size')
+    parser.add_argument('--hp-layers', default=12, type=int, help='Hyperparameter: number of layers')
+    parser.add_argument('--hp-first-layer-filter-size', default=6, type=int, help='Hyperparameter: filter size in first layer')
+    parser.add_argument('--hp-first-layer-filter-stride', default=2, type=int, help='Hyperparameter: filter stride in first layer')
+    parser.add_argument('--hp-first-layer-filter-depth', default=32, type=int, help='Hyperparameter: the number of filters in the first and last layers')
     parser.add_argument('--hp-depth-increment', default=5, type=int, help='Hyperparameter: increment the decrement filter depth by this amount between first and last layer')
     parser.add_argument('--hp-grid-nn', default=16, type=int, help='Hyperparameter: size of YOLO grid: grid-nn x grid-nn')
     parser.add_argument('--hp-cell-n', default=2, type=int, help='Hyperparameter: number of ROIs detected per YOLO grid cell')
@@ -171,15 +171,15 @@ def main(argv):
     parser.add_argument('--hp-lr2', default=3000, type=float, help='Hyperparameter: learning rate decay period in steps. Only used when the decay type is "exponential". For "cosine-restarts", the first decay period is always iterations/8.')
     parser.add_argument('--hp-decay-type', default="exponential", choices=["exponential", "cosine-restarts"], help='Hyperparameter: learning rate decay type. "exponential" (default) or "cosine-restarts".')
     parser.add_argument('--hp-decay-restarts', default=3, type=int, choices=range(0, 6), help='Hyperparameter: learning rate decay restarts over the entire training. Only used when decay-type is "cosine-restarts". The learning rate always decays to its min value at the end of "iterations" and the first restart is always at iterations/8.')
-    parser.add_argument('--hp-decay-restart-height', default=0.5, type=float, help='Hyperparameter: learning rate restart value as a fraction of the previous max learning rate. Only used when decay-type is "cosine-restarts"')
+    parser.add_argument('--hp-decay-restart-height', default=0.99, type=float, help='Hyperparameter: learning rate restart value as a fraction of the previous max learning rate. Only used when decay-type is "cosine-restarts"')
     parser.add_argument('--hp-dropout', default=0.0, type=float, help='Hyperparameter: dropout rate. It should be between 0.0 and 0.5. 0.0 for no dropout.')
     parser.add_argument('--hp-spatial-dropout', default=True, type=str2bool, help='Hyperparameter: dropout type, spatial or ordinary. Spatial works better in convolutional networks.')
     parser.add_argument('--hp-bnexp', default=0.993, type=float, help='Hyperparameter: exponential decay for batch norm moving averages.')
     parser.add_argument('--hp-lw1', default=1, type=float, help='Hyperparameter: loss weight LW1')
     parser.add_argument('--hp-lw2', default=3, type=float, help='Hyperparameter: loss weight LW2')
     parser.add_argument('--hp-lw3', default=30, type=float, help='Hyperparameter: loss weight LW3')
-    # hyperparameters for training data generation. They do not affect test data.
-    parser.add_argument('--hp-data-tiles-per-gt-roi', default=100, type=int, help='Data generation hyperparameter: number of training tiles generated around each ground truth ROI')
+    # hyperparameters for training data generation when training from large photos directly. They do not affect test data.
+    parser.add_argument('--hp-data-tiles-per-gt-roi', default=166, type=int, help='Data generation hyperparameter: number of training tiles generated around each ground truth ROI')
     parser.add_argument('--hp-data-rnd-distmax', default=2.0, type=float, help='Data generation hyperparameter: training tiles selection max random distance from ground truth ROI (always 2.0 for eval tiles)')
     parser.add_argument('--hp-data-rnd-hue', default=True, type=str2bool, help='Data generation hyperparameter: data augmentation with random hue on training images')
     parser.add_argument('--hp-data-rnd-orientation', default=True, type=str2bool, help='Data generation hyperparameter: data augmentation by rotating and flipping tiles.')

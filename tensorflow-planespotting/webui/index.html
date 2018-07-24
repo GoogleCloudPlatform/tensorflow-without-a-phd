@@ -29,6 +29,8 @@
 
     <!-- Google API scripts -->
     <script defer src="googleapiaccess.js"></script>
+    <!-- This Google Maps API key is restricted to http://localhost:8000/*
+     Get your own API key if deploying publicly-->
     <script defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCS9dHO2mN7iHFnWCUQAQF5Oh_8rItiQoM&libraries=visualization,geometry&callback=initMap"></script>
     <script defer src="https://apis.google.com/js/api.js?onload=handleClientLoad"></script>
 
@@ -111,6 +113,7 @@
                 <div class="console" id="sap"></div>
                 <form name="modsel">
                     <select name="model">
+                        <!-- sorry, you do not have access to these models, please train your own -->
                         <option value="plane_jpeg_scan_100_200_300_400_600_900/versions/v00">20x20 tile classifier v0</option>
                         <option value="plane_jpeg_scan_100_200_300_400_600_900/versions/v02">20x20 tile regularized accuracy 99.6%</option>
                         <option value="plane_jpeg_scan_100_200_300_400_600_900/versions/v7_256x256">20x20 tile classifier best - more data</option>
@@ -121,7 +124,7 @@
                         <option value="jpeg_yolo_256x256/versions/v874" selected>YOLO detection v874, best fast, 16x16x2 swarm optimized, 12 layers, data augmentation+, cosine restarts</option>
                         <option value="jpeg_yolo_256x256/versions/v814">YOLO detection v814, best compromise, 16x16x2, swarm optimized, 17 layers, data augmentation+, light dropout</option>
                         <option value="jpeg_yolo_256x256/versions/v806b">YOLO 17L least false positives, many missed planes v806b</option>
-                        <option value="jpeg_yolo_256x256/versions/v818dark">YOLO 17L best detection, many false positives v818dark</option>
+                        <option value="jpeg_yolo_256x256/versions/v818dark">YOLO 17L darknet, best detection, many false positives v818dark</option>
                         <option value="jpeg_yolo_256x256/versions/v875b">YOLO 17L v875b cosine restarts, good detection, quite a few false positives</option>
                     </select>
                 </form>

@@ -24,7 +24,7 @@ and engineering tips, tricks and best practices to build and train the neural ne
                      <a href="https://youtu.be/u4alGiomYP4">video</a> |
                      <a href="https://docs.google.com/presentation/d/1TVixw6ItiZ8igjp6U17tcgoFrLSaHWQmMOwjlgQY9co/pub?slide=id.p">slides</a> |
                      <a href="https://codelabs.developers.google.com/codelabs/cloud-tensorflow-mnist/#0">codelab</a> |
-                     <a href="https://github.com/martin-gorner/tensorflow-mnist-tutorial">code</a><br/><br/></div>
+                     <a href="tree/master/tensorflow-mnist-tutorial">code</a><br/><br/></div>
                      <p>The basics of building neural networks for software engineers. Neural weights and biases, activation functions, supervised learning and gradient descent.
                      Tips and best practices for efficient training: learning rate decay, dropout regularisation and the intricacies of overfitting. Dense and convolutional neural networks. This session starts with low-level
                      Tensorflow and also has a sample of high-level Tensorflow code using layers and Datasets. Code sample: MNIST handwritten digit recognition with 99% accuracy. Duration: 55 min</p></td>
@@ -33,7 +33,7 @@ and engineering tips, tricks and best practices to build and train the neural ne
         <td width="50%"><div align="center">
                                           <a href="https://youtu.be/vq2nnJ4g6N0?t=76m">video</a> |
                                           <a href="https://docs.google.com/presentation/d/18MiZndRCOxB7g-TcCl2EZOElS5udVaCuxnGznLnmOlE/pub?slide=id.g1245051c73_0_25">slides</a> |
-                                          <a href="https://github.com/martin-gorner/tensorflow-mnist-tutorial/blob/master/README_BATCHNORM.md">code</a><br/><br/></div>
+                                          <a href="blob/master/tensorflow-mnist-tutorial/README_BATCHNORM.md">code</a><br/><br/></div>
                                           <p>What is batch normalisation, how to use it appropriately and how to see if it is working or not.
                                           Code sample: MNIST handwritten digit recognition with 99.5% accuracy. Duration: 25 min</p></td>
         <td width="50%"><img alt="The superpower: batch normalization" src="tensorflow-rl-pong/images/flds2.png"/></td>

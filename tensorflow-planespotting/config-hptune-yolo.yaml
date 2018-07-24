@@ -20,35 +20,18 @@ trainingInput:
     maxTrials: 72
     maxParallelTrials: 9
     params:
-      # layers = layers21 * 2 + 1
-      - parameterName: hp-layers21
+      - parameterName: hp-layers
         type: INTEGER
-        minValue: 3
-        maxValue: 10
-        scaleType: UNIT_LINEAR_SCALE
-      # base_depth = base_depth5*5
-      - parameterName: hp-base-depth5
-        type: INTEGER
-        minValue: 3
-        maxValue: 15
+        minValue: 10
+        maxValue: 20
         scaleType: UNIT_LINEAR_SCALE
       - parameterName: hp-dropout
         type: DOUBLE
         minValue: 0.0
         maxValue: 0.5
         scaleType: UNIT_LINEAR_SCALE
-      - parameterName: hp-lw3
-        type: DOUBLE
-        minValue: 1
-        maxValue: 100
-        scaleType: UNIT_LOG_SCALE
-      - parameterName: hp-lr0
-        type: DOUBLE
-        minValue: 0.001
-        maxValue: 0.01
-        scaleType: UNIT_LOG_SCALE
       - parameterName: hp-lr2
         type: DOUBLE
         minValue: 1000
-        maxValue: 10000
+        maxValue: 100000
         scaleType: UNIT_LOG_SCALE

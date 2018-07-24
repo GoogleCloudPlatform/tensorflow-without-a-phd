@@ -15,7 +15,7 @@
 # To use this:
 # gcloud ml-engine versions create vXXX \
 # --model <model name> \
-# --origin gs://ml1-demo-martin/jobs/plane064/1/export/planesnet/1506462261/ \
+# --origin gs://ml1-demo-martin/jobs/plane064/1/export/planespotting/1506462261/ \
 # --config predictions_deploy_config.yaml
 
 description: ""

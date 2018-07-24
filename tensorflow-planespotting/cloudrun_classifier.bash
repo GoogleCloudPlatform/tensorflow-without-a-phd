@@ -14,14 +14,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Use your own bucket and project here, source data must be downloaded from Kaggle
+BUCKET="gs://ml1-demo-martin"
+PROJECT="cloudml-demo-martin"
+REGION="us-central1"
+#DATA="gs://ml1-demo-martin/data/planesnet32K.bkg257K.pln88K.ppln88K.pklz2"
+DATA="gs://ml1-demo-martin/data/planesnet32K.pklz2"
 
 CONFIG="config.yaml"
 #CONFIG="config-hptune-classifier.yaml"
-BUCKET="gs://ml1-demo-martin"
-#DATA="gs://ml1-demo-martin/data/planesnet32K.bkg257K.pln88K.ppln88K.pklz2"
-DATA="gs://ml1-demo-martin/data/planesnet32K.pklz2"
-PROJECT="cloudml-demo-martin"
-REGION="us-central1"
 
 # auto-incrementing run number padded with zeros to 3 digits
 NFILE="cloudrunN.txt"

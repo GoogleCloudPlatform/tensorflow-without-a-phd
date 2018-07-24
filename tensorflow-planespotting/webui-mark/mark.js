@@ -49,9 +49,7 @@ var markersOnDisk = [
     'USGS_TUC1s',
     'USGS_TUC2s',
     'USGS_TUC3s',
-    'USGS_TUC4s',
-    'USGS_VCV',
-    'USGS_VCV2']
+    'USGS_TUC4s']
 
 document.addEventListener("DOMContentLoaded", function(event) {
     var image = document.querySelector("#container img")

@@ -12,15 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This is a data generation job. No training will be performed.
 
-# this is a data generation job. No training will be performed.
-
+# Set your own bucket and project here, as well as the destination folder
 BUCKET="gs://ml1-demo-martin"
-DATA="gs://ml1-demo-martin/data/USGS_public_domain_airports"
-# Destination directory of the data. The folder as well as the <samename>_eval folder must exist.
-TILEDATA="gs://ml1-demo-martin/data/USGS_public_domain_tiles100_x166_rnd_orient_airports_tfrecords2"
 PROJECT="cloudml-demo-martin"
 REGION="us-central1"
+# Destination directory of the data. The folder as well as the <samename>_eval folder must exist.
+TILEDATA="gs://ml1-demo-martin/data/USGS_public_domain_tiles100_x166_rnd_orient_airports_tfrecords2"
+
+# Source data
+DATA="gs://ml1-demo-martin/data/USGS_public_domain_airports"
 
 # auto-incrementing run number padded with zeros to 3 digits
 NFILE="cloudrunN.txt"

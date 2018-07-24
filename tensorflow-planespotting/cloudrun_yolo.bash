@@ -14,14 +14,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Use your own bucket and project here
+BUCKET="gs://ml1-demo-martin"
+PROJECT="cloudml-demo-martin"
+REGION="us-central1"
+
 CONFIG="config.yaml"
 #CONFIG="config-distributed.yaml"
 #CONFIG="config-hptune-yolo.yaml"
-BUCKET="gs://ml1-demo-martin"
-#DATA="gs://ml1-demo-martin/data/USGS_public_domain_airports"
-TILEDATA="gs://ml1-demo-martin/data/USGS_public_domain_tiles100_x166_rnd_orient_airports_tfrecords2"
-PROJECT="cloudml-demo-martin"
-REGION="us-central1"
+#DATA="gs://planespotting-data-public/USGS_public_domain_photos"
+TILEDATA="gs://planespotting-data-public/tiles_from_USGS_photos"
 
 # auto-incrementing run number padded with zeros to 3 digits
 NFILE="cloudrunN.txt"
@@ -50,18 +52,6 @@ gcloud ml-engine jobs submit training airplane$N \
     --hp-first-layer-filter-size 3 \
     --hp-first-layer-filter-stride 1 \
     --hp-depth-increment 8 \
-
-#    --hp-dropout 0.0 \
-#    --hp-decay-type cosine-restarts \
-#    --hp-decay-restarts 0 \
-#    --hp-decay-restart-height 0.99
-
-#    --hp-layers 12 \
-#    --hp-first-layer-filter-depth 32 \
-#    --hp-first-layer-filter-size 6 \
-#    --hp-first-layer-filter-stride 2 \
-#    --hp-depth-increment 5
-
 
 # Model with fewest false positives: airplane806 (v806b). Training time: 24h, inference time: 2.8s
 #gcloud ml-engine jobs submit training airplane$N \
@@ -125,4 +115,11 @@ gcloud ml-engine jobs submit training airplane$N \
 #    --hp-first-layer-filter-stride 2 \
 #    --hp-depth-increment 5 \
 #    --hp-dropout 0.0
+
+# If you want to experiment with cosine-restart learning rate decay
+#    --hp-dropout 0.0 \
+#    --hp-decay-type cosine-restarts \
+#    --hp-decay-restarts 4 \
+#    --hp-decay-restart-height 0.99
+
 
