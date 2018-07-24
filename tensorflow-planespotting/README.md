@@ -30,13 +30,13 @@ needed to provide detection capabilities. They can be found in file
 A script is provided for running the training on ML Engine. It implements
 auto-incrementing job names so that successive trainings are called job001, job002 and so on.
 Apart from that, it is contains little more that the `gcloud ml-engine jobs submit training`.
-The script is [cloudrun_yolo.bash](cloudrun_yolo.bash). By default, it trains a larger
+The script is [cloudrun_yolo.bash](cloudrun_yolo.bash). By default, it trains a 
 17 layer squeezenet/YOLO detection model. To start training, fill out the prerequisites and run the script.
 
 Prerequisites:
 * Go to the Google cloud console at [https://console.cloud.google.com/](https://console.cloud.google.com/), create a project, enable billing.
 * In the console, create a [Cloud Storage bucket](https://console.cloud.google.com/storage/). Use storage
-class "regional" in your preferred [region with ML-Engine resources](https://cloud.google.com/ml-engine/docs/tensorflow/regions).
+class "regional" and put it in your preferred [region that has ML-Engine resources](https://cloud.google.com/ml-engine/docs/tensorflow/regions).
 This bucket is where your trained model will be stored.
 * Download and install the [Googe Cloud SDK](https://cloud.google.com/sdk/) so that you can use the "gcloud" command line utility.
 * Run `gcloud init` to configure your project and sign in with your account.
@@ -50,7 +50,7 @@ NVIDIA P100 GPU.
  ./cloudrun_yolo.bash
  ```
  
- You can switch to cluster training, using 4 GPus for training and 1 for evaluations,
+ You can switch to cluster training, using 4 GPUs for training and 1 for evaluations,
  by using the [config-distributed.yaml](config-distributed.yaml) config file. Edit the
  script and point the CONFIG variable to it.
 
@@ -92,7 +92,8 @@ own bucket for output data:
  ```
  
  The YOLO model can be trained both from large aerial photos and from 256x256 tiles
- in TFRecord format. The following command line parameter switches between the two modes:
+ in TFRecord format. The following command line parameter switches between the two
+ modes. Adjust it in the [cloudrun_yolo.bash](cloudrun_yolo.bash) file:
  ```bash
  # To train train from large aerial photographs use:
  --data gs://planespotting-data-public/USGS_public_domain_photos
@@ -136,7 +137,7 @@ python -m SimpleHTTPServer 8000
 In the UI, authenticate with ML Engine, select an airport and a model and click "analyze".
 Models served from ML Engine are meant to be accessed from the server side of your
 application so the authentication step is usually performed on the server. If
-you want to configured your model so that anyone can access it, you will have to
+you want to configure your model so that anyone can access it, you will have to
 [set up an Apigee Edge proxy in front of it](https://cloud.google.com/solutions/serving-machine-learning-models-using-apigee-edge-and-ml-engine)
 and make the Apigee endpoint public.
 
@@ -144,13 +145,13 @@ and make the Apigee endpoint public.
 
 This dataset was created by hand by tagging public aerial imagery downloaded from
 the U.S. Geological Survey. A Javascript/HTML UI is provided should you want to tag
-additional images. You will find it in [webui-mark](webui-mark). You can also
+additional images. You will find it in [webui-mark](webui-mark). You can
 run it from a local web browser:
 
 ```bash
 # assuming the current directory is tensorflow-planespotting
 cd webui-mark
-# copy the existing photos and ROIs, this is where you can add yours
+# copy the existing data, add yours if you have any
 mkdir USGS_public_domain_airports
 gsutil -m cp gs://planespotting-data-public/USGS_public_domain_photos/* USGS_public_domain_airports
 gsutil -m cp gs://planespotting-data-public/USGS_public_domain_photos_eval/* USGS_public_domain_airports
