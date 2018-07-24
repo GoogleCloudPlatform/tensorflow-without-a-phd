@@ -33,7 +33,7 @@ and engineering tips, tricks and best practices to build and train the neural ne
         <td width="50%"><div align="center">
                                           <a href="https://youtu.be/vq2nnJ4g6N0?t=76m">video</a> |
                                           <a href="https://docs.google.com/presentation/d/18MiZndRCOxB7g-TcCl2EZOElS5udVaCuxnGznLnmOlE/pub?slide=id.g1245051c73_0_25">slides</a> |
-                                          <a href="blob/master/tensorflow-mnist-tutorial/README_BATCHNORM.md">code</a><br/><br/></div>
+                                          <a href="tensorflow-mnist-tutorial/README_BATCHNORM.md">code</a><br/><br/></div>
                                           <p>What is batch normalisation, how to use it appropriately and how to see if it is working or not.
                                           Code sample: MNIST handwritten digit recognition with 99.5% accuracy. Duration: 25 min</p></td>
         <td width="50%"><img alt="The superpower: batch normalization" src="tensorflow-rl-pong/images/flds2.png"/></td>
