@@ -56,10 +56,6 @@ and region.  You are ready to train. The default training configuration uses a s
  # assuming the current directory is tensorflow-planespotting
  ./cloudrun_yolo.bash
  ```
- 
- You can switch to cluster training, using 4 GPUs for training and 1 for evaluations,
- by using the [config-distributed.yaml](config-distributed.yaml) config file. Edit the
- script and point the CONFIG variable to it.
 
 ### Local
 You can train a basic 12 layer model locally with default settings
