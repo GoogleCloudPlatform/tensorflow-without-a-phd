@@ -90,7 +90,7 @@ and engineering tips, tricks and best practices to build and train the neural ne
 <br/>
 <br/>
 <table width="75%">
-    <tr><td colspan="3">Quick access to all code samples:</td></tr>
+    <tr><td colspan="4">Quick access to all code samples:</td></tr>
     <tr>
         <td width="25%">
                     <b><a href="tensorflow-mnist-tutorial">tensorflow-mnist-tutorial</a></b><br/>

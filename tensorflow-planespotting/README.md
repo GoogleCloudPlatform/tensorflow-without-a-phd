@@ -3,11 +3,13 @@
 
 ## Introduction
 
-This is a code sample for the talk "Tensorflow, deep learning and modern convolutional neural nets, without a PhD" ([video](https://youtu.be/vaL1I2BD_xY) | [slides](https://goo.gl/VxQDmx))
+This is a code sample for the talk "Tensorflow, deep learning and modern
+convolutional neural nets, without a PhD" ([video](https://youtu.be/vaL1I2BD_xY) |
+[slides](https://docs.google.com/presentation/d/19u0Tm0JHL5tpzyarLILvy4qLSuDBFNNx2hwSvZsFPI0/pub))
 
 Author: Martin Görner
 
-##The model
+## The model
 You will find the squeezenet model in the [trainer_yolo/model.py](trainer_yolo/model.py) file
 in function `model_core_configurable_squeezenet`. It has a configurable
 number of layers and might therefore not be very readable. A more readable
@@ -21,7 +23,7 @@ These core models are standard sequences convolutional layaers. Additional layer
 needed to provide detection capabilities. They can be found in file
 [trainer_yolo/model_layers.py](trainer_yolo/model_layers.py) function `YOLO_head`. 
 
-##Training
+## Training
 
 ### Cloud training using ML Engine
 
@@ -119,7 +121,7 @@ A test UI written in Javascrip/HTML is provided. You can use it to navigate
 Google Maps in satellite mode, and analyze any aerial imagery you find to try and spot
 airplanes. You can find it in [webui](webui).
 
-![airplane detection demo](tensorflow-planespotting/img/screen-shot-demo.jpg)
+![airplane detection demo](img/screen-shot-demo.jpg)
 
 Once you have trained and deployed a model, edit the [webui/index.html](webui/index.html)
 so that the list of models in the select box contains yours, selected by default.
@@ -158,7 +160,7 @@ python -m SimpleHTTPServer 8000
 If you are adding your own files for tagging, you will have to reference them in the
 list in [webui-mark/mark.js](webui-mark/mark.js) otherwise they will not appear in the UI.
 
-[airplane tagging UI](tensorflow-planespotting/img/screen-shot-mark.jpg)
+![airplane tagging UI](img/screen-shot-mark.jpg)
 
 If you tag additional images and want to add them to the public dataset, open a GitHub issue
 and I will gladly accept your contribution, provided the images are public.
