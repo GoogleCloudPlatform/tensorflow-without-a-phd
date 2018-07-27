@@ -4,7 +4,7 @@
 ## Introduction
 
 This is a code sample for the talk "Tensorflow, deep learning and modern
-convolutional neural nets, without a PhD" ([video](https://youtu.be/vaL1I2BD_xY) |
+convolutional neural nets, without a PhD" ([video](https://youtu.be/KC4201o83W0) |
 [slides](https://docs.google.com/presentation/d/19u0Tm0JHL5tpzyarLILvy4qLSuDBFNNx2hwSvZsFPI0/pub))
 
 Author: Martin Görner
