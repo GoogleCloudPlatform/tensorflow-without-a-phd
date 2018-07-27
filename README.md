@@ -19,7 +19,7 @@ and engineering tips, tricks and best practices to build and train the neural ne
 
 <table width="100%">
     <tr>
-        <td width="50%"><img alt="Tensorflow and deep learning without a PhD" src="tensorflow-rl-pong/images/flds1.jpg"/></td>
+        <td width="50%"><img alt="Tensorflow and deep learning without a PhD" src="tensorflow-rl-pong/images/flds1.png"/></td>
         <td width="50%">
             <div align="center">
                      <a href="https://youtu.be/u4alGiomYP4">video</a> |
@@ -37,10 +37,10 @@ and engineering tips, tricks and best practices to build and train the neural ne
                                           <a href="tensorflow-mnist-tutorial/README_BATCHNORM.md">code</a><br/><br/></div>
                                           <p>What is batch normalisation, how to use it appropriately and how to see if it is working or not.
                                           Code sample: MNIST handwritten digit recognition with 99.5% accuracy. Duration: 25 min</p></td>
-        <td width="50%"><img alt="The superpower: batch normalization" src="tensorflow-rl-pong/images/flds2.jpg"/></td>
+        <td width="50%"><img alt="The superpower: batch normalization" src="tensorflow-rl-pong/images/flds2.png"/></td>
     </tr>
     <tr>
-        <td border=0 width="50%"><img alt="Tensorflow, deep learning and recurrent neural networks, without a PhD" src="tensorflow-rl-pong/images/flds3.jpg"/></td>
+        <td border=0 width="50%"><img alt="Tensorflow, deep learning and recurrent neural networks, without a PhD" src="tensorflow-rl-pong/images/flds3.png"/></td>
         <td border=0 width="50%">
             <div align="center">
                  <a href="https://youtu.be/fTUwdXUFfI8">video</a> |
@@ -61,10 +61,10 @@ and engineering tips, tricks and best practices to build and train the neural ne
                   Convenets for detection: the YOLO (You Look Only Once) architecture. Full-scale model training and serving with Tensorflow's Estimator API on Google
                   Cloud ML Engine and Cloud TPUs (Tensor Processing Units).
                   Application: airplane detection in aerial imagery. Duration: 55 min</p></td>
-        <td width="50%"><img alt="Tensorflow, deep learning and modern convnets, without a PhD" src="tensorflow-rl-pong/images/flds4.jpg"/></td>
+        <td width="50%"><img alt="Tensorflow, deep learning and modern convnets, without a PhD" src="tensorflow-rl-pong/images/flds4.png"/></td>
     </tr>
     <tr>
-            <td border=0 width="50%"><img alt="Tensorflow, deep learning and modern RNN architectures, without a PhD" src="tensorflow-rl-pong/images/flds5.jpg"/></td>
+            <td border=0 width="50%"><img alt="Tensorflow, deep learning and modern RNN architectures, without a PhD" src="tensorflow-rl-pong/images/flds5.png"/></td>
             <td border=0 width="50%">
                 <div align="center">
                      <a href="https://youtu.be/pzOzmxCR37I">video</a> |
@@ -85,7 +85,7 @@ and engineering tips, tricks and best practices to build and train the neural ne
             Uses reinforcement learning and policy gradients. The approach can be generalized to
             other problems involving a non-differentiable step that cannot be trained using traditional supervised learning techniques.
             A practical application: neural architecture search - neural networks designing neural networks. Co-author: Yu-Han Liu. Duration: 40 min</p></td>
-        <td width="50%"><img alt="Tensorflow and deep reinforcement learning, without a PhD" src="tensorflow-rl-pong/images/flds6.jpg"/></td>
+        <td width="50%"><img alt="Tensorflow and deep reinforcement learning, without a PhD" src="tensorflow-rl-pong/images/flds6.png"/></td>
         </tr>
 </table>
 <br/>
