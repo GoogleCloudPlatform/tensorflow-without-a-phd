@@ -2,11 +2,12 @@
     <tr>
         <td width="50%">
             <H2>Featured code sample</H2>
-            <b><a href="tensorflow-rl-pong">tensorflow-rl-pong</a></b><br/>
-            Code from the Google I/O 2018 session "Tensorflow and deep reinforcement
-            learning, without a PhD". Other samples from the "Tensorflow without a PhD" series are in
+            <b><a href="tensorflow-planespotting">tensorflow-planespotting</a></b><br/>
+            Code from the Google Cloud NEXT 2018 session "Tensorflow, deep
+            learning and modern convnets, without a PhD". Other samples from the "Tensorflow without a PhD" series are in
             this repository too.
-        <td width="50%"><a href="https://youtu.be/t1A3NTttvBA"><img alt="Tensorflow and deep reinforcement learning, without a PhD" src="tensorflow-rl-pong/images/io2018thumb.jpg"/></a></td>
+        <td width="50%"><a href="https://youtu.be/KC4201o83W0"><img alt="Tensorflow, deep
+        learning and modern convnets, without a PhD" src="tensorflow-planespotting/images/next2018thumb.jpg"/></a></td>
     </tr>
 </table>
 <br/>
@@ -18,7 +19,7 @@ and engineering tips, tricks and best practices to build and train the neural ne
 
 <table width="100%">
     <tr>
-        <td width="50%"><img alt="Tensorflow and deep learning without a PhD" src="tensorflow-rl-pong/images/flds1.png"/></td>
+        <td width="50%"><img alt="Tensorflow and deep learning without a PhD" src="tensorflow-rl-pong/images/flds1.jpg"/></td>
         <td width="50%">
             <div align="center">
                      <a href="https://youtu.be/u4alGiomYP4">video</a> |
@@ -36,10 +37,10 @@ and engineering tips, tricks and best practices to build and train the neural ne
                                           <a href="tensorflow-mnist-tutorial/README_BATCHNORM.md">code</a><br/><br/></div>
                                           <p>What is batch normalisation, how to use it appropriately and how to see if it is working or not.
                                           Code sample: MNIST handwritten digit recognition with 99.5% accuracy. Duration: 25 min</p></td>
-        <td width="50%"><img alt="The superpower: batch normalization" src="tensorflow-rl-pong/images/flds2.png"/></td>
+        <td width="50%"><img alt="The superpower: batch normalization" src="tensorflow-rl-pong/images/flds2.jpg"/></td>
     </tr>
     <tr>
-        <td border=0 width="50%"><img alt="Tensorflow, deep learning and recurrent neural networks, without a PhD" src="tensorflow-rl-pong/images/flds3.png"/></td>
+        <td border=0 width="50%"><img alt="Tensorflow, deep learning and recurrent neural networks, without a PhD" src="tensorflow-rl-pong/images/flds3.jpg"/></td>
         <td border=0 width="50%">
             <div align="center">
                  <a href="https://youtu.be/fTUwdXUFfI8">video</a> |
@@ -52,22 +53,22 @@ and engineering tips, tricks and best practices to build and train the neural ne
     </tr>
     <tr>
         <td width="50%"><div align="center">
-                  <a href="https://youtu.be/vaL1I2BD_xY">video</a> |
+                  <a href="https://youtu.be/KC4201o83W0">video</a> |
                   <a href="https://docs.google.com/presentation/d/19u0Tm0JHL5tpzyarLILvy4qLSuDBFNNx2hwSvZsFPI0/pub">slides</a> |
                   <a href="tensorflow-planespotting">code</a><br/><br/></div>
                   <p>Convolutional neural network architectures for image processing. Convnet basics, convolution filters and how to stack them. 
                   Learnings from the Inception model: modules with parallel convolutions, 1x1 convolutions. A simple modern convnet architecture: Squeezenet.
                   Convenets for detection: the YOLO (You Look Only Once) architecture. Full-scale model training and serving with Tensorflow's Estimator API on Google Cloud ML Engine.
                   Application: airplane detection in aerial imagery. Duration: 55 min</p></td>
-        <td width="50%"><img alt="Tensorflow, deep learning and modern convnets, without a PhD" src="tensorflow-rl-pong/images/flds4.png"/></td>
+        <td width="50%"><img alt="Tensorflow, deep learning and modern convnets, without a PhD" src="tensorflow-rl-pong/images/flds4.jpg"/></td>
     </tr>
     <tr>
-            <td border=0 width="50%"><img alt="Tensorflow, deep learning and modern RNN architectures, without a PhD" src="tensorflow-rl-pong/images/flds5.png"/></td>
+            <td border=0 width="50%"><img alt="Tensorflow, deep learning and modern RNN architectures, without a PhD" src="tensorflow-rl-pong/images/flds5.jpg"/></td>
             <td border=0 width="50%">
                 <div align="center">
                      <a href="https://youtu.be/pzOzmxCR37I">video</a> |
                      <a href="https://docs.google.com/presentation/d/17gLPozfb-l3WCR8FnejNJD9tEI_igTq1YqIXzCtOR14/pub">slides</a> |
-                     code: soon<br/><br/></div>
+                     <a href="https://github.com/conversationai/conversationai-models/tree/master/attention-tutorial">code</a><br/><br/></div>
                      <p>Advanced RNN architectures for natural language processing. Word embeddings, text classification,
                      bidirectional models, sequence to sequence models for translation. Attention mechanisms. This session also explores
                      Tensorflow's powerful seq2seq API. Applications: toxic comment detection and langauge translation.
@@ -83,7 +84,7 @@ and engineering tips, tricks and best practices to build and train the neural ne
             Uses reinforcement learning and policy gradients. The approach can be generalized to
             other problems involving a non-differentiable step that cannot be trained using traditional supervised learning techniques.
             A practical application: neural architecture search - neural networks designing neural networks. Co-author: Yu-Han Liu. Duration: 40 min</p></td>
-        <td width="50%"><img alt="Tensorflow and deep reinforcement learning, without a PhD" src="tensorflow-rl-pong/images/flds6.png"/></td>
+        <td width="50%"><img alt="Tensorflow and deep reinforcement learning, without a PhD" src="tensorflow-rl-pong/images/flds6.jpg"/></td>
         </tr>
 </table>
 <br/>
@@ -92,21 +93,27 @@ and engineering tips, tricks and best practices to build and train the neural ne
 <table width="75%">
     <tr><td colspan="4">Quick access to all code samples:</td></tr>
     <tr>
-        <td width="25%">
+        <td width="33%">
                     <b><a href="tensorflow-mnist-tutorial">tensorflow-mnist-tutorial</a></b><br/>
                     dense and convolutional neural network tutorial
                 </td>
-        <td width="25%">
+        <td width="33%">
             <b><a href="tensorflow-rnn-tutorial">tensorflow-rnn-tutorial</a></b><br/>
-            recurrent neural network tutorial
+            recurrent neural network tutorial using temperature series
         </td>
-        <td width="25%">
+        <td width="33%">
             <b><a href="tensorflow-rl-pong">tensorflow-rl-pong</a></b><br/>
             "pong" with reinforcement learning
         </td>
-        <td width="25%">
-            <b><a href="tensorflow-planespotting">tensorflow-planespotting</a></b><br/>
-            Airplane detection model
+    </tr>
+    <tr>
+    <td width="33%">
+        <b><a href="tensorflow-planespotting">tensorflow-planespotting</a></b><br/>
+        airplane detection model
+    </td>
+    <td width="33%">
+            <b><a href="https://github.com/conversationai/conversationai-models/tree/master/attention-tutorial">conversationai: attention-tutorial</a></b><br/>
+            Toxic comment detection with RNNs and attention
         </td>
     </tr>
 </table>
