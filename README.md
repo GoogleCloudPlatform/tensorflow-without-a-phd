@@ -7,7 +7,7 @@
             learning and modern convnets, without a PhD". Other samples from the "Tensorflow without a PhD" series are in
             this repository too.
         <td width="50%"><a href="https://youtu.be/KC4201o83W0"><img alt="Tensorflow, deep
-        learning and modern convnets, without a PhD" src="tensorflow-planespotting/images/next2018thumb.jpg"/></a></td>
+        learning and modern convnets, without a PhD" src="tensorflow-planespotting/img/next2018thumb.jpg"/></a></td>
     </tr>
 </table>
 <br/>
@@ -58,7 +58,8 @@ and engineering tips, tricks and best practices to build and train the neural ne
                   <a href="tensorflow-planespotting">code</a><br/><br/></div>
                   <p>Convolutional neural network architectures for image processing. Convnet basics, convolution filters and how to stack them. 
                   Learnings from the Inception model: modules with parallel convolutions, 1x1 convolutions. A simple modern convnet architecture: Squeezenet.
-                  Convenets for detection: the YOLO (You Look Only Once) architecture. Full-scale model training and serving with Tensorflow's Estimator API on Google Cloud ML Engine.
+                  Convenets for detection: the YOLO (You Look Only Once) architecture. Full-scale model training and serving with Tensorflow's Estimator API on Google
+                  Cloud ML Engine and Cloud TPUs (Tensor Processing Units).
                   Application: airplane detection in aerial imagery. Duration: 55 min</p></td>
         <td width="50%"><img alt="Tensorflow, deep learning and modern convnets, without a PhD" src="tensorflow-rl-pong/images/flds4.jpg"/></td>
     </tr>
