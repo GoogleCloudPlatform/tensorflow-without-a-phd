@@ -18,8 +18,8 @@ import numpy as np
 
 import sys
 sys.path.append("mlengine")
-from trainer.task import load_mnist_data  # import from mlengine/tariner/task.py
-from trainer.task import load_dataset     # import from mlengine/tariner/task.py
+from trainer.task import load_mnist_data  # import from mlengine/trainer/task.py
+from trainer.task import load_dataset     # import from mlengine/trainer/task.py
 
 # This loads entire dataset to an in-memory numpy array.
 # This uses tf.data.Dataset to avoid duplicating code.
