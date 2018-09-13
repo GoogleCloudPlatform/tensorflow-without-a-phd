@@ -55,6 +55,7 @@
                         <option value="SFO">SFO San Francisco</option>
                         <option value="SFO2">SFO San Francisco 2</option>
                         <option value="CDG">CDG Paris Roissy</option>
+                        <option value="CDG2">CDG Paris Roissy 2</option>
                         <option value="LBG">LBG Paris Le Bourget</option>
                         <option value="LBG2">LBG Paris Le Bourget 2</option>
                         <option value="SEA">SEA Seattle Tacoma</option>
@@ -117,15 +118,15 @@
                         <option value="plane_jpeg_scan_100_200_300_400_600_900/versions/v00">20x20 tile classifier v0</option>
                         <option value="plane_jpeg_scan_100_200_300_400_600_900/versions/v02">20x20 tile regularized accuracy 99.6%</option>
                         <option value="plane_jpeg_scan_100_200_300_400_600_900/versions/v7_256x256">20x20 tile classifier best - more data</option>
-                        <option value="jpeg_yolo_256x256/versions/v5">YOLO detection 16x16x2 swarm optimized, 12 layers</option>
-                        <option value="jpeg_yolo_256x256/versions/v19">YOLO detection 16x16x2 swarm optimized, 12 layers, data augmentation</option>
-                        <option value="jpeg_yolo_256x256/versions/v20">YOLO detection 16x16x2, swarm optimized, 17 layers, data augmentation</option>
-                        <option value="jpeg_yolo_256x256/versions/v795">YOLO detection 16x16x2 swarm optimized, 12 layers, data augmentation+ v795</option>
-                        <option value="jpeg_yolo_256x256/versions/v874" selected>YOLO detection v874, best fast, 16x16x2 swarm optimized, 12 layers, data augmentation+, cosine restarts</option>
-                        <option value="jpeg_yolo_256x256/versions/v814">YOLO detection v814, best compromise, 16x16x2, swarm optimized, 17 layers, data augmentation+, light dropout</option>
-                        <option value="jpeg_yolo_256x256/versions/v806b">YOLO 17L least false positives, many missed planes v806b</option>
-                        <option value="jpeg_yolo_256x256/versions/v818dark">YOLO 17L darknet, best detection, many false positives v818dark</option>
-                        <option value="jpeg_yolo_256x256/versions/v875b">YOLO 17L v875b cosine restarts, good detection, quite a few false positives</option>
+                        <option value="jpeg_yolo_256x256/versions/v5">YOLO 12 layers, v5, 16x16x2 swarm optimized</option>
+                        <option value="jpeg_yolo_256x256/versions/v19">YOLO 12 layers, v19, 16x16x2 swarm optimized, data augmentation</option>
+                        <!--option value="jpeg_yolo_256x256/versions/v20">YOLO detection 16x16x2, swarm optimized, 17 layers, data augmentation</option-->
+                        <!--option value="jpeg_yolo_256x256/versions/v795">YOLO detection 16x16x2 swarm optimized, 12 layers, data augmentation+ v795</option-->
+                        <option value="jpeg_yolo_256x256/versions/v874" selected>YOLO 12 layers, v874, best fast, 16x16x2 swarm optimized, data augmentation+, cosine restarts</option>
+                        <option value="jpeg_yolo_256x256/versions/v814">YOLO 17 layers, v814, 16x16x2, swarm optimized, 17 layers, data augmentation+, light dropout</option>
+                        <!--option value="jpeg_yolo_256x256/versions/v806b">YOLO 17L least false positives, many missed planes v806b</option-->
+                        <!--option value="jpeg_yolo_256x256/versions/v818dark">YOLO 17L darknet, best detection, many false positives v818dark</option-->
+                        <option value="jpeg_yolo_256x256/versions/v875b">YOLO 17 layers, v875b, 16x16x2, swarm optimized, data augmentation+, light dropout, cosine restarts, distributed x4, good but some false positives</option>
                     </select>
                 </form>
             </div>

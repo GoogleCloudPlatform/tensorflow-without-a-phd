@@ -31,7 +31,7 @@ if [ ! -f $NFILE ]; then echo "0" > $NFILE; fi
 read -r line < $NFILE
 N=$((line+1))
 echo $N > $NFILE;
-printf -v N "%03d" $N
+printf -v N "%04d" $N
 
 set -x
 gcloud ml-engine jobs submit training airplane$N \
@@ -41,7 +41,7 @@ gcloud ml-engine jobs submit training airplane$N \
     --region ${REGION} \
     --module-name trainer_yolo.main \
     --package-path trainer_yolo \
-    --runtime-version 1.8 \
+    --runtime-version 1.10 \
     -- \
     --tiledata "${TILEDATA}" \
     --hp-shuffle-buf 5000 \

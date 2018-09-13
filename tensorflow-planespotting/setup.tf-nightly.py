@@ -22,6 +22,8 @@ import setuptools
 
 setuptools.setup(
     install_requires=['tf-nightly-gpu'],
+    # for a specific version of tensorflow
+    #install_requires=['tensorflow-gpu>=1.10'],
     packages=setuptools.find_packages(),
     include_package_data=True
 )
