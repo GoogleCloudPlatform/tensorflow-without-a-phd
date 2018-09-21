@@ -30,7 +30,7 @@ gcloud ml-engine jobs submit training $JOB_NAME \
     --module-name $MAIN_TRAINER_MODULE \
     --region us-central1 \
     --config config.yaml \
-    --runtime-version 1.4 \
+    --runtime-version 1.10 \
     -- \
     --output-dir $BUCKET"pong_$now" \
     --learning-rate 0.0005 \
