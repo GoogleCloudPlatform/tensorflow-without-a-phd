@@ -47,8 +47,8 @@ def build_graph(observations):
     The weights will be shared.
     """
     with tf.variable_scope('model', reuse=tf.AUTO_REUSE):
-        hidden = tf.keras.layers.Dense(args.hidden_dim, use_bias=False, activation='relu')(observations)
-        logits = tf.keras.layers.Dense(len(ACTIONS), use_bias=False)(hidden)
+        hidden = tf.layers.dense(observations, args.hidden_dim, use_bias=False, activation=tf.nn.relu)
+        logits = tf.layers.dense(hidden, len(ACTIONS), use_bias=False)
 
     return logits
 
@@ -131,6 +131,8 @@ def main(args):
             tf.summary.scalar('loss', loss)
 
             merged = tf.summary.merge_all()
+
+        print('Number of trainable variables: {}'.format(len(tf.trainable_variables())))
 
     inner_env = gym.make('Pong-v0')
     # tf.agents helper to more easily track consecutive pairs of frames
