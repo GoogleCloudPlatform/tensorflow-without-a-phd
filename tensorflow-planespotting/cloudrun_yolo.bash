@@ -45,7 +45,7 @@ gcloud ml-engine jobs submit training airplane$N \
     -- \
     --tiledata "${TILEDATA}" \
     --hp-iterations 25000 \
-    --hp-layers 17 \
+    --hp-layers 17
 
 # Model with fewest false positives: airplane806 (v806b). Training time: 24h, inference time: 2.8s
 #gcloud ml-engine jobs submit training airplane$N \
