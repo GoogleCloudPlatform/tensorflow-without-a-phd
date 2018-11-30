@@ -132,7 +132,10 @@ def start_training(output_dir, hparams, data, tiledata, **kwargs):
     estimator = tf.contrib.tpu.TPUEstimator(model_fn=model.model_fn, model_dir=output_dir, params=hparams,
                                             train_batch_size=hparams['batch'],
                                             eval_batch_size=hparams['batch'],  # TPU constraint: batch sizes must be the same (?)
-                                            config=training_config, use_tpu=hparams['use_tpu'])
+                                            config=training_config, use_tpu=hparams['use_tpu'],
+                                            export_to_tpu=False)  # we do not need the TPU graph in the exported model since
+                                                                  # we will be serving it from CPUs/GPUs. Also, without
+                                                                  # export_to_tpu=Flase, TPUEstimator.export_saved_model crashes (TF1.12 and earlier)
 
     # estimator = tf.estimator.Estimator(model_fn=model.model_fn,
     #                                    model_dir=output_dir,
