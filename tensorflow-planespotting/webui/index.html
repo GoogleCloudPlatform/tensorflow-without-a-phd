@@ -65,47 +65,6 @@
                         <option value="NRT">NRT Tokyo Narita</option>
                         <option value="ICN">ICN Seoul Incheon</option>
                         <option value="DMA">DMA Davis Mothan Boneyard</option>
-
-                        <option value="">--> training pictures</option>
-                        <option value="train_ATL">ATL Atlanta</option>
-                        <option value="train_AUS">AUS Austin</option>
-                        <option value="train_BHM">BHM Birmingham, Alabama</option>
-                        <option value="train_BOS">BOS Boston</option>
-                        <option value="train_BWI">BWI Baltimore</option>
-                        <option value="train_CLT">CLT Charlotte</option>
-                        <option value="train_CVG">CVG Cincinnati</option>
-                        <option value="train_DSM">DSM Des Moines</option>
-                        <option value="train_EYW">EYW Key West, Florida</option>
-                        <option value="train_FAT">FAT Fresno</option>
-                        <option value="train_FLG">FLG Flagstaff</option>
-                        <option value="train_FLL">FLL Fort Lauderdale</option>
-                        <option value="train_FWA">FWA Fort Wayne</option>
-                        <option value="train_IAD">IAD Dulles</option>
-                        <option value="train_IAH">IAH Houston</option>
-                        <option value="train_IND">IND Indianapolis</option>
-                        <option value="train_MDW">MDW Chicago Midway</option>
-                        <option value="train_MIA">MIA Miami</option>
-                        <option value="train_OAK">OAK Oakland</option>
-                        <option value="train_OHR">OHR Chicago O'Hare</option>
-                        <option value="train_PHX">PHX Phoenix</option>
-                        <option value="train_SAN">SAN San Antonio</option>
-                        <option value="train_SEA">SEA Seattle</option>
-                        <option value="train_SFO">SFO San Francisco</option>
-                        <option value="train_SJC">SJC San Jose</option>
-
-                        <option value="">--> test pictures</option>
-                        <option value="test_DEN">DEN Denver</option>
-                        <option value="test_LAX">LAX Los Angeles</option>
-                        <option value="test_MSY">MSY New Orleans</option>
-                        <option value="test_TUC1l">TUC Tucson 1l</option>
-                        <option value="test_TUC1s">TUC Tucson 1s</option>
-                        <option value="test_TUC2s">TUC Tucson 2s</option>
-                        <option value="test_TUC3s">TUC Tucson 3s</option>
-                        <option value="test_TUC4s">TUC Tucson 4s</option>
-
-                        <option value="">--> boneyard pictures</option>
-                        <option value="train_DMA">DMA Davis Mothan Boneyard</option>
-                        <option value="train_DMA2">DMA Davis Mothan Boneyard 2</option>
                     </select>
                 </form>
                 <canvas id="cap"></canvas>
@@ -115,20 +74,9 @@
                 <form name="modsel"">
                     <input id="analyze" type="hidden" value="Analyze" autofocus>
                     <div class="console" id="sap"></div>
-                    <select name="model">
-                        <!-- sorry, you do not have access to these models, please train your own -->
-                        <option value="cloudml-demo-martin/plane_jpeg_scan_100_200_300_400_600_900/v00">20x20 tile classifier v0</option>
-                        <option value="cloudml-demo-martin/plane_jpeg_scan_100_200_300_400_600_900/v02">20x20 tile regularized accuracy 99.6%</option>
-                        <option value="cloudml-demo-martin/plane_jpeg_scan_100_200_300_400_600_900/v7_256x256">20x20 tile classifier best - more data</option>
-                        <option value="cloudml-demo-martin/jpeg_yolo_256x256/v5">YOLO 12 layers, v5, 16x16x2 swarm optimized</option>
-                        <option value="cloudml-demo-martin/jpeg_yolo_256x256/v19">YOLO 12 layers, v19, 16x16x2 swarm optimized, data augmentation</option>
-                        <!--option value="cloudml-demo-martin/jpeg_yolo_256x256/v20">YOLO detection 16x16x2, swarm optimized, 17 layers, data augmentation</option-->
-                        <!--option value="cloudml-demo-martin/jpeg_yolo_256x256/v795">YOLO detection 16x16x2 swarm optimized, 12 layers, data augmentation+ v795</option-->
-                        <option value="cloudml-demo-martin/jpeg_yolo_256x256/v874" selected>YOLO 12 layers, v874, best fast, 16x16x2 swarm optimized, data augmentation+, cosine restarts</option>
-                        <option value="cloudml-demo-martin/jpeg_yolo_256x256/v814">YOLO 17 layers, v814, 16x16x2, swarm optimized, 17 layers, data augmentation+, light dropout</option>
-                        <!--option value="cloudml-demo-martin/jpeg_yolo_256x256/v806b">YOLO 17L least false positives, many missed planes v806b</option-->
-                        <!--option value="cloudml-demo-martin/jpeg_yolo_256x256/v818dark">YOLO 17L darknet, best detection, many false positives v818dark</option-->
-                        <option value="cloudml-demo-martin/jpeg_yolo_256x256/v875b">YOLO 17 layers, v875b, 16x16x2, swarm optimized, data augmentation+, light dropout, cosine restarts, distributed x4, good but some false positives</option>
+                    <select name="model" style="visibility:hidden">
+                        <!-- pre-deployed models here
+                        <option value="my_project/my_model/my_version">Good model</option> -->
                     </select>
                 </form>
                 <form name="addyourown">

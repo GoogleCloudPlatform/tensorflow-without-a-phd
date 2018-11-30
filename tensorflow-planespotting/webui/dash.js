@@ -27,6 +27,9 @@ document.addEventListener("DOMContentLoaded", function(event) {
         cap.height = zone_height
     }
 
+    // check if model selector contains data, if so make it visible
+    addModel();
+
     // form event handlers
     addyourown.addEventListener('submit', function(evt) {
         if (addyourown.button.type == 'submit')
@@ -234,7 +237,10 @@ function displayResultMarkers(tile, markers, model_version) {
 function processingURL(url) {
     var sap = document.getElementById("sap")
     if (sap) {
-        sap.innerHTML += url
+        if (url && url != 'projects/')
+            sap.innerHTML += url;
+        else
+            sap.innerHTML += "ERROR: there is no model specified";
     }
 }
 
@@ -307,17 +313,25 @@ function disableMapScroll() {
 }
 
 function addModel() {
-    for (i = 0; i < document.modsel.model.options.length; ++i){
-        if (document.modsel.model.options[i].value == document.addyourown.model.value){
+    var n
+    for (n = 0; n < document.modsel.model.options.length; n++){
+        if (document.modsel.model.options[n].value == document.addyourown.model.value){
             document.modsel.model.value = document.addyourown.model.value
             return
         }
     }
-    var option = document.createElement("option")
-    option.text = document.addyourown.model.value
-    option.value = document.addyourown.model.value
-    document.modsel.model.add(option)
-    document.modsel.model.value = document.addyourown.model.value
+    if (document.addyourown.model.value) {
+        var option = document.createElement("option")
+        option.text = document.addyourown.model.value
+        option.value = document.addyourown.model.value
+        document.modsel.model.add(option)
+        // select the newly added value
+        document.modsel.model.value = document.addyourown.model.value
+        n++
+    }
+    // make the select box visible if it has more than one value now
+    if (n>0)
+        document.modsel.model.style.visibility = "visible"
 }
 
 function toggleAddYourOwnEdit() {

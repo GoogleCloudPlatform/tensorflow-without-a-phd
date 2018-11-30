@@ -75,6 +75,12 @@ body {
     margin-top:2px;
     margin-bottom:2px;
 }
+.uiblock input[type="text"] {
+    display: block;
+    width: 97%;   /* bug ? */
+    margin-top:2px;
+    margin-bottom:1px;
+}
 .uiblock .title {
     color: grey;
     margin-bottom: 2px;
