@@ -69,6 +69,12 @@ body {
     margin-bottom:2px;
     text-align-last: center;
 }
+.uiblock input {
+    display: block;
+    width: 100%;
+    margin-top:2px;
+    margin-bottom:2px;
+}
 .uiblock .title {
     color: grey;
     margin-bottom: 2px;

@@ -20,6 +20,7 @@
     <meta charset="UTF-8">
     <title>Plane spotting</title>
     <link rel="stylesheet" href="style.css" />
+    <link rel="shortcut icon" type="image/ico" href="favicon.jpg" />
 
     <!-- application scripts, need DOM ready -->
     <script defer src="globals.js"></script>
@@ -41,9 +42,10 @@
         <div id="dashboard">
             <div class="uiblock" >
                 <div class="title">ML Engine</div>
-                <button id="authorize-button" onclick="authorize()" style="display: none;">Authorize</button>
-                <button id="signout-button" onclick="signout()" style="display: none;">Sign Out</button>
-                <div class="msg" ng-bind="pubsub_status"></div>
+                <form name="signinUI">
+                    <input name="authorize" type="submit" value="Authorize" />
+                    <input name="signout" type="hidden" value="Sign Out" />
+                </form>
             </div>
             <div class="uiblock">
                 <div class="title">Map capture</div>
@@ -110,40 +112,44 @@
             </div>
             <div class="uiblock">
                 <div class="title">ML Engine REST call</div>
-                <button id="analyze-button" onclick="analyze()" style="display:none;">Analyze</button>
-                <div class="console" id="sap"></div>
-                <form name="modsel">
+                <form name="modsel"">
+                    <input id="analyze" type="hidden" value="Analyze" autofocus>
+                    <div class="console" id="sap"></div>
                     <select name="model">
                         <!-- sorry, you do not have access to these models, please train your own -->
-                        <option value="plane_jpeg_scan_100_200_300_400_600_900/versions/v00">20x20 tile classifier v0</option>
-                        <option value="plane_jpeg_scan_100_200_300_400_600_900/versions/v02">20x20 tile regularized accuracy 99.6%</option>
-                        <option value="plane_jpeg_scan_100_200_300_400_600_900/versions/v7_256x256">20x20 tile classifier best - more data</option>
-                        <option value="jpeg_yolo_256x256/versions/v5">YOLO 12 layers, v5, 16x16x2 swarm optimized</option>
-                        <option value="jpeg_yolo_256x256/versions/v19">YOLO 12 layers, v19, 16x16x2 swarm optimized, data augmentation</option>
-                        <!--option value="jpeg_yolo_256x256/versions/v20">YOLO detection 16x16x2, swarm optimized, 17 layers, data augmentation</option-->
-                        <!--option value="jpeg_yolo_256x256/versions/v795">YOLO detection 16x16x2 swarm optimized, 12 layers, data augmentation+ v795</option-->
-                        <option value="jpeg_yolo_256x256/versions/v874" selected>YOLO 12 layers, v874, best fast, 16x16x2 swarm optimized, data augmentation+, cosine restarts</option>
-                        <option value="jpeg_yolo_256x256/versions/v814">YOLO 17 layers, v814, 16x16x2, swarm optimized, 17 layers, data augmentation+, light dropout</option>
-                        <!--option value="jpeg_yolo_256x256/versions/v806b">YOLO 17L least false positives, many missed planes v806b</option-->
-                        <!--option value="jpeg_yolo_256x256/versions/v818dark">YOLO 17L darknet, best detection, many false positives v818dark</option-->
-                        <option value="jpeg_yolo_256x256/versions/v875b">YOLO 17 layers, v875b, 16x16x2, swarm optimized, data augmentation+, light dropout, cosine restarts, distributed x4, good but some false positives</option>
+                        <option value="cloudml-demo-martin/plane_jpeg_scan_100_200_300_400_600_900/v00">20x20 tile classifier v0</option>
+                        <option value="cloudml-demo-martin/plane_jpeg_scan_100_200_300_400_600_900/v02">20x20 tile regularized accuracy 99.6%</option>
+                        <option value="cloudml-demo-martin/plane_jpeg_scan_100_200_300_400_600_900/v7_256x256">20x20 tile classifier best - more data</option>
+                        <option value="cloudml-demo-martin/jpeg_yolo_256x256/v5">YOLO 12 layers, v5, 16x16x2 swarm optimized</option>
+                        <option value="cloudml-demo-martin/jpeg_yolo_256x256/v19">YOLO 12 layers, v19, 16x16x2 swarm optimized, data augmentation</option>
+                        <!--option value="cloudml-demo-martin/jpeg_yolo_256x256/v20">YOLO detection 16x16x2, swarm optimized, 17 layers, data augmentation</option-->
+                        <!--option value="cloudml-demo-martin/jpeg_yolo_256x256/v795">YOLO detection 16x16x2 swarm optimized, 12 layers, data augmentation+ v795</option-->
+                        <option value="cloudml-demo-martin/jpeg_yolo_256x256/v874" selected>YOLO 12 layers, v874, best fast, 16x16x2 swarm optimized, data augmentation+, cosine restarts</option>
+                        <option value="cloudml-demo-martin/jpeg_yolo_256x256/v814">YOLO 17 layers, v814, 16x16x2, swarm optimized, 17 layers, data augmentation+, light dropout</option>
+                        <!--option value="cloudml-demo-martin/jpeg_yolo_256x256/v806b">YOLO 17L least false positives, many missed planes v806b</option-->
+                        <!--option value="cloudml-demo-martin/jpeg_yolo_256x256/v818dark">YOLO 17L darknet, best detection, many false positives v818dark</option-->
+                        <option value="cloudml-demo-martin/jpeg_yolo_256x256/v875b">YOLO 17 layers, v875b, 16x16x2, swarm optimized, data augmentation+, light dropout, cosine restarts, distributed x4, good but some false positives</option>
                     </select>
                 </form>
-            </div>
+                <form name="addyourown">
+                    <input name="model" type="hidden" placeholder="project/model/version" />
+                    <input name="button" type="submit" value="+add your own model" />
+                </form>
+           </div>
 
-            <div class="uiblock">
-                <div class="title">JSON</div>
-                <div class="console" id="jap"></div>
-            </div>
-        </div>
-        <div id="map"></div>
-        <div id="imgmap" class="drag-scrollable"></div>
-        <div id="zoomctrl">
-            <div onclick="zoomIn()">+</div>
-            <div onclick="zoomOut()">-</div>
-        </div>
-        <div id="zone-container"><div id="zone"></div></div></div>
-    </div>
+           <div class="uiblock">
+               <div class="title">JSON</div>
+               <div class="console" id="jap"></div>
+           </div>
+       </div>
+       <div id="map"></div>
+       <div id="imgmap" class="drag-scrollable"></div>
+       <div id="zoomctrl">
+           <div onclick="zoomIn()">+</div>
+           <div onclick="zoomOut()">-</div>
+       </div>
+       <div id="zone-container"><div id="zone"></div></div></div>
+   </div>
 </body>
 
 </html>

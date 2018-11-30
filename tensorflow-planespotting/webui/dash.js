@@ -26,28 +26,79 @@ document.addEventListener("DOMContentLoaded", function(event) {
         cap.width = zone_width
         cap.height = zone_height
     }
+
+    // form event handlers
+    addyourown.addEventListener('submit', function(evt) {
+        if (addyourown.button.type == 'submit')
+            toggleAddYourOwnEdit();
+        else {
+            addModel();
+            toggleAddYourOwnButton();
+        }
+        evt.preventDefault();
+        return false
+    });
+
+    addyourown.model.addEventListener('keyup', function(evt) {
+        if (evt.which == 27) {
+            toggleAddYourOwnButton();
+            //evt.stopPropagation();
+            evt.preventDefault();
+        }
+    })
+
+    modsel.addEventListener('submit', function(evt) {
+        analyze();
+        evt.preventDefault();
+        return false
+    });
+
+    signinUI.addEventListener('submit', function(evt) {
+        if (signinUI.authorize.type == "submit")
+            authorize();
+        else if (signinUI.signout.type == "submit")
+            signout();
+        evt.preventDefault();
+        return false
+    });
+
 });
 
 function updateSigninStatus(isSignedIn) {
     if (isSignedIn) {
-        authorizeButton.style.display = 'none';
-        signoutButton.style.display = 'block';
-        analyzeButton.style.display = 'block';
+        signinUI.authorize.type = 'hidden';
+        signinUI.signout.type = 'submit';
+        modsel.analyze.type = 'submit'
     } else {
-        authorizeButton.style.display = 'block';
-        signoutButton.style.display = 'none';
-        analyzeButton.style.display = 'none';
+        signinUI.authorize.type = 'submit';
+        signinUI.signout.type = "hidden";
+        modsel.analyze.type = 'hidden'
     }
 }
 
 function analyze() {
-    resetResults()
-    var delay = 0
+    resetResults();
+    var delay = 0;
 
-    var model_url = "projects/cloudml-demo-martin/models/" + document.modsel.model.value
-    var model_version = model_url.match(/\/v([0-9]+)/) // can be undefined
-    //var model_version = /\/v([0-9].*).*/.match(model_url) // can be undefined
-    model_version = model_version[1]
+    model_name = document.modsel.model.value
+    // format some_project/some_model/some_version
+    var model_parts = model_name.split('/');
+    model_project_name = model_parts[0];
+    model_basename = model_parts[1];
+    model_baseversion = model_parts[2];
+
+    var model_url = "projects/" + model_project_name;
+    if (model_basename) model_url += "/models/" + model_basename;
+    if (model_baseversion) model_url += "/versions/" + model_baseversion;
+
+    // hack to revert coords for some old versions
+    var model_version = model_url.match(/\/v([0-9]+)/);
+    if (model_version == null)
+        model_version = 99;  // all new version do not need the hack
+    else
+        model_version = model_version[1];
+
+    processingURL(model_url);
 
     payload_tiles.map(function (tile) {
         setTimeout(function() {
@@ -57,8 +108,6 @@ function analyze() {
             // magic formula: the body of the request goes into the "resource" parameter
             mlengine.projects.predict({
                 name: model_url,
-                //name: "projects/cloudml-demo-martin/models/plane_jpeg_scan_100_200_300_400_600_900/versions/v7_256x256",
-                //name: "projects/cloudml-demo-martin/models/jpeg_yolo_256x256",
                 resource: body
             })
                 .then(function (res) {
@@ -68,7 +117,6 @@ function analyze() {
                     }
                     else {
                         var nb_planes = 0
-                        var nb_results = 0
                         var result_markers = []
                         res.result.predictions.map(function(prediction) {
                             //code for endpoint jpeg_yolo_256x256
@@ -183,6 +231,13 @@ function displayResultMarkers(tile, markers, model_version) {
     }
 }
 
+function processingURL(url) {
+    var sap = document.getElementById("sap")
+    if (sap) {
+        sap.innerHTML += url
+    }
+}
+
 function processingResults(tile) {
     var sap = document.getElementById("sap")
     if (sap) {
@@ -250,3 +305,30 @@ function disableMapScroll() {
     if (sap) sap.innerHTML = "Grabbing pixels..."
     console.log("---Disable Map Scroll")
 }
+
+function addModel() {
+    for (i = 0; i < document.modsel.model.options.length; ++i){
+        if (document.modsel.model.options[i].value == document.addyourown.model.value){
+            document.modsel.model.value = document.addyourown.model.value
+            return
+        }
+    }
+    var option = document.createElement("option")
+    option.text = document.addyourown.model.value
+    option.value = document.addyourown.model.value
+    document.modsel.model.add(option)
+    document.modsel.model.value = document.addyourown.model.value
+}
+
+function toggleAddYourOwnEdit() {
+    addyourown.button.type = 'hidden';
+    addyourown.model.type = 'text';
+    addyourown.model.focus()
+}
+
+function toggleAddYourOwnButton() {
+    addyourown.button.type = 'submit';
+    addyourown.model.type = 'hidden';
+    setTimeout(function(){addyourown.button.focus()}, 0)
+}
+

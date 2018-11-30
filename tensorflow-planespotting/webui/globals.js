@@ -29,12 +29,8 @@ var tile_size = 256
 // acceptable tile sizes depend on ML Engine model used. Currently:
 // plane_jpeg_scan_100_200_300_400_600_900 supports square tiles of 100, 200, 300, 400, 600, 900 and 256 pixels
 // jpeg_yolo_256x256 supports square tiles of 256 pixels only
-var tile_delay = 50 // delay in ms between consecutive calls to ML Engine online predictions API (can be 0)
+var tile_delay = 50  // delay in ms between consecutive calls to ML Engine online predictions API (can be 0)
 
-// all button event handlers
-var analyzeButton = document.getElementById('analyze-button');
-var authorizeButton = document.getElementById('authorize-button');
-var signoutButton = document.getElementById('signout-button');
 var scrollTimer;
 
 // airports with their coordinates

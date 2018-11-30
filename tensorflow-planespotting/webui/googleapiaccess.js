@@ -29,11 +29,14 @@ function initMap() {
         zoom = 16
     else
         zoom = parseInt(zoom)
+
     googlemap = new google.maps.Map(document.getElementById('map'), {
         zoom: zoom,
         center: latlng,
-        mapTypeId: google.maps.MapTypeId.SATELLITE
-    })
+        mapTypeId: google.maps.MapTypeId.SATELLITE,
+        streetViewControl: false,  // disable pegman
+        fullscreenControl: false
+    });
     // this works on map load
     google.maps.event.addListenerOnce(googlemap, 'tilesloaded', grabPixels)
     // this works after the maps has loaded once, and for some reason the setTimeout is necessary
