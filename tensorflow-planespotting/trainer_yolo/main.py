@@ -194,7 +194,7 @@ def main(argv):
     parser.add_argument('--hp-data-cache-n-epochs', default=0, type=int, help='Generate random data variations for n epochs then cache and reuse.')
     # switch for training on TPUs
     parser.add_argument('--hp-use-tpu', default=True, type=str2bool, help='Enable training on TPUs')
-    parser.add_argument('--hp-tpu-iterations', default=1000, type=int, help='Iterations per call to the TPU')
+    parser.add_argument('--hp-tpu-iterations', default=200, type=int, help='Iterations per call to the TPU')
     # TPUEstimator uses the following parameters internally - do not use them
     parser.add_argument('--tpu', default=None, help='(internal) ML Engine uses this argument to pass the IP address of the TPU')
     parser.add_argument('--tpu-zone', default=None, help='(internal) GCP zone where to provision the TPUs')
