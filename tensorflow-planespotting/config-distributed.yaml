@@ -17,6 +17,15 @@
 # 1 parameter server with a CPU only
 
 trainingInput:
-  scaleTier: CUSTOM
   masterType: standard
   workerType: cloud_tpu_v3
+  workerCount: 1
+
+#trainingInput:
+#  masterType: 'n1-standard-16'
+#  workerType: 'cloud_tpu'
+#  worker_count: 1
+#  workerConfig:
+#    accelerator_config:
+#      type: 'TPU_V3'
+#      count: 8
