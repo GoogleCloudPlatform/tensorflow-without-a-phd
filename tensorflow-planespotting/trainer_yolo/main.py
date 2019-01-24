@@ -116,14 +116,14 @@ def start_training(output_dir, hparams, data, tiledata, **kwargs):
     # If running long evaluations, workers can be done before master and in that case ML Engine crashes.
     # These device filters prevent unwanted communications from happening and will prevent the crash.
     # This code should be folded into Estimator in Tensorflow v1.9
-    tf_config = json.loads(os.environ.get('TF_CONFIG', '{}'))
-    config = None
-    if 'task' not in tf_config:
-        config = None
-    elif tf_config['task']['type'] == 'master':
-        config = tf.ConfigProto(device_filters=['/job:ps', '/job:master'])
-    elif tf_config['task']['type'] == 'worker':
-        config = tf.ConfigProto(device_filters=['/job:ps', '/job:worker/task:%d' % tf_config['task']['index']])
+    #tf_config = json.loads(os.environ.get('TF_CONFIG', '{}'))
+    #config = None
+    #if 'task' not in tf_config:
+    #    config = None
+    #elif tf_config['task']['type'] == 'master':
+    #    config = tf.ConfigProto(device_filters=['/job:ps', '/job:master'])
+    #elif tf_config['task']['type'] == 'worker':
+    #    config = tf.ConfigProto(device_filters=['/job:ps', '/job:worker/task:%d' % tf_config['task']['index']])
     # end of temporary fix code for distributed training on ML Engine
 
     # Experimental distribution strategy if running on a machine with multiple GPUs
@@ -134,8 +134,8 @@ def start_training(output_dir, hparams, data, tiledata, **kwargs):
                                              save_summary_steps=100,
                                              save_checkpoints_steps=2000,
                                              keep_checkpoint_max=1,
-                                             train_distribute=distribution,
-                                             session_config=config)  # device filters set here
+                                             train_distribute=distribution)
+    #                                         session_config=config)  # device filters set here
 
     estimator = tf.estimator.Estimator(model_fn=model.model_fn,
                                        model_dir=output_dir,
