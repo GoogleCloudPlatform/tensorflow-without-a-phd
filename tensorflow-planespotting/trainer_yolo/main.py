@@ -116,9 +116,7 @@ def start_training(output_dir, hparams, data, tiledata, **kwargs):
         model_dir=output_dir,
         session_config=tf.ConfigProto(allow_soft_placement=True, log_device_placement=False),
         tpu_config=tf.contrib.tpu.TPUConfig(hparams['tpu_iterations'], 8),  # 8 cores in a TPU board
-        cluster=tf.contrib.cluster_resolver.TPUClusterResolver(kwargs['tpu'],
-                                                               kwargs['tpu_zone'],
-                                                               kwargs['gcp_project']) if hparams['use_tpu'] else None)
+        cluster=tf.contrib.cluster_resolver.TPUClusterResolver(kwargs['master']) if hparams['use_tpu'] else None)
 
     # Experimental distribution strategy if running on a machine with multiple GPUs
     # logging.log(logging.INFO, "GPUs found: " + str(get_available_gpus()))
@@ -196,9 +194,7 @@ def main(argv):
     parser.add_argument('--hp-use-tpu', default=True, type=str2bool, help='Enable training on TPUs')
     parser.add_argument('--hp-tpu-iterations', default=200, type=int, help='Iterations per call to the TPU')
     # TPUEstimator uses the following parameters internally - do not use them
-    parser.add_argument('--tpu', default=None, help='(internal) ML Engine uses this argument to pass the IP address of the TPU')
-    parser.add_argument('--tpu-zone', default=None, help='(internal) GCP zone where to provision the TPUs')
-    parser.add_argument('--gcp-project', default=None, help='(internal) GCP project where to provision the TPUs')
+    parser.add_argument('--master', default=None, help='(internal) ML Engine uses this argument to pass the IP address of the TPU')
 
     args = parser.parse_args()
     arguments = args.__dict__
