@@ -17,9 +17,6 @@
 # 1 parameter server with a CPU only
 
 trainingInput:
-  masterType: standard_v100
-  parameterServerType: standard
-  workerType: standard_v100
-
-  parameterServerCount: 1
-  workerCount: 3
+  scaleTier: CUSTOM
+  masterType: standard
+  workerType: cloud_tpu_v3
