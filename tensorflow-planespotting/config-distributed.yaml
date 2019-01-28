@@ -16,11 +16,17 @@
 # 1 master with a GPU, all four machines will be training
 # 1 parameter server with a CPU only
 
+# To use this config file, use the following command-line options:
+# --scale-tier CUSTOM
+# --config #{THIS_CONFIG_FILE}
+
+# old syntax for TPUv3 (subject to whitelist while in alpha)
 trainingInput:
   masterType: standard
   workerType: cloud_tpu_v3
   workerCount: 1
 
+# new syntax for TPUv3 (subject to whitelist while in alpha)
 #trainingInput:
 #  masterType: 'n1-standard-16'
 #  workerType: 'cloud_tpu'
