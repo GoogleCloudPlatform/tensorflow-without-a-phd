@@ -36,6 +36,7 @@ printf -v N "%04d" $N
 set -x
 gcloud ml-engine jobs submit training airplane$N \
     --job-dir "${BUCKET}/jobs/airplane$N" \
+    --scale-tier CUSTOM \
     --config ${CONFIG} \
     --project ${PROJECT} \
     --region ${REGION} \

@@ -132,7 +132,7 @@ def start_training(output_dir, hparams, data, tiledata, **kwargs):
 
     training_config = tf.estimator.RunConfig(model_dir=output_dir,
                                              save_summary_steps=100,
-                                             save_checkpoints_steps=2000,
+                                             save_checkpoints_steps=hparams['iterations']//hparams['evaluations'],
                                              keep_checkpoint_max=1,
                                              train_distribute=distribution)
     #                                         session_config=config)  # device filters set here
@@ -156,6 +156,7 @@ def main(argv):
     parser.add_argument('--hp-batch-size', default=10, type=int, help='Hyperparameter: training batch size')
     parser.add_argument('--hp-eval-batch-size', default=32, type=int, help='Hyperparameter: evaluation batch size')
     parser.add_argument('--hp-eval-iterations', default=262, type=int, help='Hyperparameter: eval iterations')  # eval dataset is 8380 tiles (262 batches of 32) - larger batch will OOM.
+    parser.add_argument('--hp-evaluations', default=4, type=int, help='Hyperparameter: number of evaluations during the training run')
     parser.add_argument('--hp-shuffle-buf', default=3000, type=int, help='Hyperparameter: data shuffle buffer size. Use at least 20,000 if training from aerial photos directly. 3000 is good when trainig from tiles.')
     parser.add_argument('--hp-layers', default=12, type=int, help='Hyperparameter: number of layers')
     parser.add_argument('--hp-first-layer-filter-size', default=3, type=int, help='Hyperparameter: filter size in first layer')

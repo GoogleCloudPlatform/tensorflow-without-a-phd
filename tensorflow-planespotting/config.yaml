@@ -13,13 +13,7 @@
 # limitations under the License.
 
 trainingInput:
-  #scaleTier: BASIC
-  #scaleTier: BASIC_GPU
-  #scaleTier: BASIC_TPU
-  #scaleTier: STANDARD_1
-  #scaleTier: PREMIUM_1
-
-  scaleTier: CUSTOM
+  
   masterType: standard_p100
-  #masterType: complex_model_m_p100  # Four NVIDIA Tesla P100 GPUs (Beta), for use with MirroredStrategy
+  #masterType: complex_model_m_v100  # Four NVIDIA Tesla P100 GPUs (Beta), for use with MirroredStrategy
 
