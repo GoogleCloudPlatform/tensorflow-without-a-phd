@@ -142,8 +142,8 @@ def start_training(output_dir, hparams, data, tiledata, **kwargs):
 
     # tf.estimator.train_and_evaluate(estimator, train_spec, eval_spec)
 
-    TPU_EVAL_EVERY_STEPS = 10000  # only one eval at the end
-    for i in range(int(math.ceil(hparams["iterations"]*1.0/TPU_EVAL_EVERY_STEPS))):
+    TPU_EVAL_EVERY_STEPS = hparams["iterations"]//hparams["evaluations"]
+    for i in range(hparams["evaluations"]):
         estimator.train(train_data_input_fn, steps=min(TPU_EVAL_EVERY_STEPS, hparams["iterations"]-TPU_EVAL_EVERY_STEPS*i))
         estimator.evaluate(input_fn=eval_data_input_fn, steps=hparams['eval_iterations'])
     estimator.export_savedmodel(os.path.join(output_dir, "planespotting"), serving_input_fn)
