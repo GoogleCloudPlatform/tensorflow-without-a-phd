@@ -12,14 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# 4 training workers with GPUs
-# 1 master with a GPU because it will be running evaluations which are quite heavy in this model
+# 3 training workers with GPUs, one of them will do evaluations
+# 1 master with a GPU, all four machines will be training
 # 1 parameter server with a CPU only
 
 trainingInput:
-  masterType: standard_p100
+  masterType: standard_v100
   parameterServerType: standard
-  workerType: standard_p100
+  workerType: standard_v100
 
   parameterServerCount: 1
-  workerCount: 4
+  workerCount: 3
