@@ -412,25 +412,7 @@ def scale_rois(rois, scale_xy):
     return rois * tiled_scale  # broadcast
 
 
-# tiles shape [n_tiles, 4] coordinates (x1, y1, x2, y2) in aerial image coordinates
-# rois shape [n_rois, 4] coordinates (x1, y1, x2, y2) in aerial image coordinates
-# max_per_tile: max number of possible rois in one tile, if None, all rois are returned along with a boolean mask
-# output: shape [n_tiles, max_per_tile or n_rois, 4] coordinates (x1, y1, x2, y2) in tile
-#         relative coordinates in which tile width = 1.0
-def rois_in_tiles_relative(tiles, rois, max_per_tile=None, assert_on_overflow=True):
-    if max_per_tile:
-        rois, overflow = remove_non_intersecting_rois_and_pad(tiles, rois, max_per_tile)  # [n_tiles, max_per_tile, 4]
-    else:
-        rois, is_roi_in_tile = find_non_intersecting_rois(tiles, rois)  # [n_tiles, n_rois, 4]
-        #rois = tf.where(tf.tile(tf.expand_dims(is_roi_in_tile, axis=-1), [1,1,4]), rois, tf.zeros_like(rois))
-        rois = zero_where(rois, tf.logical_not(is_roi_in_tile))
-
-    # Log error if padding overflow
-    if max_per_tile and assert_on_overflow:
-        with tf.control_dependencies([tf.assert_non_positive(overflow,
-                                     message="ROI per tile overflow. Set MAX_TARGET_ROIS_PER_TILE to a larger value.")]):
-            rois = tf.identity(rois)
-
+def make_rois_relative_to_tiles(tiles, rois):
     # roi coordinates relative to tile
     tiles = tf.expand_dims(tiles, axis=1)  # force broadcasting on correct axis
     tile_x1, tile_y1, tile_x2, tile_y2 = tf.unstack(tiles, axis=2)  # shape [n_tiles, 1]
@@ -440,13 +422,42 @@ def rois_in_tiles_relative(tiles, rois, max_per_tile=None, assert_on_overflow=Tr
     roi_y1 = (roi_y1 - tile_y1) / (tile_y2-tile_y1)
     roi_y2 = (roi_y2 - tile_y1) / (tile_y2-tile_y1)
     rois = tf.stack([roi_x1, roi_y1, roi_x2, roi_y2], axis=-1)  # shape [n_tiles, max_per_tile, 4]
+    return rois
+
+
+# tiles shape [n_tiles, 4] coordinates (x1, y1, x2, y2) in aerial image coordinates
+# rois shape [n_rois, 4] coordinates (x1, y1, x2, y2) in aerial image coordinates
+# max_per_tile: max number of possible rois in one tile
+# output: shape [n_tiles, max_per_tile, 4] coordinates (x1, y1, x2, y2) in tile
+#         relative coordinates in which tile width = 1.0
+def rois_in_tiles_relative_and_pad(tiles, rois, max_per_tile, assert_on_overflow=True):
+    rois, overflow = remove_non_intersecting_rois_and_pad(tiles, rois, max_per_tile)  # [n_tiles, max_per_tile, 4]
+    rois = make_rois_relative_to_tiles(tiles, rois)
     # replace empty ROIs by (0,0,0,0) for clarity
     is_roi_empty = find_empty_rois(rois)
     rois = zero_where(rois, is_roi_empty)
-    if max_per_tile:
-        return rois
-    else:
-        return rois, is_roi_in_tile
+
+    # Log error if padding overflow
+    if assert_on_overflow:
+        with tf.control_dependencies([tf.assert_non_positive(overflow,
+                                                             message="ROI per tile overflow. Set MAX_TARGET_ROIS_PER_TILE to a larger value.")]):
+            rois = tf.identity(rois)
+    return rois
+
+
+# tiles shape [n_tiles, 4] coordinates (x1, y1, x2, y2) in aerial image coordinates
+# rois shape [n_rois, 4] coordinates (x1, y1, x2, y2) in aerial image coordinates
+# max_per_tile: max number of possible rois in one tile, if None, all rois are returned along with a boolean mask
+# output: shape [n_tiles, n_rois, 4] coordinates (x1, y1, x2, y2) in tile
+#         relative coordinates in which tile width = 1.0
+def rois_in_tiles_relative(tiles, rois):
+    rois, is_roi_in_tile = find_non_intersecting_rois(tiles, rois)  # [n_tiles, n_rois, 4]
+    rois = zero_where(rois, tf.logical_not(is_roi_in_tile))
+    rois = make_rois_relative_to_tiles(tiles, rois)
+    # replace empty ROIs by (0,0,0,0) for clarity
+    is_roi_empty = find_empty_rois(rois)
+    rois = zero_where(rois, is_roi_empty)
+    return rois, is_roi_in_tile
 
 
 class IOUCalculator(object):

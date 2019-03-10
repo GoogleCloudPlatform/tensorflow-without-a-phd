@@ -251,7 +251,7 @@ def generate_slice(pixels, rois, fname, yolo_cfg, rnd_hue, rnd_orientation, repe
     # "roi": a plane bounding box (ground truth)
 
     # Compute ground truth ROIs
-    target_rois = box.rois_in_tiles_relative(tiles, rois, settings.MAX_TARGET_ROIS_PER_TILE)  # shape [n_tiles, MAX_TARGET_ROIS_PER_TILE, 4]
+    target_rois = box.rois_in_tiles_relative_and_pad(tiles, rois, settings.MAX_TARGET_ROIS_PER_TILE)  # shape [n_tiles, MAX_TARGET_ROIS_PER_TILE, 4]
 
     # resize rois to units used by crop_and_resize
     # TODO: refactor unit conversion into utils_box
@@ -452,7 +452,7 @@ def read_tfrecord_features(example, yolo_cfg, rnd_hue, rnd_orientation):
     tile = tf.constant([0, 0, settings.TILE_SIZE, settings.TILE_SIZE], tf.float32)
     one_tile = tf.expand_dims(tile, axis=0)
     # Compute ground truth ROIs
-    target_rois = box.rois_in_tiles_relative_padded(one_tile, rois, settings.MAX_TARGET_ROIS_PER_TILE)  # shape [n_tiles, MAX_TARGET_ROIS_PER_TILE, 4]
+    target_rois = box.rois_in_tiles_relative_and_pad(one_tile, rois, settings.MAX_TARGET_ROIS_PER_TILE)  # shape [n_tiles, MAX_TARGET_ROIS_PER_TILE, 4]
     target_rois = tf.reshape(target_rois, [settings.MAX_TARGET_ROIS_PER_TILE, 4])  # 4 for x1, y1, x2, y2
     # Compute ground truth ROIs assigned to YOLO grid cells
     yolo_target_rois = yolo_roi_attribution(tile, rois, yolo_cfg)

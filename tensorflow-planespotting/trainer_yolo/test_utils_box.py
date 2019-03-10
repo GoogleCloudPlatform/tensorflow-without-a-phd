@@ -173,8 +173,8 @@ class BoxRoiUtilsTest(unittest.TestCase):
         correct_bool4 = np.array([[False, True, False, True, False],
                                   [False, True, False, False, False],
                                   [False, True, False, True, True]])
-        filtered_rois = rois_in_tiles_relative(tiles, rois, max_per_tile=3)
-        filtered_rois2 = rois_in_tiles_relative(tiles, rois, max_per_tile=2, assert_on_overflow=False)  # this overflows max_per_tile
+        filtered_rois = rois_in_tiles_relative_and_pad(tiles, rois, max_per_tile=3)
+        filtered_rois2 = rois_in_tiles_relative_and_pad(tiles, rois, max_per_tile=2, assert_on_overflow=False)  # this overflows max_per_tile
         filtered_rois3, is_in_roi3 = rois_in_tiles_relative(tiles, rois)
         filtered_rois4, is_in_roi4 = rois_in_tiles_relative(irregular_tiles, rois)
         with tf.Session() as sess:
