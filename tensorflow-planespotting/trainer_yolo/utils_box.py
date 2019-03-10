@@ -339,7 +339,7 @@ def find_empty_rois(rois):
 # rois: shape [n, 4]
 # mask: shape [n]
 # output: shape [max_n, 4]
-def filter_by_bool(rois, mask, max_n):
+def filter_by_bool_and_pad(rois, mask, max_n):
     rois = tf.boolean_mask(rois, mask)
     n = tf.shape(rois)[0]
     # make sure we have enough space in the tensor for all ROIs.
@@ -354,10 +354,10 @@ def filter_by_bool(rois, mask, max_n):
 # rois: shape [batch, n, 4]
 # mask: shape [batch, n]
 # output: shape [batch, max_n, 4]
-def batch_filter_by_bool(rois, mask, max_n):
+def batch_filter_by_bool_and_pad(rois, mask, max_n):
     rois_n = tf.count_nonzero(mask, axis=1)
     overflow = tf.maximum(rois_n - max_n, 0)
-    rois = tf.map_fn(lambda rois__mask: filter_by_bool(*rois__mask, max_n=max_n), (rois, mask), dtype=tf.float32)  # shape [batch, max_n, 4]
+    rois = tf.map_fn(lambda rois__mask: filter_by_bool_and_pad(*rois__mask, max_n=max_n), (rois, mask), dtype=tf.float32)  # shape [batch, max_n, 4]
     rois = tf.reshape(rois, [-1, max_n, 4])  # Tensorflow needs a hint about the shape
     return rois, overflow
 
@@ -365,48 +365,88 @@ def batch_filter_by_bool(rois, mask, max_n):
 # tiles shape [n_tiles, 4] coordinates (x1, y1, x2, y2) in aerial image coordinates
 # rois shape [n_rois, 4] coordinates (x1, y1, x2, y2) in aerial image coordinates
 # output: shape [n_tiles, max_per_tile, 4] in aerial image coordinates. Roi list padded with empty ROIs.
-def remove_non_intersecting_rois(tiles, rois, max_per_tile):
-    n_tiles = tf.shape(tiles)[0]
-    # compute which rois are contained in which tiles
-    rois = tf.expand_dims(rois, axis=0)  # shape [1, n_rois, 4]
-    rois = tf.tile(rois, [n_tiles, 1, 1])  # shape [n_tiles, n_rois, 4]
-    is_roi_in_tile = tf.map_fn(lambda tiles_rois: boxintersect(*tiles_rois), (tiles, rois), dtype=bool)  # shape [n_tiles, n_rois]
-    rois, overflow = batch_filter_by_bool(rois, is_roi_in_tile, max_per_tile)
-    return rois, overflow
-
-
-# rois shape [batch, n_rois, 4] coordinates (x1, y1, x2, y2) in aerial image coordinates
-# output: shape [batch, max_per_tile, 4] in aerial image coordinates. Roi list padded with empty ROIs.
-def remove_empty_rois(rois, max_per_tile):
-    is_non_empty_roi = tf.logical_not(find_empty_rois(rois))
-    rois, overflow = batch_filter_by_bool(rois, is_non_empty_roi, max_per_tile)
-    return rois, overflow
+def remove_non_intersecting_rois_and_pad(tiles, rois, max_per_tile):
+    rois_per_tile, is_roi_in_tile = find_non_intersecting_rois(tiles, rois)  # shapes [n_tiles, n_rois]
+    rois_per_tile, overflow = batch_filter_by_bool_and_pad(rois_per_tile, is_roi_in_tile, max_per_tile)
+    return rois_per_tile, overflow
 
 
 # tiles shape [n_tiles, 4] coordinates (x1, y1, x2, y2) in aerial image coordinates
 # rois shape [n_rois, 4] coordinates (x1, y1, x2, y2) in aerial image coordinates
-# max_per_tile: max number of possible rois in one tile
-# output: shape [n_tiles, max_per_tile, 4] coordinates (x1, y1, x2, y2) in tile
+# output: shape [n_tiles, max_per_tile, 4] in aerial image coordinates. Roi list padded with empty ROIs.
+def find_non_intersecting_rois(tiles, rois):
+    n_tiles = tf.shape(tiles)[0]
+    # compute which rois are contained in which tiles
+    rois_per_tile = tf.expand_dims(rois, axis=0)  # shape [1, n_rois, 4]
+    rois_per_tile = tf.tile(rois_per_tile, [n_tiles, 1, 1])  # shape [n_tiles, n_rois, 4]
+    is_roi_in_tile = tf.map_fn(lambda tiles_rois: boxintersect(*tiles_rois), (tiles, rois_per_tile), dtype=bool)  # shapes [n_tiles, n_rois]
+    return rois_per_tile, is_roi_in_tile
+
+
+# rois shape [batch, n_rois, 4] coordinates (x1, y1, x2, y2) in aerial image coordinates
+# output: shape [batch, max_per_tile, 4] in aerial image coordinates. Roi list padded with empty ROIs.
+def remove_empty_rois_and_pad(rois, max_per_tile):
+    is_non_empty_roi = tf.logical_not(find_empty_rois(rois))
+    rois, overflow = batch_filter_by_bool_and_pad(rois, is_non_empty_roi, max_per_tile)
+    return rois, overflow
+
+# zeroes out the first array based on the mask
+# the rank of the mask array must be one less than the first array
+# the boolean mask is tiled to the same shape
+# Ex: rois = [[1,2,3], [3,2,3]] mask = [True, False] => [[0,0,0], [3,2,3]]
+def zero_where(rois, mask):
+    coordinate_shape = rois.get_shape()[-1:]  # [4] for coordinates like [x1, x2, y1, y2]
+    shape = mask.get_shape()
+    shape = tf.ones_like(shape, tf.int32)
+    shape = tf.concat([shape, coordinate_shape], axis=0)  # tile shape like [1, 1,.., 4]
+    mask = tf.expand_dims(mask, axis=-1)
+    mask = tf.tile(mask, shape)  # replicates the booleans along the last dimension
+    return tf.where(mask, tf.zeros_like(rois), rois)
+
+
+# rois shape [..., 4] coordinates (x1, y1, x2, y2)
+# scale_xy is (scale_x, scale_y)
+# returns all x coordinates multiplied by scale_x, all y coordinates divided by scale_y
+def scale_rois(rois, scale_xy):
+    tiled_scale = tf.tile(scale_xy, [2])  # for (xmin,xmax) and (ymin,ymax)
+    return rois * tiled_scale  # broadcast
+
+
+# tiles shape [n_tiles, 4] coordinates (x1, y1, x2, y2) in aerial image coordinates
+# rois shape [n_rois, 4] coordinates (x1, y1, x2, y2) in aerial image coordinates
+# max_per_tile: max number of possible rois in one tile, if None, all rois are returned along with a boolean mask
+# output: shape [n_tiles, max_per_tile or n_rois, 4] coordinates (x1, y1, x2, y2) in tile
 #         relative coordinates in which tile width = 1.0
-# Assumes all tiles have the same size tile_size
-def rois_in_tiles_relative(tiles, rois, tile_size, max_per_tile, assert_on_overflow=True):
-    rois, overflow = remove_non_intersecting_rois(tiles, rois, max_per_tile)  # [n_tiles, max_per_tile, 4]
-    if assert_on_overflow:
+def rois_in_tiles_relative(tiles, rois, max_per_tile=None, assert_on_overflow=True):
+    if max_per_tile:
+        rois, overflow = remove_non_intersecting_rois_and_pad(tiles, rois, max_per_tile)  # [n_tiles, max_per_tile, 4]
+    else:
+        rois, is_roi_in_tile = find_non_intersecting_rois(tiles, rois)  # [n_tiles, n_rois, 4]
+        #rois = tf.where(tf.tile(tf.expand_dims(is_roi_in_tile, axis=-1), [1,1,4]), rois, tf.zeros_like(rois))
+        rois = zero_where(rois, tf.logical_not(is_roi_in_tile))
+
+    # Log error if padding overflow
+    if max_per_tile and assert_on_overflow:
         with tf.control_dependencies([tf.assert_non_positive(overflow,
                                      message="ROI per tile overflow. Set MAX_TARGET_ROIS_PER_TILE to a larger value.")]):
             rois = tf.identity(rois)
-    is_roi_empty = find_empty_rois(rois)
-    is_roi_empty = tf.stack([is_roi_empty, is_roi_empty, is_roi_empty, is_roi_empty], axis=-1)
+
+    # roi coordinates relative to tile
     tiles = tf.expand_dims(tiles, axis=1)  # force broadcasting on correct axis
     tile_x1, tile_y1, tile_x2, tile_y2 = tf.unstack(tiles, axis=2)  # shape [n_tiles, 1]
     roi_x1, roi_y1, roi_x2, roi_y2 = tf.unstack(rois, axis=2)  # shape [n_tiles, max_per_tile]
-    roi_x1 = (roi_x1 - tile_x1) / tile_size  # shapes [n_tiles, max_per_tile] x [n_tiles] broadcast
-    roi_x2 = (roi_x2 - tile_x1) / tile_size
-    roi_y1 = (roi_y1 - tile_y1) / tile_size
-    roi_y2 = (roi_y2 - tile_y1) / tile_size
+    roi_x1 = (roi_x1 - tile_x1) / (tile_x2-tile_x1)  # shapes [n_tiles, max_per_tile] x [n_tiles] broadcast
+    roi_x2 = (roi_x2 - tile_x1) / (tile_x2-tile_x1)
+    roi_y1 = (roi_y1 - tile_y1) / (tile_y2-tile_y1)
+    roi_y2 = (roi_y2 - tile_y1) / (tile_y2-tile_y1)
     rois = tf.stack([roi_x1, roi_y1, roi_x2, roi_y2], axis=-1)  # shape [n_tiles, max_per_tile, 4]
     # replace empty ROIs by (0,0,0,0) for clarity
-    return tf.where(is_roi_empty, tf.zeros_like(rois), rois)
+    is_roi_empty = find_empty_rois(rois)
+    rois = zero_where(rois, is_roi_empty)
+    if max_per_tile:
+        return rois
+    else:
+        return rois, is_roi_in_tile
 
 
 class IOUCalculator(object):

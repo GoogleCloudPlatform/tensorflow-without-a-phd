@@ -118,29 +118,36 @@ class BoxRoiUtilsTest(unittest.TestCase):
 
     def test_remove_non_intersecting_rois(self):
         tiles = tf.constant([[0.0, 0.0, 3.0, 3.0],  # tile0
-                 [1, -1, 3, 1],         # tile1
-                 [4, 3, 7, 8]])          # tile2
+                             [1, -1, 3, 1],         # tile1
+                             [4, 3, 7, 8]])         # tile2
         rois = tf.constant([[0.0, 0.0, 1.0, 1.0],   # intersects tile0
-                [-1, -1, 5, 5],         # intersects tile0, tile1, tile2
-                [-1, -5, 0, 0],         # intersect nothing
-                [2, 2, 5, 8]])           # intersects tile0, tile2
+                            [-1, -1, 5, 5],         # intersects tile0, tile1, tile2
+                            [-1, -5, 0, 0],         # intersect nothing
+                            [2, 2, 5, 8]])          # intersects tile0, tile2
         correct = np.array([[[0.0, 0.0, 1.0, 1.0], [-1, -1, 5, 5], [2, 2, 5, 8]],  # tile0 rois
                    [[-1, -1, 5, 5], [0, 0, 0, 0], [0, 0, 0, 0]],           # tile1 rois
                    [[-1, -1, 5, 5], [2, 2, 5, 8], [0, 0, 0, 0]]])          # tile2 rois
-        filtered_rois = remove_non_intersecting_rois(tiles, rois, max_per_tile=3)
+        correct_bool = np.array([[True, True, False, True],
+                                 [False, True, False, False],
+                                 [False, True, False, True]])
+        filtered_rois, overflow = remove_non_intersecting_rois_and_pad(tiles, rois, max_per_tile=3)
+        rois_per_tile, empty_rois_mask = find_non_intersecting_rois(tiles, rois)
         with tf.Session() as sess:
-            res1, overflow = sess.run(filtered_rois)
-            #print(overflow)
+            res1, ovf, res_bool = sess.run([filtered_rois, overflow, empty_rois_mask])
         d = np.linalg.norm(res1-correct)
-        ovf = np.sum(overflow)
-        self.assertTrue(d<1e-6, "remove_non_intersecting_rois test failed")
-        self.assertTrue(ovf==0, "remove_non_intersecting_rois overflow test failed")
+        ovf = np.sum(ovf)
+        self.assertTrue(d<1e-6, "remove_non_intersecting_rois_and_pad test failed")
+        self.assertTrue(ovf==0, "remove_non_intersecting_rois_and_pad overflow test failed")
+        self.assertTrue((res_bool==correct_bool).all(), "find_non_intersecting_rois overflow test failed")
 
 
     def test_rois_in_tile_relative(self):
         tiles = tf.constant([[0.0, 0.0, 3.0, 3.0],  # tile0
                              [1, -1, 4, 2],         # tile1
                              [4, 3, 7, 6]])         # tile2
+        irregular_tiles = tf.constant([[0.0, 1.0, 3.0, 3.0],  # tile0
+                                       [1, -1, 4, 2],         # tile1
+                                       [4, 3, 8, 6]])         # tile2 w=4, h=3
         rois = tf.constant([[0.0, 0.0, 1.0, 1.0],   # intersects tile0
                             [-1, -1, 5, 5],         # intersects tile0, tile1, tile2
                             [-1, -5, 0, 0],         # intersect nothing
@@ -152,15 +159,59 @@ class BoxRoiUtilsTest(unittest.TestCase):
         correct2 = np.array([[[0.0, 0.0, 1.0, 1.0], [-1, -1, 5, 5]],  # tile0 rois
                             [[-2, 0, 4, 6], [0, 0, 0, 0]],           # tile1 rois
                             [[-5, -4, 1, 2], [-2, -1, 1, 5]]])   / 3.0       # tile2 rois
-        filtered_rois = rois_in_tiles_relative(tiles, rois, tile_size=3.0, max_per_tile=3)
-        filtered_rois2 = rois_in_tiles_relative(tiles, rois, tile_size=3.0, max_per_tile=2, assert_on_overflow=False)  # this overflows max_per_tile
+        correct3 = np.array([[[0.0, 0.0, 1.0, 1.0], [-1, -1, 5, 5], [0,0,0,0], [2, 2, 5, 8], [0,0,0,0]],  # tile0 rois
+                            [[0,0,0,0], [-2, 0, 4, 6], [0,0,0,0], [0,0,0,0], [0,0,0,0]],           # tile1 rois
+                            [[0,0,0,0], [-5, -4, 1, 2], [0,0,0,0], [-2, -1, 1, 5], [1, 2, 2, 3]]]) / 3.0       # tile2 rois
+        correct4 = np.array([[[0.0, 0.0, 0.0, 0.0], [-1, -2, 5, 4], [0,0,0,0], [2, 1, 5, 7], [0,0,0,0]],  # tile0 rois
+                             [[0,0,0,0], [-2, 0, 4, 6], [0,0,0,0], [0,0,0,0], [0,0,0,0]],           # tile1 rois
+                             [[0,0,0,0], [-5, -4, 1, 2], [0,0,0,0], [-2, -1, 1, 5], [1, 2, 2, 3]]]) / [[[3.0, 2.0, 3.0, 2.0]],
+                                                                                                       [[3.0, 3.0, 3.0, 3.0]],
+                                                                                                       [[4.0, 3.0, 4.0, 3.0]]]      # tile2 rois
+        correct_bool3 = np.array([[True, True, False, True, False],
+                                  [False, True, False, False, False],
+                                  [False, True, False, True, True]])
+        correct_bool4 = np.array([[False, True, False, True, False],
+                                  [False, True, False, False, False],
+                                  [False, True, False, True, True]])
+        filtered_rois = rois_in_tiles_relative(tiles, rois, max_per_tile=3)
+        filtered_rois2 = rois_in_tiles_relative(tiles, rois, max_per_tile=2, assert_on_overflow=False)  # this overflows max_per_tile
+        filtered_rois3, is_in_roi3 = rois_in_tiles_relative(tiles, rois)
+        filtered_rois4, is_in_roi4 = rois_in_tiles_relative(irregular_tiles, rois)
         with tf.Session() as sess:
             res1 = sess.run(filtered_rois)
             res2 = sess.run(filtered_rois2)
-            #print(res1)
-            #print(correct)
+            res3, res_bool3, res4, res_bool4 = sess.run([filtered_rois3, is_in_roi3, filtered_rois4, is_in_roi4])
         d = np.linalg.norm(res1-correct) + np.linalg.norm(res2-correct2)
-        self.assertTrue(d<1e-6, "rois_in_tile_relative test failed")
+        d3 = np.linalg.norm(res3-correct3)
+        d4 = np.linalg.norm(res4-correct4) + np.linalg.norm(res4-correct4)
+        self.assertTrue(d<1e-6, "rois_in_tile_relative (max_per_roi) test failed")
+        self.assertTrue((res_bool3==correct_bool3).all(), "rois_in_tiles_relative test failed on booleans")
+        self.assertTrue(d3<1e-6, "rois_in_tile_relative test failed on values")
+        self.assertTrue((res_bool4==correct_bool4).all(), "rois_in_tiles_relative test failed on booleans with irregular tiles")
+        self.assertTrue(d4<1e-6, "rois_in_tile_relative test failed on values with irregular tiles")
+
+    def test_scale_rois(self):
+        scale = np.array([2, 0.5])
+        seed1 = np.array([1, 1, 4, 3])
+        rois1 = tf.constant(seed1, dtype=tf.float32)
+        correct1 = seed1 * np.concatenate([scale, scale])
+        seed2 = np.array([[1, 1, 4, 3], [2, 3, 7, 5], [3, 4, 4, 5]])
+        rois2 = tf.constant(seed2, dtype=tf.float32)
+        correct2 = seed2 * np.concatenate([scale, scale])
+        seed3 = np.array([[[1, 1, 4, 3], [2, 3, 7, 5], [3, 4, 4, 5]],
+                          [[6, -2, 1, 3], [-2, 3, 2, 4], [-2, 3, 1, 5]],
+                          [[1, 1, 4, 3], [2, 3, 7, 5], [3, 4, 4, 5]]])
+        rois3 = tf.constant(seed3, dtype=tf.float32)
+        correct3 = seed3 * np.concatenate([scale, scale])
+        tfscale = tf.constant(scale, dtype=tf.float32)
+        scaled1 = scale_rois(rois1, tfscale)
+        scaled2 = scale_rois(rois2, tfscale)
+        scaled3 = scale_rois(rois3, tfscale)
+        with tf.Session() as sess:
+            res1, res2, res3 = sess.run([scaled1, scaled2, scaled3])
+        d = np.linalg.norm(res1-correct1) + np.linalg.norm(res2-correct2) + np.linalg.norm(res3-correct3)
+        self.assertTrue(d<1e-6, "scale_rois test failed")
+
 
     def test_batch_iou(self):
         rois1 = tf.constant([[1, 1, 4, 3],
