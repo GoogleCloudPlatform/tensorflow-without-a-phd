@@ -342,11 +342,12 @@ def find_empty_rois(rois):
 def filter_by_bool_and_pad(rois, mask, max_n):
     rois = tf.boolean_mask(rois, mask)
     n = tf.shape(rois)[0]
+    coord_shape = tf.shape(rois)[-1]  # shape of coordinates, 4 for x1y1x2y2
     # make sure we have enough space in the tensor for all ROIs.
     # If not, pad to max_n and return a boolean to signal the overflow.
     pad_n = tf.maximum(max_n-n, 0)
     rois = tf.pad(rois, [[0, pad_n], [0, 0]])  # pad to max_n elements
-    rois = tf.slice(rois, [0,0], [max_n, 4])  # truncate to max_n elements
+    rois = tf.slice(rois, [0,0], [max_n, coord_shape])  # truncate to max_n elements
     return rois
 
 
