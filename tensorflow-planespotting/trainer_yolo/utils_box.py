@@ -397,7 +397,7 @@ def remove_empty_rois_and_pad(rois, max_per_tile):
 # Ex: rois = [[1,2,3], [3,2,3]] mask = [True, False] => [[0,0,0], [3,2,3]]
 def zero_where(rois, mask):
     coordinate_shape = rois.get_shape()[-1:]  # [4] for coordinates like [x1, x2, y1, y2]
-    shape = mask.get_shape()
+    shape = tf.shape(mask)
     shape = tf.ones_like(shape, tf.int32)
     shape = tf.concat([shape, coordinate_shape], axis=0)  # tile shape like [1, 1,.., 4]
     mask = tf.expand_dims(mask, axis=-1)
