@@ -124,17 +124,21 @@ airplanes. You can find it in [webui](webui).
 
 ![airplane detection demo](img/screen-shot-demo.jpg)
 
-Once you have trained and deployed a model, edit the [webui/index.html](webui/index.html)
-so that the list of models in the select box contains yours, selected by default.
-You can then launch the demo from any local web server. Please make sure to serve it
-from http://localhost:8000. The Google Maps API key for this demo is restricted to localhost:8000.
+Once you have trained and deployed a model, start a local web server and open
+[webui/index.html](webui/index.html). Please make sure to serve the demo from
+http://localhost:8000. The Google Maps API key for this demo is restricted
+to ports 8000 to 8008.
  
 ```bash
 # assuming the current directory is tensorflow-planespotting
 cd webui
-python -m SimpleHTTPServer 8000  
+python3 -m http.server --bind localhost 8000 # ports 8000 to 8008  
 ```
-In the UI, authenticate with ML Engine, select an airport and a model and click "analyze".
+In the UI, authenticate with ML Engine, enter the name of your deployed
+model in the "+add you own" box and hit ENTER. You can then select an airport and click "analyze".
+
+![airplane detection demo](img/planespotting_UI_explanation_s.jpg)
+
 Models served from ML Engine are meant to be accessed from the server side of your
 application so the authentication step is usually performed on the server. If
 you want to configure your model so that anyone can access it, you will have to
