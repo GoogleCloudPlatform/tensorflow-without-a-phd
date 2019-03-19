@@ -19,7 +19,7 @@ The YOLO (You Look Only Once) paper uses a different architecture they call
 and `model_core_darknet17`. In practice it was found that the squeezenet
 architecture was more effective in most cases for the task of detecting airplanes.
 
-These core models are standard sequences convolutional layaers. Additional layers are
+These core models are standard sequences convolutional layers. Additional layers are
 needed to provide detection capabilities. They can be found in file
 [trainer_yolo/model_layers.py](trainer_yolo/model_layers.py) function `YOLO_head`. 
 

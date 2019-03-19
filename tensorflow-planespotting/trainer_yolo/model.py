@@ -212,7 +212,7 @@ def model_fn(features, labels, mode, params):
     detected_rois = tf.stack([box_x, box_y, detected_w], axis=-1)  # shape [batch, GRID_N, GRID_N, CELL_B, 3]
     detected_rois = box.grid_cell_to_tile_coords(detected_rois, grid_nn, settings.TILE_SIZE) / settings.TILE_SIZE
     detected_rois = tf.reshape(detected_rois, [-1, grid_nn*grid_nn*cell_n, 4])
-    detected_rois, detected_rois_overflow = box.remove_empty_rois(detected_rois, settings.MAX_DETECTED_ROIS_PER_TILE)
+    detected_rois, detected_rois_overflow = box.remove_empty_rois_and_pad(detected_rois, settings.MAX_DETECTED_ROIS_PER_TILE)
 
     loss = train_op = eval_metrics = None
     if mode != tf.estimator.ModeKeys.PREDICT:
