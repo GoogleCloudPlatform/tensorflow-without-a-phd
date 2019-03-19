@@ -119,8 +119,9 @@ You model will be ready to serve within a minute ot two.
 ### Demo time: testing your model
 
 A test UI written in Javascrip/HTML is provided. You can use it to navigate
-Google Maps in satellite mode, and analyze any aerial imagery you find to try and spot
-airplanes. You can find it in [webui](webui).
+Google Maps in satellite mode, and analyze any aerial imagery to spot
+airplanes. You can find it in [webui](webui). The demo splits an image from Google
+maps into overlapping 256x256 tiles and sends them to your deployed model for analysis. 
 
 ![airplane detection demo](img/screen-shot-demo.jpg)
 
