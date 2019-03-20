@@ -334,39 +334,44 @@ def find_empty_rois(rois):
     empty = tf.logical_or(tf.equal(roi_x1, roi_x2), tf.equal(roi_y1, roi_y2))
     return empty
 
+# TPU port: tf.boolean_mask cannot be supported on TPU
 
 # Selects items from rois acccording to boolean mask. Pads the result to max_n items.
 # rois: shape [n, 4]
 # mask: shape [n]
 # output: shape [max_n, 4]
-def filter_by_bool_and_pad(rois, mask, max_n):
-    rois = tf.boolean_mask(rois, mask)
-    n = tf.shape(rois)[0]
-    coord_shape = tf.shape(rois)[-1]  # shape of coordinates, 4 for x1y1x2y2
-    # make sure we have enough space in the tensor for all ROIs.
-    # If not, pad to max_n and return a boolean to signal the overflow.
-    pad_n = tf.maximum(max_n-n, 0)
-    rois = tf.pad(rois, [[0, pad_n], [0, 0]])  # pad to max_n elements
-    rois = tf.slice(rois, [0,0], [max_n, coord_shape])  # truncate to max_n elements
-    return rois
+#def filter_by_bool_and_pad(rois, mask, max_n):
+#    rois = tf.boolean_mask(rois, mask)
+#    n = tf.shape(rois)[0]
+#    coord_shape = tf.shape(rois)[-1]  # shape of coordinates, 4 for x1y1x2y2
+#    # make sure we have enough space in the tensor for all ROIs.
+#    # If not, pad to max_n and return a boolean to signal the overflow.
+#    pad_n = tf.maximum(max_n-n, 0)
+#    rois = tf.pad(rois, [[0, pad_n], [0, 0]])  # pad to max_n elements
+#    rois = tf.slice(rois, [0,0], [max_n, coord_shape])  # truncate to max_n elements
+#    return rois
 
 
 # Selects items from rois acccording to boolean mask. Pads the result to max_n items.
 # rois: shape [batch, n, 4]
 # mask: shape [batch, n]
 # output: shape [batch, max_n, 4]
-def batch_filter_by_bool_and_pad(rois, mask, max_n):
-    rois_n = tf.count_nonzero(mask, axis=1)
-    overflow = tf.maximum(rois_n - max_n, 0)
-    rois = tf.map_fn(lambda rois__mask: filter_by_bool_and_pad(*rois__mask, max_n=max_n), (rois, mask), dtype=tf.float32)  # shape [batch, max_n, 4]
-    rois = tf.reshape(rois, [-1, max_n, 4])  # Tensorflow needs a hint about the shape
-    return rois, overflow
+#def batch_filter_by_bool_and_pad(rois, mask, max_n):
+#    rois_n = tf.count_nonzero(mask, axis=1)
+#    overflow = tf.maximum(rois_n - max_n, 0)
+#    rois = tf.map_fn(lambda rois__mask: filter_by_bool_and_pad(*rois__mask, max_n=max_n), (rois, mask), dtype=tf.float32)  # shape [batch, max_n, 4]
+#    rois = tf.reshape(rois, [-1, max_n, 4])  # Tensorflow needs a hint about the shape
+#    return rois, overflow
 
 # Filters ROIs to a fixed shape, truncating if too many elements, padding if too few
 # Tnput rois shape [batch, rois_n, 4]
 # The number of rois in the output is min(rois_n, max_n) so this function never "pads up" unnecessarily
 # TODO: TF 1.10
 # This function ues tf.top_k which will be available for TPUs in TF 1.10 only. Until then, use filter_rois_by_bool2
+
+# Update 03/19/2019: top_k now works on TPU under TF 1.12 but using this function
+# results in an OutOfRangeError from the data iterator. Must investigate.
+
 def batch_filter_by_bool_and_pad(rois, mask, max_n):
     max_n = tf.minimum(max_n, tf.shape(rois)[1])  # make sure we do not pad unnecessarily
     rois_n = tf.count_nonzero(mask, axis=1, dtype=tf.int32)
@@ -436,7 +441,7 @@ def batch_filter_by_bool_and_pad2(rois, mask, max_n):
 # output: shape [n_tiles, max_per_tile, 4] in aerial image coordinates. Roi list padded with empty ROIs.
 def remove_non_intersecting_rois_and_pad(tiles, rois, max_per_tile):
     rois_per_tile, is_roi_in_tile = find_non_intersecting_rois(tiles, rois)  # shapes [n_tiles, n_rois]
-    rois_per_tile, overflow = batch_filter_by_bool_and_pad(rois_per_tile, is_roi_in_tile, max_per_tile)
+    rois_per_tile, overflow = batch_filter_by_bool_and_pad2(rois_per_tile, is_roi_in_tile, max_per_tile)
     return rois_per_tile, overflow
 
 
@@ -456,7 +461,7 @@ def find_non_intersecting_rois(tiles, rois):
 # output: shape [batch, max_per_tile, 4] in aerial image coordinates. Roi list padded with empty ROIs.
 def remove_empty_rois_and_pad(rois, max_per_tile):
     is_non_empty_roi = tf.logical_not(find_empty_rois(rois))
-    rois, overflow = batch_filter_by_bool_and_pad(rois, is_non_empty_roi, max_per_tile)
+    rois, overflow = batch_filter_by_bool_and_pad2(rois, is_non_empty_roi, max_per_tile)
     return rois, overflow
 
 # zeroes out the first array based on the mask

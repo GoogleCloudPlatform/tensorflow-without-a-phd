@@ -274,11 +274,10 @@ def model_fn(features, labels, mode, params):
 
         # Mistakes and correct detections for visualisation and debugging.
         # This is computed against the ground truth boxes assigned to YOLO grid cells.
-        # Disabled for TPU
-        # mistakes, size_correct, position_correct, all_correct = box.compute_mistakes(box_x, box_y,
-        #                                                                              box_w, box_c_sim,
-        #                                                                              target_x, target_y,
-        #                                                                              target_w, target_is_plane, grid_nn)
+        mistakes, size_correct, position_correct, all_correct = box.compute_mistakes(box_x, box_y,
+                                                                                     box_w, box_c_sim,
+                                                                                     target_x, target_y,
+                                                                                     target_w, target_is_plane, grid_nn)
 
         # Debug image for logging in Tensorboad.
         # Disabled for TPU
