@@ -275,46 +275,55 @@ def test_remove_empty_rois_and_pad(self):
                              [2, 3, 7, 5],
                              [3, 4, 4, 5]], dtype=tf.float32)
         rois1b = tf.constant([[1, 1, 4, 3],
-                             [2, 3, 7, 5]], dtype=tf.float32)
+                              [2, 3, 7, 5]], dtype=tf.float32)
         rois2 = tf.constant([[1, 1, 4, 3],
                              [2, 3, 7, 5],
                              [3, 4, 4, 5]], dtype=tf.float32)
         rois2b = tf.constant([[1, 1, 4, 3],
-                             [2, 3, 7, 5]], dtype=tf.float32)
+                              [2, 3, 7, 5]], dtype=tf.float32)
         rois3 = tf.constant([[1, 1, 3, 3],
                              [2, 3, 7, 5],
                              [3, 4, 4, 5]], dtype=tf.float32)
         rois3b = tf.constant([[1, 1, 3, 3],
-                             [2, 3, 7, 5]], dtype=tf.float32)
+                              [2, 3, 7, 5]], dtype=tf.float32)
         norois1 = tf.constant([[1, 1, 1, 3],
-                             [2, 3, 7, 3],
-                             [3, 4, 4, 4]], dtype=tf.float32)
+                               [2, 3, 7, 3],
+                               [3, 4, 4, 4]], dtype=tf.float32)
         norois1b = tf.constant([[1, 1, 1, 3],
-                               [2, 3, 7, 3]], dtype=tf.float32)
+                                [2, 3, 7, 3]], dtype=tf.float32)
         norois2 = tf.constant([[10, 10, 12, 12],
                                [2, 3, 2, 3],
                                [-3, -4, -2, -3]], dtype=tf.float32)
         norois2b = tf.constant([[10, 10, 12, 12],
-                               [2, 3, 2, 3]], dtype=tf.float32)
-        partrois = tf.constant([[1, 1, 3, 3],
-                               [2, 3, 2, 3],
-                               [-3, -4, -2, -3]], dtype=tf.float32)
-        partroisb = tf.constant([[1, 1, 3, 3],
                                 [2, 3, 2, 3]], dtype=tf.float32)
-        batch_roisA = tf.stack([rois1, rois3, rois1, norois1, rois3], axis=0)
-        batch_roisB = tf.stack([rois2, rois2, norois1, norois2, partrois], axis=0)
-        batch_roisBb = tf.stack([rois2b, rois2b, norois1b, norois2b, partroisb], axis=0)
+        partrois = tf.constant([[1, 1, 3, 3],
+                                [2, 3, 2, 3],
+                                [-3, -4, -2, -3]], dtype=tf.float32)
+        partroisb = tf.constant([[1, 1, 3, 3],
+                                 [2, 3, 2, 3]], dtype=tf.float32)
+        noroisb = tf.constant([[0, 0, 0, 0],
+                               [0, 0, 0, 0]], dtype=tf.float32)
+        norois = tf.constant([[0, 0, 0, 0],
+                              [0, 0, 0, 0],
+                              [0, 0, 0, 0]], dtype=tf.float32)
+        batch_roisA = tf.stack([rois1, rois3, rois1, norois1, rois3, norois], axis=0)
+        batch_roisB = tf.stack([rois2, rois2, norois1, norois2, partrois, norois], axis=0)
+        batch_roisBb = tf.stack([rois2b, rois2b, norois1b, norois2b, partroisb, noroisb], axis=0)
         iou1 = IOUCalculator.batch_intersection_over_union(batch_roisA, batch_roisB, tile_size=5)
         iou2 = IOUCalculator.batch_intersection_over_union(batch_roisA, batch_roisBb, tile_size=5)
-        correct1 = np.array([1.0, 10.0/12.0, 0.0, 1.0, 4.0/10.0])
-        correct2 = np.array([1.0, 10.0/12.0, 0.0, 1.0, 4.0/10.0])
+        iou3 = IOUCalculator.batch_intersection_over_union(batch_roisA, batch_roisBb, tile_size=5, iou_batch=3)
+        iou4 = IOUCalculator.batch_intersection_over_union(batch_roisA, batch_roisB, tile_size=5, iou_batch=2)
+        correct = np.array([1.0, 10.0/12.0, 0.0, 1.0, 4.0/10.0, 1.0])
         with tf.Session() as sess:
             res1 = sess.run(iou1)
             res2 = sess.run(iou2)
-            #print(res2)
-        d1 = np.linalg.norm(res1-correct1)
-        d2 = np.linalg.norm(res2-correct2)
-        self.assertTrue((d1+d2)<1e-6, "IOUCalculator.batch_iou test failed")
+            res3 = sess.run(iou3)
+            res4 = sess.run(iou4)
+        d1 = np.linalg.norm(res1-correct)
+        d2 = np.linalg.norm(res2-correct)
+        d3 = np.linalg.norm(res3-correct)
+        d4 = np.linalg.norm(res4-correct)
+        self.assertTrue((d1+d2+d3+d4)<1e-6, "IOUCalculator.batch_iou test failed")
 
     def test_batch_iou_mean(self):
         ious1 = tf.constant([0, 1, 0.3, 0.9, 0.8], dtype=tf.float32)  # 1s are ignored in the average
