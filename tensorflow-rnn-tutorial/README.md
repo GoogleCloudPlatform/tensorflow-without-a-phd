@@ -1,4 +1,4 @@
-![flyer](tutorial/images/flyer_rnn.jpg)
+![flyer](images/flyer_rnn.jpg)
 
 # RNN Tutorial
 This tutorial is a hands-on complement to the "Tensorflow, deep learning and Recurrent Neural Networks" talk ([video](https://youtu.be/fTUwdXUFfI8), [slides](https://goo.gl/UuN41S)). If you are looking for the "Shakespeare" model featured in the talk, you can find it here: [tensorflow-rnn-shakespeare](https://github.com/martin-gorner/tensorflow-rnn-shakespeare).
