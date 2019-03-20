@@ -69,7 +69,7 @@ def start_training(output_dir, hparams, data, tiledata, **kwargs):
     if tiledata != "" and data == "":  # training from tfrecords
         tfrec_filelist = gcsfile.get_matching_files(tiledata + "/*.tfrecord")
         train_data_input_fn = lambda params: datagen.train_dataset_from_tfrecords(tfrec_filelist,
-                                                                                  params['batch_size'],
+                                                                                  params["batch_size"],
                                                                                   hparams["shuffle_buf"],
                                                                                   yolo_cfg,
                                                                                   hparams["data_rnd_hue"],
@@ -82,7 +82,7 @@ def start_training(output_dir, hparams, data, tiledata, **kwargs):
     elif data != "" and tiledata == "":  # training from aerial imagery directly
         img_filelist, roi_filelist = datagen.load_file_list(data)
         train_data_input_fn = lambda params: datagen.train_dataset_from_images(img_filelist, roi_filelist,
-                                                                               params['batch_size'],
+                                                                               params["batch_size"],
                                                                                hparams["shuffle_buf"],
                                                                                yolo_cfg,
                                                                                hparams["data_rnd_hue"],
