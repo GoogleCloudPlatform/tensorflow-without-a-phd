@@ -361,12 +361,13 @@ def batch_filter_by_bool_and_pad(rois, mask, max_n):
     rois = tf.map_fn(lambda rois__mask: filter_by_bool_and_pad(*rois__mask, max_n=max_n), (rois, mask), dtype=tf.float32)  # shape [batch, max_n, 4]
     rois = tf.reshape(rois, [-1, max_n, 4])  # Tensorflow needs a hint about the shape
     return rois, overflow
+
 # Filters ROIs to a fixed shape, truncating if too many elements, padding if too few
 # Tnput rois shape [batch, rois_n, 4]
 # The number of rois in the output is min(rois_n, max_n) so this function never "pads up" unnecessarily
 # TODO: TF 1.10
 # This function ues tf.top_k which will be available for TPUs in TF 1.10 only. Until then, use filter_rois_by_bool2
-def filter_rois_by_bool(rois, mask, max_n):
+def batch_filter_by_bool_and_pad(rois, mask, max_n):
     max_n = tf.minimum(max_n, tf.shape(rois)[1])  # make sure we do not pad unnecessarily
     rois_n = tf.count_nonzero(mask, axis=1, dtype=tf.int32)
     overflow = tf.maximum(rois_n - max_n, 0)
@@ -402,7 +403,7 @@ def filter_rois_by_bool(rois, mask, max_n):
 # TODO: TF 1.10
 # Use filter_rois_by_bool2 until tf.top_k is made available for TPUs in TF 1.10.
 # Then switch the code to filter_rois_by_bool which is better.
-def filter_rois_by_bool2(rois, mask, max_n):
+def batch_filter_by_bool_and_pad2(rois, mask, max_n):
     # TPU: it should be possible to make this work ...
     # However, not having this line will only be slightly problematic for
     # small GRID_N*GRIT_N*CELL_N settings where the filtered list will be padded unnecessarily.
@@ -455,7 +456,7 @@ def find_non_intersecting_rois(tiles, rois):
 # output: shape [batch, max_per_tile, 4] in aerial image coordinates. Roi list padded with empty ROIs.
 def remove_empty_rois_and_pad(rois, max_per_tile):
     is_non_empty_roi = tf.logical_not(find_empty_rois(rois))
-    rois, overflow = filter_rois_by_bool2(rois, is_non_empty_roi, max_per_tile)
+    rois, overflow = batch_filter_by_bool_and_pad(rois, is_non_empty_roi, max_per_tile)
     return rois, overflow
 
 # zeroes out the first array based on the mask

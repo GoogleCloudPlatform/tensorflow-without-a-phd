@@ -318,7 +318,7 @@ class BoxRoiUtilsTest(unittest.TestCase):
             res1 = sess.run(iou1)
             res2 = sess.run(iou2)
             res3 = sess.run(iou3)
-            res4 = sess.run(iou3)
+            res4 = sess.run(iou4)
         d1 = np.linalg.norm(res1-correct)
         d2 = np.linalg.norm(res2-correct)
         d3 = np.linalg.norm(res3-correct)
