@@ -9,7 +9,7 @@ All notebooks execute on Google Colaboratory for free. The last exercise runs on
 
 Part 1: [00_Keras_RNN_predictions_playground.ipynb](https://colab.research.google.com/github/GoogleCloudPlatform/tensorflow-without-a-phd/blob/master/tensorflow-rnn-tutorial/00_Keras_RNN_predictions_playground.ipynb)
 
-Part 2: [01_Keras_RNN_generator_playground.ipynb](https://colab.research.google.com/github/GoogleCloudPlatform/tensorflow-without-a-phd/blob/master/tensorflow-rnn-tutorial/01_Keras_RNN_generator_playground.ipynb) 
+Part 2: [01_Keras_stateful_RNN_playground.ipynb](https://colab.research.google.com/github/GoogleCloudPlatform/tensorflow-without-a-phd/blob/master/tensorflow-rnn-tutorial/01_Keras_stateful_RNN_playground.ipynb) 
 
 Part 3: [02_Keras_RNN_TPU_temperatures_playground.ipynb](https://colab.research.google.com/github/GoogleCloudPlatform/tensorflow-without-a-phd/blob/master/tensorflow-rnn-tutorial/02_Keras_RNN_TPU_temperatures_playground.ipynb)
 
@@ -17,11 +17,11 @@ Part 3: [02_Keras_RNN_TPU_temperatures_playground.ipynb](https://colab.research.
 
 If you are stuck, you can have a peek at the solution notebooks:
 
-Part 1: [00_Keras_RNN_predictions_playground.ipynb](https://colab.research.google.com/github/GoogleCloudPlatform/tensorflow-without-a-phd/blob/master/tensorflow-rnn-tutorial/00_Keras_RNN_predictions_solution.ipynb)
+Part 1: [00_Keras_RNN_predictions_solution.ipynb](https://colab.research.google.com/github/GoogleCloudPlatform/tensorflow-without-a-phd/blob/master/tensorflow-rnn-tutorial/00_Keras_RNN_predictions_solution.ipynb)
 
-Part 2: [01_Keras_RNN_generator_playground.ipynb](https://colab.research.google.com/github/GoogleCloudPlatform/tensorflow-without-a-phd/blob/master/tensorflow-rnn-tutorial/01_Keras_RNN_generator_solution.ipynb) 
+Part 2: [01_Keras_stateful_RNN_solution.ipynb](https://colab.research.google.com/github/GoogleCloudPlatform/tensorflow-without-a-phd/blob/master/tensorflow-rnn-tutorial/01_Keras_stateful_RNN_solution.ipynb) 
 
-Part 3: [02_Keras_RNN_TPU_temperatures_playground.ipynb](https://colab.research.google.com/github/GoogleCloudPlatform/tensorflow-without-a-phd/blob/master/tensorflow-rnn-tutorial/02_Keras_RNN_TPU_temperatures_solution.ipynb)
+Part 3: [02_Keras_RNN_TPU_temperatures_solution.ipynb](https://colab.research.google.com/github/GoogleCloudPlatform/tensorflow-without-a-phd/blob/master/tensorflow-rnn-tutorial/02_Keras_RNN_TPU_temperatures_solution.ipynb)
  
 
 ---
