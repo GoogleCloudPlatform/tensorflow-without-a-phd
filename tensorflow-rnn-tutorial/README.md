@@ -3,30 +3,26 @@
 # RNN Tutorial
 This tutorial is a hands-on complement to the "Tensorflow, deep learning and Recurrent Neural Networks" talk ([video](https://youtu.be/fTUwdXUFfI8), [slides](https://goo.gl/UuN41S)). If you are looking for the "Shakespeare" model featured in the talk, you can find it here: [tensorflow-rnn-shakespeare](https://github.com/martin-gorner/tensorflow-rnn-shakespeare).
 
- 
-## Requirements
-
-Install Python 3, then pip(3)-install jupyter, matplotlib and tensorflow.
-
-On Windows, Anaconda is recommended.
-
-## Tutorial
-
-The tutorial is in the `/tutorial` folder
-
-Instructions are in `*_playground.ipynb` files.
-
-Solutions are in `*_solution.ipynb` files.
-
-Notebooks execute locally. You can also run on Google Cloud ML Engine using the run-on-cloud-ml-engine.ipynb bash script.
+All notebooks execute on Google Colaboratory for free. The last exercise runs on a TPU (Tensor Processing Unit).
 
 ## Start here
 
-Part 1: [tutorial/00_RNN_predictions_playground.ipynb](tutorial/00_RNN_predictions_playground.ipynb)
+Part 1: [00_Keras_RNN_predictions_playground.ipynb](https://colab.research.google.com/github/GoogleCloudPlatform/tensorflow-without-a-phd/blob/master/tensorflow-rnn-tutorial/00_Keras_RNN_predictions_playground.ipynb)
 
-Part 2: [tutorial/01_RNN_generator_playground.ipynb](tutorial/01_RNN_generator_playground.ipynb) 
+Part 2: [01_Keras_RNN_generator_playground.ipynb](https://colab.research.google.com/github/GoogleCloudPlatform/tensorflow-without-a-phd/blob/master/tensorflow-rnn-tutorial/01_Keras_RNN_generator_playground.ipynb) 
 
-Part 3: [tutorial/02_RNN_generator_temperatures_playground.ipynb](tutorial/02_RNN_generator_temperatures_playground.ipynb) 
+Part 3: [02_Keras_RNN_TPU_temperatures_playground.ipynb](https://colab.research.google.com/github/GoogleCloudPlatform/tensorflow-without-a-phd/blob/master/tensorflow-rnn-tutorial/02_Keras_RNN_TPU_temperatures_playground.ipynb)
+
+## Solutions
+
+If you are stuck, you can have a peek at the solution notebooks:
+
+Part 1: [00_Keras_RNN_predictions_playground.ipynb](https://colab.research.google.com/github/GoogleCloudPlatform/tensorflow-without-a-phd/blob/master/tensorflow-rnn-tutorial/00_Keras_RNN_predictions_solution.ipynb)
+
+Part 2: [01_Keras_RNN_generator_playground.ipynb](https://colab.research.google.com/github/GoogleCloudPlatform/tensorflow-without-a-phd/blob/master/tensorflow-rnn-tutorial/01_Keras_RNN_generator_solution.ipynb) 
+
+Part 3: [02_Keras_RNN_TPU_temperatures_playground.ipynb](https://colab.research.google.com/github/GoogleCloudPlatform/tensorflow-without-a-phd/blob/master/tensorflow-rnn-tutorial/02_Keras_RNN_TPU_temperatures_solution.ipynb)
+ 
 
 ---
 *Disclaimer: This is not an official Google product but sample code provided for an educational purpose*
