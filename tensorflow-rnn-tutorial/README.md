@@ -7,6 +7,8 @@ All notebooks execute on Google Colaboratory for free. The last exercise runs on
 
 ## Start here
 
+Instructions are provided in each notebook in the section marked [WORK REQUIRED]
+
 Part 1: [00_Keras_RNN_predictions_playground.ipynb](https://colab.research.google.com/github/GoogleCloudPlatform/tensorflow-without-a-phd/blob/master/tensorflow-rnn-tutorial/00_Keras_RNN_predictions_playground.ipynb)
 
 Part 2: [01_Keras_stateful_RNN_playground.ipynb](https://colab.research.google.com/github/GoogleCloudPlatform/tensorflow-without-a-phd/blob/master/tensorflow-rnn-tutorial/01_Keras_stateful_RNN_playground.ipynb) 
