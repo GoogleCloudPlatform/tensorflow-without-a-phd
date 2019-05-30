@@ -66,7 +66,7 @@ function initAuth2() {
         //client_id: '19808069448-df7e5a57c3ftmfk3e9tptk6s7942qpah.apps.googleusercontent.com',
         //client_id: '606116430098-mjcbomnkksirtv4ped18biue5j10vm87.apps.googleusercontent.com',
         client_id: '312729138249-f2g6592bkhhqkd0ork1ljj83mr9257so.apps.googleusercontent.com',
-        scope: 'profile https://www.googleapis.com/auth/cloud-platform.read-only'
+        scope: 'profile https://www.googleapis.com/auth/cloud-platform'
     })
     return toto.then() // The API does not return a Promise but an object that returns a Promise from its .then() function
 }
