@@ -48,7 +48,7 @@ document.addEventListener("DOMContentLoaded", function(event) {
             //evt.stopPropagation();
             evt.preventDefault();
         }
-    })
+    });
 
     modsel.addEventListener('submit', function(evt) {
         analyze();
@@ -81,6 +81,7 @@ function updateSigninStatus(isSignedIn) {
 
 function analyze() {
     resetResults();
+    addModel(); // if a model is entered in the custom model field, commit it to the models list
     var delay = 0;
 
     model_name = document.modsel.model.value
@@ -313,22 +314,28 @@ function disableMapScroll() {
 }
 
 function addModel() {
-    var n
+
+    var n;
+    // do nothing if field is not visible or empty
+    if (addyourown.model.type == 'hidden' || !document.addyourown.model.value)
+        return;
+
+    // do nothing if model is already in the list
     for (n = 0; n < document.modsel.model.options.length; n++){
         if (document.modsel.model.options[n].value == document.addyourown.model.value){
             document.modsel.model.value = document.addyourown.model.value
             return
         }
     }
-    if (document.addyourown.model.value) {
-        var option = document.createElement("option")
-        option.text = document.addyourown.model.value
-        option.value = document.addyourown.model.value
-        document.modsel.model.add(option)
-        // select the newly added value
-        document.modsel.model.value = document.addyourown.model.value
-        n++
-    }
+
+    var option = document.createElement("option")
+    option.text = document.addyourown.model.value
+    option.value = document.addyourown.model.value
+    document.modsel.model.add(option)
+    // select the newly added value
+    document.modsel.model.value = document.addyourown.model.value
+    n++
+
     // make the select box visible if it has more than one value now
     if (n>0)
         document.modsel.model.style.visibility = "visible"
