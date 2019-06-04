@@ -33,7 +33,7 @@ echo $N > $NFILE;
 printf -v N "%03d" $N
 
 set -x
-gcloud ml-engine jobs submit training airplane_datagen$N \
+gcloud ai-platform jobs submit training airplane_datagen$N \
     --job-dir "${BUCKET}/jobs/airplane_datagen$N" \
     --scale-tier BASIC \
     --project ${PROJECT} \

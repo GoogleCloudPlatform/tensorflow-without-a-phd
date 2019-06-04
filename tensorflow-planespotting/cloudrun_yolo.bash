@@ -34,7 +34,7 @@ echo $N > $NFILE;
 printf -v N "%04d" $N
 
 set -x
-gcloud ml-engine jobs submit training airplane$N \
+gcloud ai-platform jobs submit training airplane$N \
     --job-dir "${BUCKET}/jobs/airplane$N" \
     --scale-tier CUSTOM \
     --config ${CONFIG} \

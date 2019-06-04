@@ -25,9 +25,9 @@ needed to provide detection capabilities. They can be found in file
 
 ## Training
 
-### Cloud training using ML Engine
+### Cloud training using AI Platform
 
-A script is provided for running the training on ML Engine. It implements
+A script is provided for running the training on AI Platform. It implements
 auto-incrementing job names so that successive trainings are called job001, job002 and so on.
 Apart from that, it is contains little more that the `gcloud ml-engine jobs submit training`.
 The script is [cloudrun_yolo.bash](cloudrun_yolo.bash). By default, it trains a 
@@ -106,11 +106,11 @@ name with `_eval` appended to the name.
 
 ### Deploying a model
 
-Trained models can be deployed to ML Engine for online or batch prediction serving.
+Trained models can be deployed to AI Platform for online or batch prediction serving.
 This demo uses the online mode. The model is deployed behind a fully managed and autoscaled 
 REST API.
 
-Once you have trained a model, go the the [Google Cloud console, ML Engine section,
+Once you have trained a model, go the the [Google Cloud console, AI Platform section,
 Models subsection](https://console.cloud.google.com/mlengine/models) and click on
 "New model" then "New version". Select the latest model checkpoint you have trained.
 It should be something like `gs://<YOUR-BUCKET>/jobs/airplaneXXX/export/planespotting/1529794205/`.
@@ -135,12 +135,12 @@ to ports 8000 to 8008.
 cd webui
 python3 -m http.server --bind localhost 8000 # ports 8000 to 8008  
 ```
-In the UI, authenticate with ML Engine, enter the name of your deployed
+In the UI, authenticate with AI Platform, enter the name of your deployed
 model in the "+add you own" box and hit ENTER. You can then select an airport and click "analyze".
 
 ![airplane detection demo](img/planespotting_UI_explanation_s.jpg)
 
-Models served from ML Engine are meant to be accessed from the server side of your
+Models served from AI Platform are meant to be accessed from the server side of your
 application so the authentication step is usually performed on the server. If
 you want to configure your model so that anyone can access it, you will have to
 [set up an Apigee Edge proxy in front of it](https://cloud.google.com/solutions/serving-machine-learning-models-using-apigee-edge-and-ml-engine)
@@ -181,7 +181,7 @@ find the code in [trainer](trainer). The dataset can be downloaded from [Kaggle/
 One interesting thing about this model is that the splitting of input images
 into 20x20 tiles (so that they can be run through the classifier) was done
 in the `serving_input_fn` function so that it happens on the fly when the
-model is deployed on ML Engine. It is a good example of how deployed models
-can run preprocessing on their input data directly on ML Engine while serving.
+model is deployed on AI Platform. It is a good example of how deployed models
+can run preprocessing on their input data directly on AI Platform while serving.
 Code here: [trainer/train.py](trainer/train.py) function `serving_input_fn`.
  
