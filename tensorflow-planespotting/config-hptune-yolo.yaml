@@ -15,9 +15,9 @@
 trainingInput:
   #scaleTier: BASIC-GPU
   scaleTier: CUSTOM
-  masterType: standard_v100
+  masterType: standard_p100
   parameterServerType: standard
-  workerType: standard_v100
+  workerType: standard_p100
   parameterServerCount: 1
   workerCount: 3
 
