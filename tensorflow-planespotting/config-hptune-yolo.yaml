@@ -13,7 +13,13 @@
 # limitations under the License.
 
 trainingInput:
-  scaleTier: BASIC-GPU
+  #scaleTier: BASIC-GPU
+  masterType: standard_v100
+  parameterServerType: standard
+  workerType: standard_v100
+  parameterServerCount: 1
+  workerCount: 3
+  
   hyperparameters:
     goal: MAXIMIZE
     hyperparameterMetricTag: IOU
