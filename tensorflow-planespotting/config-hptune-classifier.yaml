@@ -13,7 +13,8 @@
 # limitations under the License.
 
 trainingInput:
-  scaleTier: BASIC-GPU
+  scaleTier: CUSTOM
+  masterType: complex_model_m_v100
   hyperparameters:
     goal: MINIMIZE
     hyperparameterMetricTag: loss

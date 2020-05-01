@@ -17,6 +17,7 @@
 # 1 parameter server with a CPU only
 
 trainingInput:
+  scaleTier: CUSTOM
   masterType: standard_v100
   parameterServerType: standard
   workerType: standard_v100
