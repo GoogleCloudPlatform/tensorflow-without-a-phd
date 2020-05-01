@@ -13,13 +13,15 @@
 # limitations under the License.
 
 trainingInput:
-  scaleTier: complex_model_m_v100
+  scaleTier: CUSTOM
+  masterType: standard_v100
+  #masterType: complex_model_m_v100
 
   hyperparameters:
     goal: MAXIMIZE
     hyperparameterMetricTag: IOU
-    maxTrials: 72
-    maxParallelTrials: 9
+    maxTrials: 48
+    maxParallelTrials: 8
     params:
       - parameterName: hp-layers
         type: INTEGER
