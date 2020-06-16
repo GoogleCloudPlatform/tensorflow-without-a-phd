@@ -29,7 +29,7 @@ needed to provide detection capabilities. They can be found in file
 
 A script is provided for running the training on AI Platform. It implements
 auto-incrementing job names so that successive trainings are called job001, job002 and so on.
-Apart from that, it is contains little more that the `gcloud ml-engine jobs submit training`.
+Apart from that, it contains little more than the `gcloud ml-engine jobs submit training`.
 The script is [cloudrun_yolo.bash](cloudrun_yolo.bash). By default, it trains a 
 17 layer squeezenet/YOLO detection model. To start training, fill out the prerequisites and run the script.
 
@@ -95,7 +95,7 @@ own bucket for output data:
  in TFRecord format. The following command line parameter switches between the two
  modes. Adjust it in the [cloudrun_yolo.bash](cloudrun_yolo.bash) file:
  ```bash
- # To train train from large aerial photographs use:
+ # To train from large aerial photographs use:
  --data gs://planespotting-data-public/USGS_public_domain_photos
  # Alternatively, to train from 256x256 tiles in TFRecord format use: 
  --tiledata gs://planespotting-data-public/tiles_from_USGS_photos
