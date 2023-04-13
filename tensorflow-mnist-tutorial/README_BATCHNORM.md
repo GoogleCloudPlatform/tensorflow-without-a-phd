@@ -13,7 +13,7 @@ Tensorflow has both a low-level and a high-level implementation for batch normal
 #### Low-level Tensorflow
 The low-level tf.nn.batch_normalization function takes your inputs, subtracts the average and divides by the variance
 that you pass in. It is up to you to compute both the batch statistics (average
-and variance of neuron outputs across a batch) and their moving averages across multiple batches and use them apropriately at trainig and
+and variance of neuron outputs across a batch) and their moving averages across multiple batches and use them appropriately at training and
 test time. It is also up to you to compute your batch statistics
 correctly depending on whether you are in a dense or a convolutional
 layer. Sample code is available in [mnist_4.2_batchnorm_convolutional.py](mnist_4.2_batchnorm_convolutional.py)

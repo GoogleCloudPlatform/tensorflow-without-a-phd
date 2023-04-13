@@ -72,7 +72,7 @@ and engineering tips, tricks and best practices to build and train the neural ne
                      <a href="https://github.com/conversationai/conversationai-models/tree/master/attention-tutorial">code</a><br/><br/></div>
                      <p>Advanced RNN architectures for natural language processing. Word embeddings, text classification,
                      bidirectional models, sequence to sequence models for translation. Attention mechanisms. This session also explores
-                     Tensorflow's powerful seq2seq API. Applications: toxic comment detection and langauge translation.
+                     Tensorflow's powerful seq2seq API. Applications: toxic comment detection and language translation.
                      Co-author: Nithum Thain. Duration: 55 min</p></td>
     </tr>
     <tr>
