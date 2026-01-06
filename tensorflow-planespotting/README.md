@@ -76,11 +76,11 @@ This also allows better shuffling, which is important for the final accuracy.
 Both formats are available in a public Cloud Storage bucket. You can list them using `gsutil`:
  ```bash
  # large aerial photographs and ROI files:
- gsutil ls -l gs://planespotting-data-public/USGS_public_domain_photos
- gsutil ls -l gs://planespotting-data-public/USGS_public_domain_photos_eval
+ gcloud storage ls --long gs://planespotting-data-public/USGS_public_domain_photos
+ gcloud storage ls --long gs://planespotting-data-public/USGS_public_domain_photos_eval
  # 256x256 pixel tiles and adjusted ROI files:
- gsutil ls -l gs://planespotting-data-public/tiles_from_USGS_photos
- gsutil ls -l gs://planespotting-data-public/tiles_from_USGS_photos_eval 
+ gcloud storage ls --long gs://planespotting-data-public/tiles_from_USGS_photos
+ gcloud storage ls --long gs://planespotting-data-public/tiles_from_USGS_photos_eval 
  ```
 
 You can run the data generation alone using this script. Make sure you provide your
@@ -158,8 +158,8 @@ run it from a local web browser:
 cd webui-mark
 # copy the existing data, add yours if you have any
 mkdir USGS_public_domain_airports
-gsutil -m cp gs://planespotting-data-public/USGS_public_domain_photos/* USGS_public_domain_airports
-gsutil -m cp gs://planespotting-data-public/USGS_public_domain_photos_eval/* USGS_public_domain_airports
+gcloud storage cp gs://planespotting-data-public/USGS_public_domain_photos/* USGS_public_domain_airports
+gcloud storage cp gs://planespotting-data-public/USGS_public_domain_photos_eval/* USGS_public_domain_airports
 # run from local server (any port will do)
 python -m SimpleHTTPServer 8000  
 ```
